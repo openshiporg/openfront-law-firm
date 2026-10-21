@@ -1,0 +1,6 @@
+import { parseRegisterParams } from '@/features/platform/operations/lib/workspaceRegister'
+import { WorkspaceScreen } from '@/features/platform/workspaces/WorkspaceScreen'
+
+export async function IntegrationsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  return <WorkspaceScreen category="integrations" register={parseRegisterParams((await searchParams) ?? {})} />
+}

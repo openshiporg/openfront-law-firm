@@ -7,7 +7,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import { Slot } from "@radix-ui/react-slot";
@@ -201,28 +200,7 @@ function SidebarProvider({
     toggleSidebar: toggleSidebarRight,
   };
 
-  const contextValue = useMemo<SidebarContextProps>(
-    () => ({
-      left: leftState,
-      right: rightState,
-      isMobile,
-    }),
-    [
-      leftState.state,
-      leftState.open,
-      leftState.openMobile,
-      rightState.state,
-      rightState.open,
-      rightState.openMobile,
-      isMobile,
-      setOpenLeft,
-      setOpenRight,
-      setOpenMobileLeft,
-      setOpenMobileRight,
-      toggleSidebarLeft,
-      toggleSidebarRight,
-    ],
-  );
+  const contextValue: SidebarContextProps = { left: leftState, right: rightState, isMobile };
 
   return (
     <SidebarContext.Provider value={contextValue}>
@@ -441,9 +419,9 @@ function SidebarRail({ className, ...props }: ComponentProps<"button">) {
   );
 }
 
-function SidebarInset({ className, ...props }: ComponentProps<"main">) {
+function SidebarInset({ className, ...props }: ComponentProps<"div">) {
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",
@@ -737,9 +715,7 @@ function SidebarMenuSkeleton({
 }: ComponentProps<"div"> & {
   showIcon?: boolean;
 }) {
-  const width = useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`;
-  }, []);
+  const width = '70%';
 
   return (
     <div

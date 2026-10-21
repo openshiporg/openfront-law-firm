@@ -12,69 +12,3627 @@ generator client {
 }
 
 model User {
-  id                      String    @id @default(cuid())
-  name                    String    @default("")
-  email                   String    @unique @default("")
-  password                String
-  role                    Role?     @relation("User_role", fields: [roleId], references: [id])
-  roleId                  String?   @map("role")
-  tasks                   Todo[]    @relation("Todo_assignedTo")
-  passwordResetToken      String?
-  passwordResetIssuedAt   DateTime?
-  passwordResetRedeemedAt DateTime?
+  id                                    String                     @id @default(cuid())
+  name                                  String                     @default("")
+  email                                 String                     @unique @default("")
+  password                              String
+  bootstrapKey                          String?                    @unique
+  status                                UserStatusType             @default(invited)
+  onboardingStatus                      UserOnboardingStatusType   @default(not_started)
+  bootstrapRole                         Role?                      @relation("User_bootstrapRole", fields: [bootstrapRoleId], references: [id])
+  bootstrapRoleId                       String?                    @map("role")
+  activeFirm                            Firm?                      @relation("User_activeFirm", fields: [activeFirmId], references: [id])
+  activeFirmId                          String?                    @map("activeFirm")
+  firmMemberships                       FirmMembership[]           @relation("FirmMembership_user")
+  consultations                         Consultation[]             @relation("Consultation_account")
+  apiKeys                               ApiKey[]                   @relation("ApiKey_owner")
+  oauthClients                          OAuthClient[]              @relation("OAuthClient_owner")
+  oauthConsents                         OAuthConsent[]             @relation("OAuthConsent_user")
+  oauthTokens                           OAuthToken[]               @relation("OAuthToken_user")
+  authorizedMatters                     Matter[]                   @relation("Matter_authorizedUsers")
+  blockedMatters                        Matter[]                   @relation("Matter_blockedUsers")
+  createdAt                             DateTime                   @default(now())
+  updatedAt                             DateTime                   @default(now()) @updatedAt
+  passwordResetToken                    String?
+  passwordResetIssuedAt                 DateTime?
+  passwordResetRedeemedAt               DateTime?
+  from_ApiKey_createdBy                 ApiKey[]                   @relation("ApiKey_createdBy")
+  from_ApiKey_revokedBy                 ApiKey[]                   @relation("ApiKey_revokedBy")
+  from_OAuthClient_createdBy            OAuthClient[]              @relation("OAuthClient_createdBy")
+  from_OAuthClient_revokedBy            OAuthClient[]              @relation("OAuthClient_revokedBy")
+  from_Intake_openedBy                  Intake[]                   @relation("Intake_openedBy")
+  from_Intake_assignedTo                Intake[]                   @relation("Intake_assignedTo")
+  from_IntakeSubmission_reviewedBy      IntakeSubmission[]         @relation("IntakeSubmission_reviewedBy")
+  from_Consultation_host                Consultation[]             @relation("Consultation_host")
+  from_ConflictCheck_requestedBy        ConflictCheck[]            @relation("ConflictCheck_requestedBy")
+  from_ConflictCheck_reviewedBy         ConflictCheck[]            @relation("ConflictCheck_reviewedBy")
+  from_ConflictMatch_reviewedBy         ConflictMatch[]            @relation("ConflictMatch_reviewedBy")
+  from_ConflictDisposition_reviewer     ConflictDisposition[]      @relation("ConflictDisposition_reviewer")
+  from_Matter_responsibleAttorney       Matter[]                   @relation("Matter_responsibleAttorney")
+  from_Matter_originatingAttorney       Matter[]                   @relation("Matter_originatingAttorney")
+  from_MatterTeamMember_user            MatterTeamMember[]         @relation("MatterTeamMember_user")
+  from_EthicalWall_createdBy            EthicalWall[]              @relation("EthicalWall_createdBy")
+  from_EthicalWall_approvedBy           EthicalWall[]              @relation("EthicalWall_approvedBy")
+  from_EthicalWallMember_user           EthicalWallMember[]        @relation("EthicalWallMember_user")
+  from_EthicalWallMember_approvedBy     EthicalWallMember[]        @relation("EthicalWallMember_approvedBy")
+  from_MatterStatusEvent_actorUser      MatterStatusEvent[]        @relation("MatterStatusEvent_actorUser")
+  from_DocketEntry_verifiedBy           DocketEntry[]              @relation("DocketEntry_verifiedBy")
+  from_Deadline_verifiedBy              Deadline[]                 @relation("Deadline_verifiedBy")
+  from_Deadline_assignedTo              Deadline[]                 @relation("Deadline_assignedTo")
+  from_LegalTask_assignedTo             LegalTask[]                @relation("LegalTask_assignedTo")
+  from_LegalTask_assignedBy             LegalTask[]                @relation("LegalTask_assignedBy")
+  from_CommunicationParticipant_user    CommunicationParticipant[] @relation("CommunicationParticipant_user")
+  from_CommunicationMessage_senderUser  CommunicationMessage[]     @relation("CommunicationMessage_senderUser")
+  from_DocumentVersion_createdBy        DocumentVersion[]          @relation("DocumentVersion_createdBy")
+  from_RateRule_user                    RateRule[]                 @relation("RateRule_user")
+  from_TimeEntry_user                   TimeEntry[]                @relation("TimeEntry_user")
+  from_TimeEntry_approvedBy             TimeEntry[]                @relation("TimeEntry_approvedBy")
+  from_Expense_incurredBy               Expense[]                  @relation("Expense_incurredBy")
+  from_Expense_approvedBy               Expense[]                  @relation("Expense_approvedBy")
+  from_TrustTransaction_postedBy        TrustTransaction[]         @relation("TrustTransaction_postedBy")
+  from_TrustBalanceSnapshot_createdBy   TrustBalanceSnapshot[]     @relation("TrustBalanceSnapshot_createdBy")
+  from_TrustReconciliation_createdBy    TrustReconciliation[]      @relation("TrustReconciliation_createdBy")
+  from_TrustReconciliation_reviewedBy   TrustReconciliation[]      @relation("TrustReconciliation_reviewedBy")
+  from_Payment_receivedBy               Payment[]                  @relation("Payment_receivedBy")
+  from_PaymentAllocation_allocatedBy    PaymentAllocation[]        @relation("PaymentAllocation_allocatedBy")
+  from_Refund_requestedBy               Refund[]                   @relation("Refund_requestedBy")
+  from_Refund_approvedBy                Refund[]                   @relation("Refund_approvedBy")
+  from_PortalAccount_user               PortalAccount[]            @relation("PortalAccount_user")
+  from_PortalMatterAccess_grantedBy     PortalMatterAccess[]       @relation("PortalMatterAccess_grantedBy")
+  from_PortalMatterAccess_revokedBy     PortalMatterAccess[]       @relation("PortalMatterAccess_revokedBy")
+  from_PortalShare_grantedBy            PortalShare[]              @relation("PortalShare_grantedBy")
+  from_PortalShare_revokedBy            PortalShare[]              @relation("PortalShare_revokedBy")
+  from_PortalDiscoveryPolicy_recordedBy PortalDiscoveryPolicy[]    @relation("PortalDiscoveryPolicy_recordedBy")
+  from_PortalGrantIntent_actor          PortalGrantIntent[]        @relation("PortalGrantIntent_actor")
+  from_IntegrationConnection_owner      IntegrationConnection[]    @relation("IntegrationConnection_owner")
+  from_RetentionHold_createdBy          RetentionHold[]            @relation("RetentionHold_createdBy")
+  from_RetentionHold_releasedBy         RetentionHold[]            @relation("RetentionHold_releasedBy")
+  from_RetentionAction_performedBy      RetentionAction[]          @relation("RetentionAction_performedBy")
+  from_RetentionAction_approvedBy       RetentionAction[]          @relation("RetentionAction_approvedBy")
+  from_AuditEvent_actorUser             AuditEvent[]               @relation("AuditEvent_actorUser")
+  from_AgentPrincipal_owner             AgentPrincipal[]           @relation("AgentPrincipal_owner")
+  from_AgentCredential_createdBy        AgentCredential[]          @relation("AgentCredential_createdBy")
+  from_AgentCredential_revokedBy        AgentCredential[]          @relation("AgentCredential_revokedBy")
+  from_AgentGrant_requestedBy           AgentGrant[]               @relation("AgentGrant_requestedBy")
+  from_AgentGrant_approvedBy            AgentGrant[]               @relation("AgentGrant_approvedBy")
+  from_AgentAction_requestedByUser      AgentAction[]              @relation("AgentAction_requestedByUser")
+  from_AgentAction_approvedBy           AgentAction[]              @relation("AgentAction_approvedBy")
+  from_AgentActionEvent_actorUser       AgentActionEvent[]         @relation("AgentActionEvent_actorUser")
 
-  @@index([roleId])
+  @@index([bootstrapRoleId])
+  @@index([activeFirmId])
 }
 
 model Role {
-  id                 String  @id @default(cuid())
-  name               String  @default("")
-  canCreateTodos     Boolean @default(false)
-  canManageAllTodos  Boolean @default(false)
-  canSeeOtherPeople  Boolean @default(false)
-  canEditOtherPeople Boolean @default(false)
-  canManagePeople    Boolean @default(false)
-  canManageRoles     Boolean @default(false)
-  canAccessDashboard Boolean @default(false)
-  assignedTo         User[]  @relation("User_role")
+  id                          String           @id @default(cuid())
+  name                        String           @default("")
+  status                      RoleStatusType   @default(active)
+  firm                        Firm?            @relation("Role_firm", fields: [firmId], references: [id])
+  firmId                      String?          @map("firm")
+  canAccessDashboard          Boolean          @default(false)
+  canManageOnboarding         Boolean          @default(false)
+  canReadPeople               Boolean          @default(false)
+  canManagePeople             Boolean          @default(false)
+  canManageRoles              Boolean          @default(false)
+  canManageFirm               Boolean          @default(false)
+  canReadIntake               Boolean          @default(false)
+  canManageIntake             Boolean          @default(false)
+  canRunConflictChecks        Boolean          @default(false)
+  canResolveConflicts         Boolean          @default(false)
+  canReadMatters              Boolean          @default(false)
+  canManageMatters            Boolean          @default(false)
+  canManageEthicalWalls       Boolean          @default(false)
+  canReadCalendar             Boolean          @default(false)
+  canManageCalendar           Boolean          @default(false)
+  canReadTasks                Boolean          @default(false)
+  canManageTasks              Boolean          @default(false)
+  canReadCommunications       Boolean          @default(false)
+  canManageCommunications     Boolean          @default(false)
+  canReadDocuments            Boolean          @default(false)
+  canManageDocuments          Boolean          @default(false)
+  canReadBilling              Boolean          @default(false)
+  canManageBilling            Boolean          @default(false)
+  canReadTrust                Boolean          @default(false)
+  canManageTrust              Boolean          @default(false)
+  canReadPayments             Boolean          @default(false)
+  canManagePayments           Boolean          @default(false)
+  canReadPortal               Boolean          @default(false)
+  canManagePortal             Boolean          @default(false)
+  canReadIntegrations         Boolean          @default(false)
+  canManageIntegrations       Boolean          @default(false)
+  canReadMachineCredentials   Boolean          @default(false)
+  canManageMachineCredentials Boolean          @default(false)
+  canReadRetention            Boolean          @default(false)
+  canManageRetention          Boolean          @default(false)
+  canViewAudit                Boolean          @default(false)
+  canReadAgents               Boolean          @default(false)
+  canManageAgents             Boolean          @default(false)
+  canApproveAgentActions      Boolean          @default(false)
+  assignedTo                  User[]           @relation("User_bootstrapRole")
+  memberships                 FirmMembership[] @relation("FirmMembership_role")
+  createdAt                   DateTime         @default(now())
+  updatedAt                   DateTime         @default(now()) @updatedAt
+
+  @@index([firmId])
 }
 
-model Todo {
-  id                   String      @id @default(cuid())
-  label                String      @default("")
-  description          Json        @default("[{\"type\":\"paragraph\",\"children\":[{\"text\":\"\"}]}]")
-  isComplete           Boolean     @default(false)
-  status               String?     @default("todo")
-  priority             Int?        @default(1)
-  tags                 Json        @default("[]")
-  dueDate              DateTime?
-  weight               Float?      @default(1)
-  budget               Decimal?    @default("0.00") @postgresql.Decimal(10, 2)
-  isPrivate            Boolean     @default(false)
-  largeNumber          BigInt?
-  metadata             Json?
-  secretNote           String?
-  coverImage_id        String?
-  coverImage_filesize  Int?
-  coverImage_width     Int?
-  coverImage_height    Int?
-  coverImage_extension String?
-  todoImages           TodoImage[] @relation("Todo_todoImages")
-  assignedTo           User?       @relation("Todo_assignedTo", fields: [assignedToId], references: [id])
-  assignedToId         String?     @map("assignedTo")
+model Firm {
+  id                                 String                     @id @default(cuid())
+  isDemo                             Boolean                    @default(false)
+  name                               String                     @default("")
+  displayName                        String                     @default("")
+  shortName                          String                     @default("")
+  brandTagline                       String                     @default("")
+  brandColor                         String                     @default("")
+  supportEmail                       String                     @default("")
+  logoIcon                           String                     @default("<svg fill=\"none\" height=\"100%\" viewBox=\"0 0 40 48\" width=\"100%\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-rule=\"evenodd\" fill-rule=\"evenodd\"><path d=\"m34.5868 8.40061-9.6868-2.59556c-.6687-.17919-1.2108.23679-1.2108.92911v10.02854c0 .6923.5421 1.3988 1.2108 1.578l9.6868 2.5955c.6687.1792 1.2109-.2368 1.2109-.9291v-10.02848c0-.69232-.5422-1.39882-1.2109-1.57801zm-9.6868-6.35625c-2.6749-.71674-4.8434.94718-4.8434 3.71647v10.02847c0 2.7693 2.1685 5.5953 4.8434 6.312l9.6868 2.5956c2.6749.7168 4.8434-.9472 4.8434-3.7165v-10.0284c0-2.76934-2.1685-5.59533-4.8434-6.31207z\" fill=\"#8098f9\"/><path d=\"m26.9812 16.5707-12.1085-3.2444c-.6687-.1792-1.2109.2368-1.2109.9291v12.5356c0 .6923.5422 1.3988 1.2109 1.578l12.1085 3.2445c.6687.1792 1.2108-.2368 1.2108-.9291v-12.5356c0-.6924-.5421-1.3989-1.2108-1.5781zm-12.1085-7.0051c-2.6749-.71674-4.8434.9472-4.8434 3.7165v12.5356c0 2.7693 2.1685 5.5953 4.8434 6.312l12.1085 3.2445c2.6749.7167 4.8433-.9472 4.8433-3.7165v-12.5356c0-2.7693-2.1684-5.5953-4.8433-6.312z\" fill=\"#6172f3\"/><path d=\"m19.3736 24.7409-14.53021-3.8934c-.66873-.1792-1.21085.2368-1.21085.9291v15.0428c0 .6923.54212 1.3988 1.21085 1.578l14.53021 3.8933c.6687.1792 1.2108-.2368 1.2108-.9291v-15.0427c0-.6923-.5421-1.3988-1.2108-1.578zm-14.53021-7.6541c-2.67493-.7167-4.84339.9472-4.84339 3.7165v15.0427c0 2.7693 2.16846 5.5953 4.84339 6.3121l14.53021 3.8933c2.6749.7168 4.8433-.9472 4.8433-3.7164v-15.0428c0-2.7693-2.1684-5.5953-4.8433-6.312z\" fill=\"#444ce7\"/></g></svg>")
+  logoColor                          String                     @default("0")
+  slug                               String                     @unique @default("")
+  status                             FirmStatusType             @default(onboarding)
+  defaultTimezone                    String                     @default("UTC")
+  defaultCurrency                    String                     @default("USD")
+  offices                            Office[]                   @relation("Office_firm")
+  memberships                        FirmMembership[]           @relation("FirmMembership_firm")
+  activeUsers                        User[]                     @relation("User_activeFirm")
+  roles                              Role[]                     @relation("Role_firm")
+  createdAt                          DateTime                   @default(now())
+  updatedAt                          DateTime                   @default(now()) @updatedAt
+  from_ApiKey_firm                   ApiKey[]                   @relation("ApiKey_firm")
+  from_OAuthClient_firm              OAuthClient[]              @relation("OAuthClient_firm")
+  from_OAuthConsent_firm             OAuthConsent[]             @relation("OAuthConsent_firm")
+  from_OAuthToken_firm               OAuthToken[]               @relation("OAuthToken_firm")
+  from_Contact_firm                  Contact[]                  @relation("Contact_firm")
+  from_Address_firm                  Address[]                  @relation("Address_firm")
+  from_ContactMethod_firm            ContactMethod[]            @relation("ContactMethod_firm")
+  from_Intake_firm                   Intake[]                   @relation("Intake_firm")
+  from_IntakeParticipant_firm        IntakeParticipant[]        @relation("IntakeParticipant_firm")
+  from_IntakeSubmission_firm         IntakeSubmission[]         @relation("IntakeSubmission_firm")
+  from_Consultation_firm             Consultation[]             @relation("Consultation_firm")
+  from_ConflictCheck_firm            ConflictCheck[]            @relation("ConflictCheck_firm")
+  from_ConflictSearchTerm_firm       ConflictSearchTerm[]       @relation("ConflictSearchTerm_firm")
+  from_ConflictMatch_firm            ConflictMatch[]            @relation("ConflictMatch_firm")
+  from_ConflictDisposition_firm      ConflictDisposition[]      @relation("ConflictDisposition_firm")
+  from_PracticeArea_firm             PracticeArea[]             @relation("PracticeArea_firm")
+  from_Matter_firm                   Matter[]                   @relation("Matter_firm")
+  from_MatterParty_firm              MatterParty[]              @relation("MatterParty_firm")
+  from_MatterTeamMember_firm         MatterTeamMember[]         @relation("MatterTeamMember_firm")
+  from_EthicalWall_firm              EthicalWall[]              @relation("EthicalWall_firm")
+  from_EthicalWallMember_firm        EthicalWallMember[]        @relation("EthicalWallMember_firm")
+  from_MatterStatusEvent_firm        MatterStatusEvent[]        @relation("MatterStatusEvent_firm")
+  from_Court_firm                    Court[]                    @relation("Court_firm")
+  from_Docket_firm                   Docket[]                   @relation("Docket_firm")
+  from_DocketEntry_firm              DocketEntry[]              @relation("DocketEntry_firm")
+  from_Deadline_firm                 Deadline[]                 @relation("Deadline_firm")
+  from_LegalTask_firm                LegalTask[]                @relation("LegalTask_firm")
+  from_CommunicationThread_firm      CommunicationThread[]      @relation("CommunicationThread_firm")
+  from_CommunicationParticipant_firm CommunicationParticipant[] @relation("CommunicationParticipant_firm")
+  from_CommunicationMessage_firm     CommunicationMessage[]     @relation("CommunicationMessage_firm")
+  from_CommunicationDelivery_firm    CommunicationDelivery[]    @relation("CommunicationDelivery_firm")
+  from_Document_firm                 Document[]                 @relation("Document_firm")
+  from_DocumentVersion_firm          DocumentVersion[]          @relation("DocumentVersion_firm")
+  from_SignatureRequest_firm         SignatureRequest[]         @relation("SignatureRequest_firm")
+  from_DocumentSigner_firm           DocumentSigner[]           @relation("DocumentSigner_firm")
+  from_SignatureEvent_firm           SignatureEvent[]           @relation("SignatureEvent_firm")
+  from_RateCard_firm                 RateCard[]                 @relation("RateCard_firm")
+  from_RateRule_firm                 RateRule[]                 @relation("RateRule_firm")
+  from_TimeEntry_firm                TimeEntry[]                @relation("TimeEntry_firm")
+  from_Expense_firm                  Expense[]                  @relation("Expense_firm")
+  from_RetainerAgreement_firm        RetainerAgreement[]        @relation("RetainerAgreement_firm")
+  from_Invoice_firm                  Invoice[]                  @relation("Invoice_firm")
+  from_InvoiceLine_firm              InvoiceLine[]              @relation("InvoiceLine_firm")
+  from_TrustAccount_firm             TrustAccount[]             @relation("TrustAccount_firm")
+  from_TrustLedgerAccount_firm       TrustLedgerAccount[]       @relation("TrustLedgerAccount_firm")
+  from_TrustTransaction_firm         TrustTransaction[]         @relation("TrustTransaction_firm")
+  from_TrustLedgerEntry_firm         TrustLedgerEntry[]         @relation("TrustLedgerEntry_firm")
+  from_TrustBalanceSnapshot_firm     TrustBalanceSnapshot[]     @relation("TrustBalanceSnapshot_firm")
+  from_TrustReconciliation_firm      TrustReconciliation[]      @relation("TrustReconciliation_firm")
+  from_Payment_firm                  Payment[]                  @relation("Payment_firm")
+  from_PaymentAllocation_firm        PaymentAllocation[]        @relation("PaymentAllocation_firm")
+  from_Refund_firm                   Refund[]                   @relation("Refund_firm")
+  from_PortalAccount_firm            PortalAccount[]            @relation("PortalAccount_firm")
+  from_PortalMatterAccess_firm       PortalMatterAccess[]       @relation("PortalMatterAccess_firm")
+  from_PortalShare_firm              PortalShare[]              @relation("PortalShare_firm")
+  from_PortalSession_firm            PortalSession[]            @relation("PortalSession_firm")
+  from_PortalDiscoveryPolicy_firm    PortalDiscoveryPolicy[]    @relation("PortalDiscoveryPolicy_firm")
+  from_PortalGrantIntent_firm        PortalGrantIntent[]        @relation("PortalGrantIntent_firm")
+  from_IntegrationConnection_firm    IntegrationConnection[]    @relation("IntegrationConnection_firm")
+  from_ExternalRecordLink_firm       ExternalRecordLink[]       @relation("ExternalRecordLink_firm")
+  from_WebhookSubscription_firm      WebhookSubscription[]      @relation("WebhookSubscription_firm")
+  from_WebhookDelivery_firm          WebhookDelivery[]          @relation("WebhookDelivery_firm")
+  from_WebhookDeliveryAttempt_firm   WebhookDeliveryAttempt[]   @relation("WebhookDeliveryAttempt_firm")
+  from_RetentionPolicy_firm          RetentionPolicy[]          @relation("RetentionPolicy_firm")
+  from_RetentionHold_firm            RetentionHold[]            @relation("RetentionHold_firm")
+  from_RetentionAction_firm          RetentionAction[]          @relation("RetentionAction_firm")
+  from_AuditEvent_firm               AuditEvent[]               @relation("AuditEvent_firm")
+  from_AgentPrincipal_firm           AgentPrincipal[]           @relation("AgentPrincipal_firm")
+  from_AgentCredential_firm          AgentCredential[]          @relation("AgentCredential_firm")
+  from_AgentGrant_firm               AgentGrant[]               @relation("AgentGrant_firm")
+  from_AgentAction_firm              AgentAction[]              @relation("AgentAction_firm")
+  from_AgentActionEvent_firm         AgentActionEvent[]         @relation("AgentActionEvent_firm")
+  from_PublicSitePolicy_firm         PublicSitePolicy[]         @relation("PublicSitePolicy_firm")
+}
 
+model Office {
+  id                                String                  @id @default(cuid())
+  firm                              Firm                    @relation("Office_firm", fields: [firmId], references: [id])
+  firmId                            String                  @map("firm")
+  name                              String                  @default("")
+  code                              String                  @default("")
+  status                            OfficeStatusType        @default(active)
+  timezone                          String                  @default("UTC")
+  email                             String                  @default("")
+  phone                             String                  @default("")
+  primaryMemberships                FirmMembership[]        @relation("FirmMembership_primaryOffice")
+  allowedMemberships                FirmMembership[]        @relation("FirmMembership_allowedOffices")
+  createdAt                         DateTime                @default(now())
+  updatedAt                         DateTime                @default(now()) @updatedAt
+  from_Intake_office                Intake[]                @relation("Intake_office")
+  from_Consultation_office          Consultation[]          @relation("Consultation_office")
+  from_Matter_office                Matter[]                @relation("Matter_office")
+  from_MatterTeamMember_office      MatterTeamMember[]      @relation("MatterTeamMember_office")
+  from_TrustAccount_office          TrustAccount[]          @relation("TrustAccount_office")
+  from_IntegrationConnection_office IntegrationConnection[] @relation("IntegrationConnection_office")
+  from_WebhookSubscription_office   WebhookSubscription[]   @relation("WebhookSubscription_office")
+
+  @@unique([firmId, code])
+  @@index([firmId])
+  @@index([code])
+}
+
+model FirmMembership {
+  id              String                   @id @default(cuid())
+  firm            Firm                     @relation("FirmMembership_firm", fields: [firmId], references: [id])
+  firmId          String                   @map("firm")
+  user            User                     @relation("FirmMembership_user", fields: [userId], references: [id])
+  userId          String                   @map("user")
+  role            Role                     @relation("FirmMembership_role", fields: [roleId], references: [id])
+  roleId          String                   @map("role")
+  primaryOffice   Office?                  @relation("FirmMembership_primaryOffice", fields: [primaryOfficeId], references: [id])
+  primaryOfficeId String?                  @map("primaryOffice")
+  allowedOffices  Office[]                 @relation("FirmMembership_allowedOffices")
+  status          FirmMembershipStatusType @default(invited)
+  title           String                   @default("")
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @default(now()) @updatedAt
+
+  @@unique([firmId, userId])
+  @@index([firmId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([primaryOfficeId])
+}
+
+model ApiKey {
+  id               String           @id @default(cuid())
+  firm             Firm             @relation("ApiKey_firm", fields: [firmId], references: [id])
+  firmId           String           @map("firm")
+  owner            User             @relation("ApiKey_owner", fields: [ownerId], references: [id])
+  ownerId          String           @map("owner")
+  name             String           @default("")
+  prefix           String           @unique @default("")
+  secretDigest     String           @default("")
+  status           ApiKeyStatusType @default(active)
+  scopes           Json?            @default("[]")
+  expiresAt        DateTime?
+  lastUsedAt       DateTime?
+  createdBy        User             @relation("ApiKey_createdBy", fields: [createdById], references: [id])
+  createdById      String           @map("createdBy")
+  revokedBy        User?            @relation("ApiKey_revokedBy", fields: [revokedById], references: [id])
+  revokedById      String?          @map("revokedBy")
+  revokedAt        DateTime?
+  revocationReason String           @default("")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @default(now()) @updatedAt
+
+  @@unique([firmId, name])
+  @@index([firmId])
+  @@index([ownerId])
+  @@index([createdById])
+  @@index([revokedById])
+}
+
+model OAuthClient {
+  id                 String                @id @default(cuid())
+  firm               Firm                  @relation("OAuthClient_firm", fields: [firmId], references: [id])
+  firmId             String                @map("firm")
+  owner              User                  @relation("OAuthClient_owner", fields: [ownerId], references: [id])
+  ownerId            String                @map("owner")
+  name               String                @default("")
+  clientId           String                @unique @default("")
+  clientSecretDigest String                @default("")
+  status             OAuthClientStatusType @default(active)
+  isConfidential     Boolean               @default(true)
+  redirectUris       Json?                 @default("[]")
+  allowedScopes      Json?                 @default("[]")
+  description        String                @default("")
+  createdBy          User                  @relation("OAuthClient_createdBy", fields: [createdById], references: [id])
+  createdById        String                @map("createdBy")
+  revokedBy          User?                 @relation("OAuthClient_revokedBy", fields: [revokedById], references: [id])
+  revokedById        String?               @map("revokedBy")
+  revokedAt          DateTime?
+  tokens             OAuthToken[]          @relation("OAuthToken_client")
+  consents           OAuthConsent[]        @relation("OAuthConsent_client")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @default(now()) @updatedAt
+
+  @@unique([firmId, name])
+  @@index([firmId])
+  @@index([ownerId])
+  @@index([createdById])
+  @@index([revokedById])
+}
+
+model OAuthConsent {
+  id                      String                 @id @default(cuid())
+  firm                    Firm                   @relation("OAuthConsent_firm", fields: [firmId], references: [id])
+  firmId                  String                 @map("firm")
+  client                  OAuthClient            @relation("OAuthConsent_client", fields: [clientId], references: [id])
+  clientId                String                 @map("client")
+  user                    User                   @relation("OAuthConsent_user", fields: [userId], references: [id])
+  userId                  String                 @map("user")
+  status                  OAuthConsentStatusType @default(active)
+  scopes                  Json?                  @default("[]")
+  consentDigest           String                 @default("")
+  grantedAt               DateTime               @default(now())
+  revokedAt               DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @default(now()) @updatedAt
+  from_OAuthToken_consent OAuthToken[]           @relation("OAuthToken_consent")
+
+  @@unique([clientId, userId, firmId])
+  @@index([firmId])
+  @@index([clientId])
+  @@index([userId])
+}
+
+model OAuthToken {
+  id                  String                             @id @default(cuid())
+  firm                Firm                               @relation("OAuthToken_firm", fields: [firmId], references: [id])
+  firmId              String                             @map("firm")
+  client              OAuthClient                        @relation("OAuthToken_client", fields: [clientId], references: [id])
+  clientId            String                             @map("client")
+  user                User                               @relation("OAuthToken_user", fields: [userId], references: [id])
+  userId              String                             @map("user")
+  consent             OAuthConsent?                      @relation("OAuthToken_consent", fields: [consentId], references: [id])
+  consentId           String?                            @map("consent")
+  tokenType           OAuthTokenTokenTypeType
+  tokenDigest         String                             @unique @default("")
+  tokenPrefix         String                             @default("")
+  familyId            String                             @default("")
+  status              OAuthTokenStatusType               @default(active)
+  scopes              Json?                              @default("[]")
+  redirectUri         String                             @default("")
+  state               String                             @default("")
+  codeChallenge       String                             @default("")
+  codeChallengeMethod OAuthTokenCodeChallengeMethodType?
+  parentToken         OAuthToken?                        @relation("OAuthToken_parentToken", fields: [parentTokenId], references: [id])
+  parentTokenId       String?                            @map("parentToken")
+  replacementTokens   OAuthToken[]                       @relation("OAuthToken_parentToken")
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  revokedAt           DateTime?
+  lastUsedAt          DateTime?
+  createdAt           DateTime                           @default(now())
+  updatedAt           DateTime                           @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([clientId])
+  @@index([userId])
+  @@index([consentId])
+  @@index([tokenPrefix])
+  @@index([familyId])
+  @@index([parentTokenId])
+}
+
+model Contact {
+  id                                          String                     @id @default(cuid())
+  firm                                        Firm                       @relation("Contact_firm", fields: [firmId], references: [id])
+  firmId                                      String                     @map("firm")
+  contactType                                 ContactContactTypeType     @default(person)
+  status                                      ContactStatusType          @default(prospective_client)
+  firstName                                   String                     @default("")
+  middleName                                  String                     @default("")
+  lastName                                    String                     @default("")
+  organizationName                            String                     @default("")
+  preferredName                               String                     @default("")
+  primaryEmail                                String                     @default("")
+  primaryPhone                                String                     @default("")
+  dateOfBirth                                 DateTime?
+  governmentIdLastFour                        String                     @default("")
+  conflictSearchAliases                       Json?                      @default("[]")
+  privilegedNotes                             String                     @default("")
+  addresses                                   Address[]                  @relation("Address_contact")
+  contactMethods                              ContactMethod[]            @relation("ContactMethod_contact")
+  createdAt                                   DateTime                   @default(now())
+  updatedAt                                   DateTime                   @default(now()) @updatedAt
+  from_Intake_primaryContact                  Intake[]                   @relation("Intake_primaryContact")
+  from_IntakeParticipant_contact              IntakeParticipant[]        @relation("IntakeParticipant_contact")
+  from_IntakeSubmission_submittedByContact    IntakeSubmission[]         @relation("IntakeSubmission_submittedByContact")
+  from_Consultation_participants              Consultation[]             @relation("Consultation_participants")
+  from_ConflictSearchTerm_sourceContact       ConflictSearchTerm[]       @relation("ConflictSearchTerm_sourceContact")
+  from_ConflictMatch_matchedContact           ConflictMatch[]            @relation("ConflictMatch_matchedContact")
+  from_Matter_client                          Matter[]                   @relation("Matter_client")
+  from_MatterParty_contact                    MatterParty[]              @relation("MatterParty_contact")
+  from_MatterParty_representedBy              MatterParty[]              @relation("MatterParty_representedBy")
+  from_MatterParty_counselContact             MatterParty[]              @relation("MatterParty_counselContact")
+  from_Docket_judgeContact                    Docket[]                   @relation("Docket_judgeContact")
+  from_Docket_clerkContact                    Docket[]                   @relation("Docket_clerkContact")
+  from_CommunicationParticipant_contact       CommunicationParticipant[] @relation("CommunicationParticipant_contact")
+  from_CommunicationMessage_senderContact     CommunicationMessage[]     @relation("CommunicationMessage_senderContact")
+  from_CommunicationDelivery_recipientContact CommunicationDelivery[]    @relation("CommunicationDelivery_recipientContact")
+  from_Document_contact                       Document[]                 @relation("Document_contact")
+  from_DocumentSigner_contact                 DocumentSigner[]           @relation("DocumentSigner_contact")
+  from_Expense_vendor                         Expense[]                  @relation("Expense_vendor")
+  from_RetainerAgreement_client               RetainerAgreement[]        @relation("RetainerAgreement_client")
+  from_Invoice_client                         Invoice[]                  @relation("Invoice_client")
+  from_TrustLedgerAccount_client              TrustLedgerAccount[]       @relation("TrustLedgerAccount_client")
+  from_Payment_payer                          Payment[]                  @relation("Payment_payer")
+  from_PortalAccount_contact                  PortalAccount[]            @relation("PortalAccount_contact")
+  from_PortalMatterAccess_contact             PortalMatterAccess[]       @relation("PortalMatterAccess_contact")
+  from_PortalShare_contact                    PortalShare[]              @relation("PortalShare_contact")
+  from_PortalGrantIntent_contact              PortalGrantIntent[]        @relation("PortalGrantIntent_contact")
+  from_ExternalRecordLink_contact             ExternalRecordLink[]       @relation("ExternalRecordLink_contact")
+  from_RetentionHold_contact                  RetentionHold[]            @relation("RetentionHold_contact")
+  from_RetentionAction_contact                RetentionAction[]          @relation("RetentionAction_contact")
+  from_AuditEvent_contact                     AuditEvent[]               @relation("AuditEvent_contact")
+  from_AgentAction_contact                    AgentAction[]              @relation("AgentAction_contact")
+
+  @@index([firmId])
+}
+
+model Address {
+  id                 String                  @id @default(cuid())
+  firm               Firm                    @relation("Address_firm", fields: [firmId], references: [id])
+  firmId             String                  @map("firm")
+  contact            Contact?                @relation("Address_contact", fields: [contactId], references: [id])
+  contactId          String?                 @map("contact")
+  label              String                  @default("Primary")
+  addressType        AddressAddressTypeType? @default(mailing)
+  line1              String                  @default("")
+  line2              String                  @default("")
+  city               String                  @default("")
+  region             String                  @default("")
+  postalCode         String                  @default("")
+  countryCode        String                  @default("US")
+  isPrimary          Boolean                 @default(false)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @default(now()) @updatedAt
+  from_Court_address Court[]                 @relation("Court_address")
+
+  @@index([firmId])
+  @@index([contactId])
+}
+
+model ContactMethod {
+  id         String                      @id @default(cuid())
+  firm       Firm                        @relation("ContactMethod_firm", fields: [firmId], references: [id])
+  firmId     String                      @map("firm")
+  contact    Contact?                    @relation("ContactMethod_contact", fields: [contactId], references: [id])
+  contactId  String?                     @map("contact")
+  methodType ContactMethodMethodTypeType
+  label      String                      @default("")
+  value      String                      @default("")
+  isPrimary  Boolean                     @default(false)
+  canContact Boolean                     @default(true)
+  verifiedAt DateTime?
+  createdAt  DateTime                    @default(now())
+  updatedAt  DateTime                    @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([contactId])
+}
+
+model Intake {
+  id                              String                @id @default(cuid())
+  firm                            Firm                  @relation("Intake_firm", fields: [firmId], references: [id])
+  firmId                          String                @map("firm")
+  intakeNumber                    String                @default("")
+  title                           String                @default("")
+  status                          IntakeStatusType      @default(new)
+  source                          IntakeSourceType?     @default(other)
+  primaryContact                  Contact               @relation("Intake_primaryContact", fields: [primaryContactId], references: [id])
+  primaryContactId                String                @map("primaryContact")
+  office                          Office?               @relation("Intake_office", fields: [officeId], references: [id])
+  officeId                        String?               @map("office")
+  openedBy                        User?                 @relation("Intake_openedBy", fields: [openedById], references: [id])
+  openedById                      String?               @map("openedBy")
+  assignedTo                      User?                 @relation("Intake_assignedTo", fields: [assignedToId], references: [id])
+  assignedToId                    String?               @map("assignedTo")
+  receivedAt                      DateTime              @default(now())
+  summary                         String                @default("")
+  desiredOutcome                  String                @default("")
+  adversePartySummary             String                @default("")
+  declineReason                   String                @default("")
+  decidedAt                       DateTime?
+  participants                    IntakeParticipant[]   @relation("IntakeParticipant_intake")
+  submissions                     IntakeSubmission[]    @relation("IntakeSubmission_intake")
+  consultations                   Consultation[]        @relation("Consultation_intake")
+  conflictChecks                  ConflictCheck[]       @relation("ConflictCheck_intake")
+  convertedMatter                 Matter?               @relation("Intake_convertedMatter", fields: [convertedMatterId], references: [id])
+  convertedMatterId               String?               @unique @map("convertedMatter")
+  createdAt                       DateTime              @default(now())
+  updatedAt                       DateTime              @default(now()) @updatedAt
+  from_CommunicationThread_intake CommunicationThread[] @relation("CommunicationThread_intake")
+  from_Document_intake            Document[]            @relation("Document_intake")
+  from_ExternalRecordLink_intake  ExternalRecordLink[]  @relation("ExternalRecordLink_intake")
+  from_AuditEvent_intake          AuditEvent[]          @relation("AuditEvent_intake")
+  from_AgentAction_intake         AgentAction[]         @relation("AgentAction_intake")
+
+  @@unique([firmId, intakeNumber])
+  @@index([firmId])
+  @@index([intakeNumber])
+  @@index([primaryContactId])
+  @@index([officeId])
+  @@index([openedById])
   @@index([assignedToId])
 }
 
-model TodoImage {
-  id              String  @id @default(cuid())
-  image_id        String?
-  image_filesize  Int?
-  image_width     Int?
-  image_height    Int?
-  image_extension String?
-  imagePath       String  @default("")
-  altText         String  @default("")
-  todos           Todo[]  @relation("Todo_todoImages")
-  metadata        Json?
+model IntakeParticipant {
+  id              String                               @id @default(cuid())
+  firm            Firm                                 @relation("IntakeParticipant_firm", fields: [firmId], references: [id])
+  firmId          String                               @map("firm")
+  intake          Intake                               @relation("IntakeParticipant_intake", fields: [intakeId], references: [id])
+  intakeId        String                               @map("intake")
+  contact         Contact                              @relation("IntakeParticipant_contact", fields: [contactId], references: [id])
+  contactId       String                               @map("contact")
+  participantRole IntakeParticipantParticipantRoleType
+  status          IntakeParticipantStatusType?         @default(active)
+  notes           String                               @default("")
+  createdAt       DateTime                             @default(now())
+  updatedAt       DateTime                             @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([intakeId])
+  @@index([contactId])
+}
+
+model IntakeSubmission {
+  id                               String                     @id @default(cuid())
+  firm                             Firm                       @relation("IntakeSubmission_firm", fields: [firmId], references: [id])
+  firmId                           String                     @map("firm")
+  intake                           Intake                     @relation("IntakeSubmission_intake", fields: [intakeId], references: [id])
+  intakeId                         String                     @map("intake")
+  submittedByContact               Contact?                   @relation("IntakeSubmission_submittedByContact", fields: [submittedByContactId], references: [id])
+  submittedByContactId             String?                    @map("submittedByContact")
+  reviewedBy                       User?                      @relation("IntakeSubmission_reviewedBy", fields: [reviewedById], references: [id])
+  reviewedById                     String?                    @map("reviewedBy")
+  status                           IntakeSubmissionStatusType @default(submitted)
+  schemaVersion                    String                     @default("")
+  formSchema                       Json?
+  responses                        Json?
+  submittedAt                      DateTime                   @default(now())
+  reviewedAt                       DateTime?
+  reviewNotes                      String                     @default("")
+  supersedes                       IntakeSubmission?          @relation("IntakeSubmission_supersedes", fields: [supersedesId], references: [id])
+  supersedesId                     String?                    @map("supersedes")
+  createdAt                        DateTime                   @default(now())
+  updatedAt                        DateTime                   @default(now()) @updatedAt
+  from_IntakeSubmission_supersedes IntakeSubmission[]         @relation("IntakeSubmission_supersedes")
+
+  @@index([firmId])
+  @@index([intakeId])
+  @@index([submittedByContactId])
+  @@index([reviewedById])
+  @@index([supersedesId])
+}
+
+model Consultation {
+  id                 String                   @id @default(cuid())
+  firm               Firm                     @relation("Consultation_firm", fields: [firmId], references: [id])
+  firmId             String                   @map("firm")
+  intake             Intake                   @relation("Consultation_intake", fields: [intakeId], references: [id])
+  intakeId           String                   @map("intake")
+  account            User?                    @relation("Consultation_account", fields: [accountId], references: [id])
+  accountId          String?                  @map("account")
+  requestKey         String?
+  requestDigest      String                   @default("")
+  serviceTitle       String                   @default("")
+  serviceSnapshot    Json?
+  feeMinor           Int                      @default(0)
+  currencyCode       String                   @default("USD")
+  status             ConsultationStatusType   @default(requested)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  timezone           String                   @default("UTC")
+  office             Office?                  @relation("Consultation_office", fields: [officeId], references: [id])
+  officeId           String?                  @map("office")
+  host               User?                    @relation("Consultation_host", fields: [hostId], references: [id])
+  hostId             String?                  @map("host")
+  participants       Contact[]                @relation("Consultation_participants")
+  location           String                   @default("")
+  outcome            ConsultationOutcomeType? @default(pending)
+  notes              String                   @default("")
+  cancellationReason String                   @default("")
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @default(now()) @updatedAt
+
+  @@unique([firmId, requestKey])
+  @@index([firmId])
+  @@index([intakeId])
+  @@index([accountId])
+  @@index([officeId])
+  @@index([hostId])
+}
+
+model ConflictCheck {
+  id            String                        @id @default(cuid())
+  firm          Firm                          @relation("ConflictCheck_firm", fields: [firmId], references: [id])
+  firmId        String                        @map("firm")
+  checkNumber   String                        @default("")
+  status        ConflictCheckStatusType       @default(requested)
+  intake        Intake?                       @relation("ConflictCheck_intake", fields: [intakeId], references: [id])
+  intakeId      String?                       @map("intake")
+  matter        Matter?                       @relation("ConflictCheck_matter", fields: [matterId], references: [id])
+  matterId      String?                       @map("matter")
+  requestedBy   User                          @relation("ConflictCheck_requestedBy", fields: [requestedById], references: [id])
+  requestedById String                        @map("requestedBy")
+  reviewedBy    User?                         @relation("ConflictCheck_reviewedBy", fields: [reviewedById], references: [id])
+  reviewedById  String?                       @map("reviewedBy")
+  searchScope   ConflictCheckSearchScopeType? @default(contacts_and_matters)
+  searchVersion String                        @default("v1")
+  startedAt     DateTime?
+  completedAt   DateTime?
+  reviewedAt    DateTime?
+  summary       String                        @default("")
+  failureReason String                        @default("")
+  terms         ConflictSearchTerm[]          @relation("ConflictSearchTerm_check")
+  matches       ConflictMatch[]               @relation("ConflictMatch_check")
+  dispositions  ConflictDisposition[]         @relation("ConflictDisposition_check")
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @default(now()) @updatedAt
+
+  @@unique([firmId, checkNumber])
+  @@index([firmId])
+  @@index([checkNumber])
+  @@index([intakeId])
+  @@index([matterId])
+  @@index([requestedById])
+  @@index([reviewedById])
+}
+
+model ConflictSearchTerm {
+  id              String                         @id @default(cuid())
+  firm            Firm                           @relation("ConflictSearchTerm_firm", fields: [firmId], references: [id])
+  firmId          String                         @map("firm")
+  matter          Matter?                        @relation("ConflictSearchTerm_matter", fields: [matterId], references: [id])
+  matterId        String?                        @map("matter")
+  check           ConflictCheck                  @relation("ConflictSearchTerm_check", fields: [checkId], references: [id])
+  checkId         String                         @map("check")
+  term            String                         @default("")
+  normalizedTerm  String                         @default("")
+  termType        ConflictSearchTermTermTypeType
+  sourceContact   Contact?                       @relation("ConflictSearchTerm_sourceContact", fields: [sourceContactId], references: [id])
+  sourceContactId String?                        @map("sourceContact")
+  includeAliases  Boolean                        @default(true)
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([checkId])
+  @@index([normalizedTerm])
+  @@index([sourceContactId])
+}
+
+model ConflictMatch {
+  id                   String                     @id @default(cuid())
+  firm                 Firm                       @relation("ConflictMatch_firm", fields: [firmId], references: [id])
+  firmId               String                     @map("firm")
+  matter               Matter?                    @relation("ConflictMatch_matter", fields: [matterId], references: [id])
+  matterId             String?                    @map("matter")
+  check                ConflictCheck              @relation("ConflictMatch_check", fields: [checkId], references: [id])
+  checkId              String                     @map("check")
+  status               ConflictMatchStatusType    @default(potential)
+  matchType            ConflictMatchMatchTypeType
+  matchedContact       Contact?                   @relation("ConflictMatch_matchedContact", fields: [matchedContactId], references: [id])
+  matchedContactId     String?                    @map("matchedContact")
+  matchedMatter        Matter?                    @relation("ConflictMatch_matchedMatter", fields: [matchedMatterId], references: [id])
+  matchedMatterId      String?                    @map("matchedMatter")
+  matchedMatterParty   MatterParty?               @relation("ConflictMatch_matchedMatterParty", fields: [matchedMatterPartyId], references: [id])
+  matchedMatterPartyId String?                    @map("matchedMatterParty")
+  score                Int?
+  matchedValue         String                     @default("")
+  evidenceExcerpt      String                     @default("")
+  sourceType           String                     @default("")
+  sourceId             String                     @default("")
+  reviewedBy           User?                      @relation("ConflictMatch_reviewedBy", fields: [reviewedById], references: [id])
+  reviewedById         String?                    @map("reviewedBy")
+  reviewedAt           DateTime?
+  dispositions         ConflictDisposition[]      @relation("ConflictDisposition_match")
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([checkId])
+  @@index([matchedContactId])
+  @@index([matchedMatterId])
+  @@index([matchedMatterPartyId])
+  @@index([reviewedById])
+}
+
+model ConflictDisposition {
+  id              String                         @id @default(cuid())
+  firm            Firm                           @relation("ConflictDisposition_firm", fields: [firmId], references: [id])
+  firmId          String                         @map("firm")
+  matter          Matter?                        @relation("ConflictDisposition_matter", fields: [matterId], references: [id])
+  matterId        String?                        @map("matter")
+  check           ConflictCheck                  @relation("ConflictDisposition_check", fields: [checkId], references: [id])
+  checkId         String                         @map("check")
+  match           ConflictMatch?                 @relation("ConflictDisposition_match", fields: [matchId], references: [id])
+  matchId         String?                        @map("match")
+  outcome         ConflictDispositionOutcomeType
+  reviewer        User                           @relation("ConflictDisposition_reviewer", fields: [reviewerId], references: [id])
+  reviewerId      String                         @map("reviewer")
+  rationale       String                         @default("")
+  conditions      String                         @default("")
+  policyReference String                         @default("")
+  decidedAt       DateTime                       @default(now())
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([checkId])
+  @@index([matchId])
+  @@index([reviewerId])
+}
+
+model PracticeArea {
+  id                                String                  @id @default(cuid())
+  firm                              Firm                    @relation("PracticeArea_firm", fields: [firmId], references: [id])
+  firmId                            String                  @map("firm")
+  name                              String                  @default("")
+  code                              String                  @default("")
+  status                            PracticeAreaStatusType? @default(active)
+  description                       String                  @default("")
+  isPublic                          Boolean                 @default(false)
+  publicSlug                        String?
+  consultationFeeMinor              Int                     @default(0)
+  consultationMinutes               Int                     @default(30)
+  matters                           Matter[]                @relation("Matter_practiceArea")
+  createdAt                         DateTime                @default(now())
+  updatedAt                         DateTime                @default(now()) @updatedAt
+  from_RateRule_practiceArea        RateRule[]              @relation("RateRule_practiceArea")
+  from_RetentionPolicy_practiceArea RetentionPolicy[]       @relation("RetentionPolicy_practiceArea")
+
+  @@unique([firmId, code])
+  @@unique([firmId, publicSlug])
+  @@index([firmId])
+  @@index([code])
+  @@index([publicSlug])
+}
+
+model Matter {
+  id                                   String                     @id @default(cuid())
+  firm                                 Firm                       @relation("Matter_firm", fields: [firmId], references: [id])
+  firmId                               String                     @map("firm")
+  matterNumber                         String                     @default("")
+  title                                String                     @default("")
+  status                               MatterStatusType           @default(proposed)
+  confidentiality                      MatterConfidentialityType  @default(standard)
+  client                               Contact                    @relation("Matter_client", fields: [clientId], references: [id])
+  clientId                             String                     @map("client")
+  office                               Office?                    @relation("Matter_office", fields: [officeId], references: [id])
+  officeId                             String?                    @map("office")
+  practiceArea                         PracticeArea?              @relation("Matter_practiceArea", fields: [practiceAreaId], references: [id])
+  practiceAreaId                       String?                    @map("practiceArea")
+  intake                               Intake?                    @relation("Intake_convertedMatter")
+  responsibleAttorney                  User?                      @relation("Matter_responsibleAttorney", fields: [responsibleAttorneyId], references: [id])
+  responsibleAttorneyId                String?                    @map("responsibleAttorney")
+  originatingAttorney                  User?                      @relation("Matter_originatingAttorney", fields: [originatingAttorneyId], references: [id])
+  originatingAttorneyId                String?                    @map("originatingAttorney")
+  description                          String                     @default("")
+  billingType                          MatterBillingTypeType?     @default(hourly)
+  openedAt                             DateTime?
+  closedAt                             DateTime?
+  closureReason                        String                     @default("")
+  customData                           Json?
+  parties                              MatterParty[]              @relation("MatterParty_matter")
+  teamMembers                          MatterTeamMember[]         @relation("MatterTeamMember_matter")
+  authorizedUsers                      User[]                     @relation("Matter_authorizedUsers")
+  blockedUsers                         User[]                     @relation("Matter_blockedUsers")
+  ethicalWalls                         EthicalWall[]              @relation("EthicalWall_matter")
+  statusEvents                         MatterStatusEvent[]        @relation("MatterStatusEvent_matter")
+  conflictChecks                       ConflictCheck[]            @relation("ConflictCheck_matter")
+  conflictMatches                      ConflictMatch[]            @relation("ConflictMatch_matchedMatter")
+  createdAt                            DateTime                   @default(now())
+  updatedAt                            DateTime                   @default(now()) @updatedAt
+  from_ConflictSearchTerm_matter       ConflictSearchTerm[]       @relation("ConflictSearchTerm_matter")
+  from_ConflictMatch_matter            ConflictMatch[]            @relation("ConflictMatch_matter")
+  from_ConflictDisposition_matter      ConflictDisposition[]      @relation("ConflictDisposition_matter")
+  from_EthicalWallMember_matter        EthicalWallMember[]        @relation("EthicalWallMember_matter")
+  from_Docket_matter                   Docket[]                   @relation("Docket_matter")
+  from_DocketEntry_matter              DocketEntry[]              @relation("DocketEntry_matter")
+  from_Deadline_matter                 Deadline[]                 @relation("Deadline_matter")
+  from_LegalTask_matter                LegalTask[]                @relation("LegalTask_matter")
+  from_CommunicationThread_matter      CommunicationThread[]      @relation("CommunicationThread_matter")
+  from_CommunicationParticipant_matter CommunicationParticipant[] @relation("CommunicationParticipant_matter")
+  from_CommunicationMessage_matter     CommunicationMessage[]     @relation("CommunicationMessage_matter")
+  from_CommunicationDelivery_matter    CommunicationDelivery[]    @relation("CommunicationDelivery_matter")
+  from_Document_matter                 Document[]                 @relation("Document_matter")
+  from_DocumentVersion_matter          DocumentVersion[]          @relation("DocumentVersion_matter")
+  from_SignatureRequest_matter         SignatureRequest[]         @relation("SignatureRequest_matter")
+  from_DocumentSigner_matter           DocumentSigner[]           @relation("DocumentSigner_matter")
+  from_SignatureEvent_matter           SignatureEvent[]           @relation("SignatureEvent_matter")
+  from_RateCard_matter                 RateCard[]                 @relation("RateCard_matter")
+  from_RateRule_matter                 RateRule[]                 @relation("RateRule_matter")
+  from_TimeEntry_matter                TimeEntry[]                @relation("TimeEntry_matter")
+  from_Expense_matter                  Expense[]                  @relation("Expense_matter")
+  from_RetainerAgreement_matter        RetainerAgreement[]        @relation("RetainerAgreement_matter")
+  from_Invoice_matter                  Invoice[]                  @relation("Invoice_matter")
+  from_InvoiceLine_matter              InvoiceLine[]              @relation("InvoiceLine_matter")
+  from_TrustLedgerAccount_matter       TrustLedgerAccount[]       @relation("TrustLedgerAccount_matter")
+  from_TrustLedgerEntry_matter         TrustLedgerEntry[]         @relation("TrustLedgerEntry_matter")
+  from_TrustBalanceSnapshot_matter     TrustBalanceSnapshot[]     @relation("TrustBalanceSnapshot_matter")
+  from_Payment_matter                  Payment[]                  @relation("Payment_matter")
+  from_PaymentAllocation_matter        PaymentAllocation[]        @relation("PaymentAllocation_matter")
+  from_Refund_matter                   Refund[]                   @relation("Refund_matter")
+  from_PortalMatterAccess_matter       PortalMatterAccess[]       @relation("PortalMatterAccess_matter")
+  from_PortalShare_matter              PortalShare[]              @relation("PortalShare_matter")
+  from_PortalGrantIntent_matter        PortalGrantIntent[]        @relation("PortalGrantIntent_matter")
+  from_ExternalRecordLink_matter       ExternalRecordLink[]       @relation("ExternalRecordLink_matter")
+  from_WebhookDelivery_matter          WebhookDelivery[]          @relation("WebhookDelivery_matter")
+  from_WebhookDeliveryAttempt_matter   WebhookDeliveryAttempt[]   @relation("WebhookDeliveryAttempt_matter")
+  from_RetentionHold_matter            RetentionHold[]            @relation("RetentionHold_matter")
+  from_RetentionAction_matter          RetentionAction[]          @relation("RetentionAction_matter")
+  from_AuditEvent_matter               AuditEvent[]               @relation("AuditEvent_matter")
+  from_AgentGrant_matter               AgentGrant[]               @relation("AgentGrant_matter")
+  from_AgentAction_matter              AgentAction[]              @relation("AgentAction_matter")
+  from_AgentActionEvent_matter         AgentActionEvent[]         @relation("AgentActionEvent_matter")
+
+  @@unique([firmId, matterNumber])
+  @@index([firmId])
+  @@index([matterNumber])
+  @@index([clientId])
+  @@index([officeId])
+  @@index([practiceAreaId])
+  @@index([responsibleAttorneyId])
+  @@index([originatingAttorneyId])
+}
+
+model MatterParty {
+  id               String                   @id @default(cuid())
+  firm             Firm                     @relation("MatterParty_firm", fields: [firmId], references: [id])
+  firmId           String                   @map("firm")
+  matter           Matter                   @relation("MatterParty_matter", fields: [matterId], references: [id])
+  matterId         String                   @map("matter")
+  contact          Contact                  @relation("MatterParty_contact", fields: [contactId], references: [id])
+  contactId        String                   @map("contact")
+  partyRole        MatterPartyPartyRoleType
+  side             MatterPartySideType?     @default(unknown)
+  representedBy    Contact?                 @relation("MatterParty_representedBy", fields: [representedById], references: [id])
+  representedById  String?                  @map("representedBy")
+  counselContact   Contact?                 @relation("MatterParty_counselContact", fields: [counselContactId], references: [id])
+  counselContactId String?                  @map("counselContact")
+  status           MatterPartyStatusType?   @default(active)
+  isPrimaryClient  Boolean                  @default(false)
+  notes            String                   @default("")
+  conflictMatches  ConflictMatch[]          @relation("ConflictMatch_matchedMatterParty")
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([contactId])
+  @@index([representedById])
+  @@index([counselContactId])
+}
+
+model MatterTeamMember {
+  id                  String                       @id @default(cuid())
+  firm                Firm                         @relation("MatterTeamMember_firm", fields: [firmId], references: [id])
+  firmId              String                       @map("firm")
+  matter              Matter                       @relation("MatterTeamMember_matter", fields: [matterId], references: [id])
+  matterId            String                       @map("matter")
+  user                User                         @relation("MatterTeamMember_user", fields: [userId], references: [id])
+  userId              String                       @map("user")
+  office              Office?                      @relation("MatterTeamMember_office", fields: [officeId], references: [id])
+  officeId            String?                      @map("office")
+  teamRole            MatterTeamMemberTeamRoleType
+  status              MatterTeamMemberStatusType   @default(active)
+  canAccessRestricted Boolean                      @default(false)
+  canEdit             Boolean                      @default(false)
+  canBill             Boolean                      @default(false)
+  assignedAt          DateTime?                    @default(now())
+  removedAt           DateTime?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @default(now()) @updatedAt
+
+  @@unique([matterId, userId])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([userId])
+  @@index([officeId])
+}
+
+model EthicalWall {
+  id              String                @id @default(cuid())
+  firm            Firm                  @relation("EthicalWall_firm", fields: [firmId], references: [id])
+  firmId          String                @map("firm")
+  matter          Matter                @relation("EthicalWall_matter", fields: [matterId], references: [id])
+  matterId        String                @map("matter")
+  name            String                @default("")
+  status          EthicalWallStatusType @default(draft)
+  reason          String                @default("")
+  policyReference String                @default("")
+  createdBy       User                  @relation("EthicalWall_createdBy", fields: [createdById], references: [id])
+  createdById     String                @map("createdBy")
+  approvedBy      User?                 @relation("EthicalWall_approvedBy", fields: [approvedById], references: [id])
+  approvedById    String?               @map("approvedBy")
+  effectiveAt     DateTime?
+  liftedAt        DateTime?
+  members         EthicalWallMember[]   @relation("EthicalWallMember_wall")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([createdById])
+  @@index([approvedById])
+}
+
+model EthicalWallMember {
+  id           String                        @id @default(cuid())
+  firm         Firm                          @relation("EthicalWallMember_firm", fields: [firmId], references: [id])
+  firmId       String                        @map("firm")
+  matter       Matter                        @relation("EthicalWallMember_matter", fields: [matterId], references: [id])
+  matterId     String                        @map("matter")
+  wall         EthicalWall                   @relation("EthicalWallMember_wall", fields: [wallId], references: [id])
+  wallId       String                        @map("wall")
+  user         User                          @relation("EthicalWallMember_user", fields: [userId], references: [id])
+  userId       String                        @map("user")
+  decision     EthicalWallMemberDecisionType
+  status       EthicalWallMemberStatusType?  @default(active)
+  approvedBy   User                          @relation("EthicalWallMember_approvedBy", fields: [approvedById], references: [id])
+  approvedById String                        @map("approvedBy")
+  reason       String                        @default("")
+  effectiveAt  DateTime?                     @default(now())
+  revokedAt    DateTime?
+  createdAt    DateTime                      @default(now())
+  updatedAt    DateTime                      @default(now()) @updatedAt
+
+  @@unique([wallId, userId])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([wallId])
+  @@index([userId])
+  @@index([approvedById])
+}
+
+model MatterStatusEvent {
+  id           String          @id @default(cuid())
+  firm         Firm            @relation("MatterStatusEvent_firm", fields: [firmId], references: [id])
+  firmId       String          @map("firm")
+  matter       Matter          @relation("MatterStatusEvent_matter", fields: [matterId], references: [id])
+  matterId     String          @map("matter")
+  fromStatus   String          @default("")
+  toStatus     String          @default("")
+  action       String          @default("")
+  reason       String          @default("")
+  actorUser    User?           @relation("MatterStatusEvent_actorUser", fields: [actorUserId], references: [id])
+  actorUserId  String?         @map("actorUser")
+  actorAgent   AgentPrincipal? @relation("MatterStatusEvent_actorAgent", fields: [actorAgentId], references: [id])
+  actorAgentId String?         @map("actorAgent")
+  occurredAt   DateTime        @default(now())
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([actorUserId])
+  @@index([actorAgentId])
+}
+
+model Court {
+  id               String             @id @default(cuid())
+  firm             Firm               @relation("Court_firm", fields: [firmId], references: [id])
+  firmId           String             @map("firm")
+  name             String             @default("")
+  courtType        CourtCourtTypeType
+  jurisdiction     String             @default("")
+  jurisdictionCode String             @default("")
+  division         String             @default("")
+  status           CourtStatusType?   @default(active)
+  address          Address?           @relation("Court_address", fields: [addressId], references: [id])
+  addressId        String?            @map("address")
+  phone            String             @default("")
+  website          String             @default("")
+  filingUrl        String             @default("")
+  dockets          Docket[]           @relation("Docket_court")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([jurisdictionCode])
+  @@index([addressId])
+}
+
+model Docket {
+  id                             String               @id @default(cuid())
+  firm                           Firm                 @relation("Docket_firm", fields: [firmId], references: [id])
+  firmId                         String               @map("firm")
+  matter                         Matter               @relation("Docket_matter", fields: [matterId], references: [id])
+  matterId                       String               @map("matter")
+  court                          Court                @relation("Docket_court", fields: [courtId], references: [id])
+  courtId                        String               @map("court")
+  docketNumber                   String               @default("")
+  title                          String               @default("")
+  status                         DocketStatusType     @default(active)
+  judgeContact                   Contact?             @relation("Docket_judgeContact", fields: [judgeContactId], references: [id])
+  judgeContactId                 String?              @map("judgeContact")
+  clerkContact                   Contact?             @relation("Docket_clerkContact", fields: [clerkContactId], references: [id])
+  clerkContactId                 String?              @map("clerkContact")
+  filedAt                        DateTime?
+  closedAt                       DateTime?
+  notes                          String               @default("")
+  entries                        DocketEntry[]        @relation("DocketEntry_docket")
+  deadlines                      Deadline[]           @relation("Deadline_docket")
+  createdAt                      DateTime             @default(now())
+  updatedAt                      DateTime             @default(now()) @updatedAt
+  from_ExternalRecordLink_docket ExternalRecordLink[] @relation("ExternalRecordLink_docket")
+
+  @@unique([matterId, docketNumber])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([courtId])
+  @@index([docketNumber])
+  @@index([judgeContactId])
+  @@index([clerkContactId])
+}
+
+model DocketEntry {
+  id                                     String                   @id @default(cuid())
+  firm                                   Firm                     @relation("DocketEntry_firm", fields: [firmId], references: [id])
+  firmId                                 String                   @map("firm")
+  matter                                 Matter                   @relation("DocketEntry_matter", fields: [matterId], references: [id])
+  matterId                               String                   @map("matter")
+  docket                                 Docket                   @relation("DocketEntry_docket", fields: [docketId], references: [id])
+  docketId                               String                   @map("docket")
+  title                                  String                   @default("")
+  entryType                              DocketEntryEntryTypeType
+  status                                 DocketEntryStatusType    @default(draft)
+  externalEntryId                        String                   @default("")
+  occurredAt                             DateTime
+  filedAt                                DateTime?
+  enteredAt                              DateTime?
+  description                            String                   @default("")
+  sourceUrl                              String                   @default("")
+  documentVersion                        DocumentVersion?         @relation("DocketEntry_documentVersion", fields: [documentVersionId], references: [id])
+  documentVersionId                      String?                  @map("documentVersion")
+  isVerified                             Boolean                  @default(false)
+  verifiedBy                             User?                    @relation("DocketEntry_verifiedBy", fields: [verifiedById], references: [id])
+  verifiedById                           String?                  @map("verifiedBy")
+  verifiedAt                             DateTime?
+  deadlines                              Deadline[]               @relation("Deadline_sourceEntry")
+  createdAt                              DateTime                 @default(now())
+  updatedAt                              DateTime                 @default(now()) @updatedAt
+  from_DocumentVersion_sourceDocketEntry DocumentVersion[]        @relation("DocumentVersion_sourceDocketEntry")
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([docketId])
+  @@index([documentVersionId])
+  @@index([verifiedById])
+}
+
+model Deadline {
+  id                        String                   @id @default(cuid())
+  firm                      Firm                     @relation("Deadline_firm", fields: [firmId], references: [id])
+  firmId                    String                   @map("firm")
+  matter                    Matter                   @relation("Deadline_matter", fields: [matterId], references: [id])
+  matterId                  String                   @map("matter")
+  docket                    Docket?                  @relation("Deadline_docket", fields: [docketId], references: [id])
+  docketId                  String?                  @map("docket")
+  sourceEntry               DocketEntry?             @relation("Deadline_sourceEntry", fields: [sourceEntryId], references: [id])
+  sourceEntryId             String?                  @map("sourceEntry")
+  title                     String                   @default("")
+  status                    DeadlineStatusType       @default(draft)
+  deadlineType              DeadlineDeadlineTypeType
+  dueAt                     DateTime
+  timezone                  String                   @default("UTC")
+  source                    DeadlineSourceType?      @default(manual)
+  calculationMethod         String                   @default("")
+  ruleReference             String                   @default("")
+  isVerified                Boolean                  @default(false)
+  verifiedBy                User?                    @relation("Deadline_verifiedBy", fields: [verifiedById], references: [id])
+  verifiedById              String?                  @map("verifiedBy")
+  verifiedAt                DateTime?
+  assignedTo                User?                    @relation("Deadline_assignedTo", fields: [assignedToId], references: [id])
+  assignedToId              String?                  @map("assignedTo")
+  completedAt               DateTime?
+  parentDeadline            Deadline?                @relation("Deadline_parentDeadline", fields: [parentDeadlineId], references: [id])
+  parentDeadlineId          String?                  @map("parentDeadline")
+  dependentDeadlines        Deadline[]               @relation("Deadline_parentDeadline")
+  tasks                     LegalTask[]              @relation("LegalTask_deadline")
+  metadata                  Json?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @default(now()) @updatedAt
+  from_AgentAction_deadline AgentAction[]            @relation("AgentAction_deadline")
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([docketId])
+  @@index([sourceEntryId])
+  @@index([verifiedById])
+  @@index([assignedToId])
+  @@index([parentDeadlineId])
+}
+
+model LegalTask {
+  id                    String                 @id @default(cuid())
+  firm                  Firm                   @relation("LegalTask_firm", fields: [firmId], references: [id])
+  firmId                String                 @map("firm")
+  matter                Matter                 @relation("LegalTask_matter", fields: [matterId], references: [id])
+  matterId              String                 @map("matter")
+  deadline              Deadline?              @relation("LegalTask_deadline", fields: [deadlineId], references: [id])
+  deadlineId            String?                @map("deadline")
+  title                 String                 @default("")
+  description           String                 @default("")
+  status                LegalTaskStatusType    @default(open)
+  priority              LegalTaskPriorityType? @default(normal)
+  assignedTo            User?                  @relation("LegalTask_assignedTo", fields: [assignedToId], references: [id])
+  assignedToId          String?                @map("assignedTo")
+  assignedBy            User?                  @relation("LegalTask_assignedBy", fields: [assignedById], references: [id])
+  assignedById          String?                @map("assignedBy")
+  dueAt                 DateTime?
+  completedAt           DateTime?
+  parentTask            LegalTask?             @relation("LegalTask_parentTask", fields: [parentTaskId], references: [id])
+  parentTaskId          String?                @map("parentTask")
+  subtasks              LegalTask[]            @relation("LegalTask_parentTask")
+  dependsOn             LegalTask[]            @relation("LegalTask_dependents")
+  dependents            LegalTask[]            @relation("LegalTask_dependents")
+  blockedReason         String                 @default("")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @default(now()) @updatedAt
+  from_TimeEntry_task   TimeEntry[]            @relation("TimeEntry_task")
+  from_AgentAction_task AgentAction[]          @relation("AgentAction_task")
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([deadlineId])
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@index([parentTaskId])
+}
+
+model CommunicationThread {
+  id                                       String                                 @id @default(cuid())
+  firm                                     Firm                                   @relation("CommunicationThread_firm", fields: [firmId], references: [id])
+  firmId                                   String                                 @map("firm")
+  matter                                   Matter?                                @relation("CommunicationThread_matter", fields: [matterId], references: [id])
+  matterId                                 String?                                @map("matter")
+  intake                                   Intake?                                @relation("CommunicationThread_intake", fields: [intakeId], references: [id])
+  intakeId                                 String?                                @map("intake")
+  subject                                  String                                 @default("")
+  status                                   CommunicationThreadStatusType          @default(open)
+  primaryChannel                           CommunicationThreadPrimaryChannelType? @default(email)
+  lastMessageAt                            DateTime?
+  participants                             CommunicationParticipant[]             @relation("CommunicationParticipant_thread")
+  messages                                 CommunicationMessage[]                 @relation("CommunicationMessage_thread")
+  createdAt                                DateTime                               @default(now())
+  updatedAt                                DateTime                               @default(now()) @updatedAt
+  from_PortalShare_communicationThread     PortalShare[]                          @relation("PortalShare_communicationThread")
+  from_RetentionAction_communicationThread RetentionAction[]                      @relation("RetentionAction_communicationThread")
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([intakeId])
+}
+
+model CommunicationParticipant {
+  id              String                                      @id @default(cuid())
+  firm            Firm                                        @relation("CommunicationParticipant_firm", fields: [firmId], references: [id])
+  firmId          String                                      @map("firm")
+  matter          Matter?                                     @relation("CommunicationParticipant_matter", fields: [matterId], references: [id])
+  matterId        String?                                     @map("matter")
+  thread          CommunicationThread                         @relation("CommunicationParticipant_thread", fields: [threadId], references: [id])
+  threadId        String                                      @map("thread")
+  user            User?                                       @relation("CommunicationParticipant_user", fields: [userId], references: [id])
+  userId          String?                                     @map("user")
+  contact         Contact?                                    @relation("CommunicationParticipant_contact", fields: [contactId], references: [id])
+  contactId       String?                                     @map("contact")
+  portalAccount   PortalAccount?                              @relation("CommunicationParticipant_portalAccount", fields: [portalAccountId], references: [id])
+  portalAccountId String?                                     @map("portalAccount")
+  participantRole CommunicationParticipantParticipantRoleType
+  status          CommunicationParticipantStatusType?         @default(active)
+  displayAddress  String                                      @default("")
+  addedAt         DateTime?                                   @default(now())
+  removedAt       DateTime?
+  createdAt       DateTime                                    @default(now())
+  updatedAt       DateTime                                    @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([threadId])
+  @@index([userId])
+  @@index([contactId])
+  @@index([portalAccountId])
+}
+
+model CommunicationMessage {
+  id                                 String                            @id @default(cuid())
+  firm                               Firm                              @relation("CommunicationMessage_firm", fields: [firmId], references: [id])
+  firmId                             String                            @map("firm")
+  matter                             Matter?                           @relation("CommunicationMessage_matter", fields: [matterId], references: [id])
+  matterId                           String?                           @map("matter")
+  thread                             CommunicationThread               @relation("CommunicationMessage_thread", fields: [threadId], references: [id])
+  threadId                           String                            @map("thread")
+  direction                          CommunicationMessageDirectionType
+  channel                            CommunicationMessageChannelType
+  status                             CommunicationMessageStatusType    @default(draft)
+  subject                            String                            @default("")
+  body                               String                            @default("")
+  senderUser                         User?                             @relation("CommunicationMessage_senderUser", fields: [senderUserId], references: [id])
+  senderUserId                       String?                           @map("senderUser")
+  senderContact                      Contact?                          @relation("CommunicationMessage_senderContact", fields: [senderContactId], references: [id])
+  senderContactId                    String?                           @map("senderContact")
+  senderAgent                        AgentPrincipal?                   @relation("CommunicationMessage_senderAgent", fields: [senderAgentId], references: [id])
+  senderAgentId                      String?                           @map("senderAgent")
+  externalMessageId                  String                            @default("")
+  replyToMessage                     CommunicationMessage?             @relation("CommunicationMessage_replyToMessage", fields: [replyToMessageId], references: [id])
+  replyToMessageId                   String?                           @map("replyToMessage")
+  replies                            CommunicationMessage[]            @relation("CommunicationMessage_replyToMessage")
+  queuedAt                           DateTime?
+  sentAt                             DateTime?
+  receivedAt                         DateTime?
+  metadata                           Json?
+  attachments                        DocumentVersion[]                 @relation("CommunicationMessage_attachments")
+  deliveries                         CommunicationDelivery[]           @relation("CommunicationDelivery_message")
+  createdAt                          DateTime                          @default(now())
+  updatedAt                          DateTime                          @default(now()) @updatedAt
+  from_DocumentVersion_sourceMessage DocumentVersion[]                 @relation("DocumentVersion_sourceMessage")
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([threadId])
+  @@index([senderUserId])
+  @@index([senderContactId])
+  @@index([senderAgentId])
+  @@index([externalMessageId])
+  @@index([replyToMessageId])
+}
+
+model CommunicationDelivery {
+  id                      String                           @id @default(cuid())
+  firm                    Firm                             @relation("CommunicationDelivery_firm", fields: [firmId], references: [id])
+  firmId                  String                           @map("firm")
+  matter                  Matter?                          @relation("CommunicationDelivery_matter", fields: [matterId], references: [id])
+  matterId                String?                          @map("matter")
+  message                 CommunicationMessage             @relation("CommunicationDelivery_message", fields: [messageId], references: [id])
+  messageId               String                           @map("message")
+  integrationConnection   IntegrationConnection?           @relation("CommunicationDelivery_integrationConnection", fields: [integrationConnectionId], references: [id])
+  integrationConnectionId String?                          @map("integrationConnection")
+  channel                 CommunicationDeliveryChannelType
+  status                  CommunicationDeliveryStatusType  @default(pending)
+  recipientContact        Contact?                         @relation("CommunicationDelivery_recipientContact", fields: [recipientContactId], references: [id])
+  recipientContactId      String?                          @map("recipientContact")
+  recipientAddress        String                           @default("")
+  provider                String                           @default("")
+  providerMessageId       String                           @default("")
+  attemptCount            Int?                             @default(0)
+  lastAttemptAt           DateTime?
+  deliveredAt             DateTime?
+  errorCode               String                           @default("")
+  errorMessage            String                           @default("")
+  providerMetadata        Json?
+  createdAt               DateTime                         @default(now())
+  updatedAt               DateTime                         @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([messageId])
+  @@index([integrationConnectionId])
+  @@index([recipientContactId])
+  @@index([providerMessageId])
+}
+
+model Document {
+  id                               String                       @id @default(cuid())
+  firm                             Firm                         @relation("Document_firm", fields: [firmId], references: [id])
+  firmId                           String                       @map("firm")
+  matter                           Matter?                      @relation("Document_matter", fields: [matterId], references: [id])
+  matterId                         String?                      @map("matter")
+  intake                           Intake?                      @relation("Document_intake", fields: [intakeId], references: [id])
+  intakeId                         String?                      @map("intake")
+  contact                          Contact?                     @relation("Document_contact", fields: [contactId], references: [id])
+  contactId                        String?                      @map("contact")
+  title                            String                       @default("")
+  status                           DocumentStatusType           @default(draft)
+  category                         DocumentCategoryType?        @default(other)
+  confidentiality                  DocumentConfidentialityType? @default(matter)
+  description                      String                       @default("")
+  currentVersion                   DocumentVersion?             @relation("Document_currentVersion", fields: [currentVersionId], references: [id])
+  currentVersionId                 String?                      @map("currentVersion")
+  versions                         DocumentVersion[]            @relation("DocumentVersion_document")
+  archivedAt                       DateTime?
+  disposedAt                       DateTime?
+  retentionPolicy                  RetentionPolicy?             @relation("Document_retentionPolicy", fields: [retentionPolicyId], references: [id])
+  retentionPolicyId                String?                      @map("retentionPolicy")
+  createdAt                        DateTime                     @default(now())
+  updatedAt                        DateTime                     @default(now()) @updatedAt
+  from_PortalShare_document        PortalShare[]                @relation("PortalShare_document")
+  from_ExternalRecordLink_document ExternalRecordLink[]         @relation("ExternalRecordLink_document")
+  from_RetentionHold_document      RetentionHold[]              @relation("RetentionHold_document")
+  from_RetentionAction_document    RetentionAction[]            @relation("RetentionAction_document")
+  from_AuditEvent_document         AuditEvent[]                 @relation("AuditEvent_document")
+  from_AgentAction_document        AgentAction[]                @relation("AgentAction_document")
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([intakeId])
+  @@index([contactId])
+  @@index([currentVersionId])
+  @@index([retentionPolicyId])
+}
+
+model DocumentVersion {
+  id                                           String                     @id @default(cuid())
+  firm                                         Firm                       @relation("DocumentVersion_firm", fields: [firmId], references: [id])
+  firmId                                       String                     @map("firm")
+  matter                                       Matter?                    @relation("DocumentVersion_matter", fields: [matterId], references: [id])
+  matterId                                     String?                    @map("matter")
+  document                                     Document                   @relation("DocumentVersion_document", fields: [documentId], references: [id])
+  documentId                                   String                     @map("document")
+  versionKey                                   String                     @unique @default("")
+  versionNumber                                Int
+  fileName                                     String                     @default("")
+  objectKey                                    String                     @default("")
+  mediaType                                    String                     @default("")
+  byteSize                                     Int
+  checksumSha256                               String                     @default("")
+  source                                       DocumentVersionSourceType? @default(upload)
+  createdBy                                    User?                      @relation("DocumentVersion_createdBy", fields: [createdById], references: [id])
+  createdById                                  String?                    @map("createdBy")
+  sourceMessage                                CommunicationMessage?      @relation("DocumentVersion_sourceMessage", fields: [sourceMessageId], references: [id])
+  sourceMessageId                              String?                    @map("sourceMessage")
+  sourceDocketEntry                            DocketEntry?               @relation("DocumentVersion_sourceDocketEntry", fields: [sourceDocketEntryId], references: [id])
+  sourceDocketEntryId                          String?                    @map("sourceDocketEntry")
+  notes                                        String                     @default("")
+  signatureRequests                            SignatureRequest[]         @relation("SignatureRequest_documentVersion")
+  createdAt                                    DateTime                   @default(now())
+  updatedAt                                    DateTime                   @default(now()) @updatedAt
+  from_DocketEntry_documentVersion             DocketEntry[]              @relation("DocketEntry_documentVersion")
+  from_CommunicationMessage_attachments        CommunicationMessage[]     @relation("CommunicationMessage_attachments")
+  from_Document_currentVersion                 Document[]                 @relation("Document_currentVersion")
+  from_Expense_receiptVersion                  Expense[]                  @relation("Expense_receiptVersion")
+  from_RetainerAgreement_signedDocumentVersion RetainerAgreement[]        @relation("RetainerAgreement_signedDocumentVersion")
+  from_PortalShare_documentVersion             PortalShare[]              @relation("PortalShare_documentVersion")
+
+  @@unique([documentId, versionNumber])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([documentId])
+  @@index([createdById])
+  @@index([sourceMessageId])
+  @@index([sourceDocketEntryId])
+}
+
+model SignatureRequest {
+  id                      String                     @id @default(cuid())
+  firm                    Firm                       @relation("SignatureRequest_firm", fields: [firmId], references: [id])
+  firmId                  String                     @map("firm")
+  matter                  Matter?                    @relation("SignatureRequest_matter", fields: [matterId], references: [id])
+  matterId                String?                    @map("matter")
+  documentVersion         DocumentVersion            @relation("SignatureRequest_documentVersion", fields: [documentVersionId], references: [id])
+  documentVersionId       String                     @map("documentVersion")
+  title                   String                     @default("")
+  status                  SignatureRequestStatusType @default(draft)
+  provider                String                     @default("")
+  integrationConnection   IntegrationConnection?     @relation("SignatureRequest_integrationConnection", fields: [integrationConnectionId], references: [id])
+  integrationConnectionId String?                    @map("integrationConnection")
+  providerRequestId       String                     @default("")
+  message                 String                     @default("")
+  sentAt                  DateTime?
+  completedAt             DateTime?
+  expiresAt               DateTime?
+  signers                 DocumentSigner[]           @relation("DocumentSigner_request")
+  events                  SignatureEvent[]           @relation("SignatureEvent_request")
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([documentVersionId])
+  @@index([integrationConnectionId])
+  @@index([providerRequestId])
+}
+
+model DocumentSigner {
+  id               String                   @id @default(cuid())
+  firm             Firm                     @relation("DocumentSigner_firm", fields: [firmId], references: [id])
+  firmId           String                   @map("firm")
+  matter           Matter?                  @relation("DocumentSigner_matter", fields: [matterId], references: [id])
+  matterId         String?                  @map("matter")
+  request          SignatureRequest         @relation("DocumentSigner_request", fields: [requestId], references: [id])
+  requestId        String                   @map("request")
+  contact          Contact?                 @relation("DocumentSigner_contact", fields: [contactId], references: [id])
+  contactId        String?                  @map("contact")
+  portalAccount    PortalAccount?           @relation("DocumentSigner_portalAccount", fields: [portalAccountId], references: [id])
+  portalAccountId  String?                  @map("portalAccount")
+  name             String                   @default("")
+  email            String                   @default("")
+  signingOrder     Int?                     @default(1)
+  status           DocumentSignerStatusType @default(pending)
+  providerSignerId String                   @default("")
+  viewedAt         DateTime?
+  signedAt         DateTime?
+  declinedAt       DateTime?
+  events           SignatureEvent[]         @relation("SignatureEvent_signer")
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([requestId])
+  @@index([contactId])
+  @@index([portalAccountId])
+  @@index([providerSignerId])
+}
+
+model SignatureEvent {
+  id              String           @id @default(cuid())
+  firm            Firm             @relation("SignatureEvent_firm", fields: [firmId], references: [id])
+  firmId          String           @map("firm")
+  matter          Matter?          @relation("SignatureEvent_matter", fields: [matterId], references: [id])
+  matterId        String?          @map("matter")
+  request         SignatureRequest @relation("SignatureEvent_request", fields: [requestId], references: [id])
+  requestId       String           @map("request")
+  signer          DocumentSigner?  @relation("SignatureEvent_signer", fields: [signerId], references: [id])
+  signerId        String?          @map("signer")
+  eventType       String           @default("")
+  providerEventId String           @default("")
+  actorReference  String           @default("")
+  occurredAt      DateTime         @default(now())
+  evidence        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+
+  @@unique([firmId, providerEventId])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([requestId])
+  @@index([signerId])
+  @@index([providerEventId])
+}
+
+model RateCard {
+  id                              String              @id @default(cuid())
+  firm                            Firm                @relation("RateCard_firm", fields: [firmId], references: [id])
+  firmId                          String              @map("firm")
+  matter                          Matter?             @relation("RateCard_matter", fields: [matterId], references: [id])
+  matterId                        String?             @map("matter")
+  name                            String              @default("")
+  status                          RateCardStatusType  @default(draft)
+  currencyCode                    String              @default("USD")
+  effectiveFrom                   DateTime?
+  effectiveTo                     DateTime?
+  description                     String              @default("")
+  rules                           RateRule[]          @relation("RateRule_rateCard")
+  createdAt                       DateTime            @default(now())
+  updatedAt                       DateTime            @default(now()) @updatedAt
+  from_RetainerAgreement_rateCard RetainerAgreement[] @relation("RetainerAgreement_rateCard")
+
+  @@index([firmId])
+  @@index([matterId])
+}
+
+model RateRule {
+  id             String               @id @default(cuid())
+  firm           Firm                 @relation("RateRule_firm", fields: [firmId], references: [id])
+  firmId         String               @map("firm")
+  matter         Matter?              @relation("RateRule_matter", fields: [matterId], references: [id])
+  matterId       String?              @map("matter")
+  rateCard       RateCard             @relation("RateRule_rateCard", fields: [rateCardId], references: [id])
+  rateCardId     String               @map("rateCard")
+  user           User?                @relation("RateRule_user", fields: [userId], references: [id])
+  userId         String?              @map("user")
+  practiceArea   PracticeArea?        @relation("RateRule_practiceArea", fields: [practiceAreaId], references: [id])
+  practiceAreaId String?              @map("practiceArea")
+  rateType       RateRuleRateTypeType
+  amountMinor    Int
+  currencyCode   String               @default("USD")
+  unitLabel      String               @default("hour")
+  priority       Int?                 @default(100)
+  effectiveFrom  DateTime?
+  effectiveTo    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([rateCardId])
+  @@index([userId])
+  @@index([practiceAreaId])
+}
+
+model TimeEntry {
+  id              String              @id @default(cuid())
+  firm            Firm                @relation("TimeEntry_firm", fields: [firmId], references: [id])
+  firmId          String              @map("firm")
+  matter          Matter              @relation("TimeEntry_matter", fields: [matterId], references: [id])
+  matterId        String              @map("matter")
+  user            User                @relation("TimeEntry_user", fields: [userId], references: [id])
+  userId          String              @map("user")
+  task            LegalTask?          @relation("TimeEntry_task", fields: [taskId], references: [id])
+  taskId          String?             @map("task")
+  status          TimeEntryStatusType @default(draft)
+  workDate        DateTime
+  startedAt       DateTime?
+  endedAt         DateTime?
+  durationMinutes Int
+  description     String              @default("")
+  isBillable      Boolean             @default(true)
+  rateMinor       Int?
+  amountMinor     Int?
+  currencyCode    String              @default("USD")
+  approvedBy      User?               @relation("TimeEntry_approvedBy", fields: [approvedById], references: [id])
+  approvedById    String?             @map("approvedBy")
+  approvedAt      DateTime?
+  invoiceLine     InvoiceLine?        @relation("InvoiceLine_timeEntry")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([userId])
+  @@index([taskId])
+  @@index([approvedById])
+}
+
+model Expense {
+  id               String                  @id @default(cuid())
+  firm             Firm                    @relation("Expense_firm", fields: [firmId], references: [id])
+  firmId           String                  @map("firm")
+  matter           Matter                  @relation("Expense_matter", fields: [matterId], references: [id])
+  matterId         String                  @map("matter")
+  incurredBy       User?                   @relation("Expense_incurredBy", fields: [incurredById], references: [id])
+  incurredById     String?                 @map("incurredBy")
+  vendor           Contact?                @relation("Expense_vendor", fields: [vendorId], references: [id])
+  vendorId         String?                 @map("vendor")
+  receiptVersion   DocumentVersion?        @relation("Expense_receiptVersion", fields: [receiptVersionId], references: [id])
+  receiptVersionId String?                 @map("receiptVersion")
+  status           ExpenseStatusType       @default(draft)
+  expenseType      ExpenseExpenseTypeType? @default(other)
+  description      String                  @default("")
+  incurredAt       DateTime
+  amountMinor      Int
+  currencyCode     String                  @default("USD")
+  isBillable       Boolean                 @default(true)
+  approvedBy       User?                   @relation("Expense_approvedBy", fields: [approvedById], references: [id])
+  approvedById     String?                 @map("approvedBy")
+  approvedAt       DateTime?
+  invoiceLine      InvoiceLine?            @relation("Expense_invoiceLine", fields: [invoiceLineId], references: [id])
+  invoiceLineId    String?                 @unique @map("invoiceLine")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([incurredById])
+  @@index([vendorId])
+  @@index([receiptVersionId])
+  @@index([approvedById])
+}
+
+model RetainerAgreement {
+  id                       String                            @id @default(cuid())
+  firm                     Firm                              @relation("RetainerAgreement_firm", fields: [firmId], references: [id])
+  firmId                   String                            @map("firm")
+  matter                   Matter                            @relation("RetainerAgreement_matter", fields: [matterId], references: [id])
+  matterId                 String                            @map("matter")
+  client                   Contact                           @relation("RetainerAgreement_client", fields: [clientId], references: [id])
+  clientId                 String                            @map("client")
+  rateCard                 RateCard?                         @relation("RetainerAgreement_rateCard", fields: [rateCardId], references: [id])
+  rateCardId               String?                           @map("rateCard")
+  agreementNumber          String                            @default("")
+  status                   RetainerAgreementStatusType       @default(draft)
+  feeStructure             RetainerAgreementFeeStructureType
+  currencyCode             String                            @default("USD")
+  initialRetainerMinor     Int?
+  evergreenThresholdMinor  Int?
+  replenishmentAmountMinor Int?
+  contingencyBasisPoints   Int?
+  termsSummary             String                            @default("")
+  signedDocumentVersion    DocumentVersion?                  @relation("RetainerAgreement_signedDocumentVersion", fields: [signedDocumentVersionId], references: [id])
+  signedDocumentVersionId  String?                           @map("signedDocumentVersion")
+  trustLedgerAccount       TrustLedgerAccount?               @relation("RetainerAgreement_trustLedgerAccount", fields: [trustLedgerAccountId], references: [id])
+  trustLedgerAccountId     String?                           @map("trustLedgerAccount")
+  sentAt                   DateTime?
+  acceptedAt               DateTime?
+  effectiveAt              DateTime?
+  terminatedAt             DateTime?
+  invoices                 Invoice[]                         @relation("Invoice_retainer")
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @default(now()) @updatedAt
+
+  @@unique([firmId, agreementNumber])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([clientId])
+  @@index([rateCardId])
+  @@index([agreementNumber])
+  @@index([signedDocumentVersionId])
+  @@index([trustLedgerAccountId])
+}
+
+model Invoice {
+  id                              String               @id @default(cuid())
+  firm                            Firm                 @relation("Invoice_firm", fields: [firmId], references: [id])
+  firmId                          String               @map("firm")
+  matter                          Matter               @relation("Invoice_matter", fields: [matterId], references: [id])
+  matterId                        String               @map("matter")
+  client                          Contact              @relation("Invoice_client", fields: [clientId], references: [id])
+  clientId                        String               @map("client")
+  retainer                        RetainerAgreement?   @relation("Invoice_retainer", fields: [retainerId], references: [id])
+  retainerId                      String?              @map("retainer")
+  invoiceNumber                   String               @default("")
+  status                          InvoiceStatusType    @default(draft)
+  currencyCode                    String               @default("USD")
+  subtotalMinor                   Int                  @default(0)
+  discountMinor                   Int                  @default(0)
+  taxMinor                        Int                  @default(0)
+  totalMinor                      Int                  @default(0)
+  paidMinor                       Int                  @default(0)
+  balanceDueMinor                 Int                  @default(0)
+  issuedAt                        DateTime?
+  dueAt                           DateTime?
+  paidAt                          DateTime?
+  voidedAt                        DateTime?
+  voidReason                      String               @default("")
+  memo                            String               @default("")
+  lines                           InvoiceLine[]        @relation("InvoiceLine_invoice")
+  payments                        Payment[]            @relation("Payment_invoice")
+  paymentAllocations              PaymentAllocation[]  @relation("PaymentAllocation_invoice")
+  refunds                         Refund[]             @relation("Refund_invoice")
+  createdAt                       DateTime             @default(now())
+  updatedAt                       DateTime             @default(now()) @updatedAt
+  from_PortalShare_invoice        PortalShare[]        @relation("PortalShare_invoice")
+  from_ExternalRecordLink_invoice ExternalRecordLink[] @relation("ExternalRecordLink_invoice")
+  from_RetentionAction_invoice    RetentionAction[]    @relation("RetentionAction_invoice")
+  from_AuditEvent_invoice         AuditEvent[]         @relation("AuditEvent_invoice")
+  from_AgentAction_invoice        AgentAction[]        @relation("AgentAction_invoice")
+
+  @@unique([firmId, invoiceNumber])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([clientId])
+  @@index([retainerId])
+  @@index([invoiceNumber])
+}
+
+model InvoiceLine {
+  id              String                  @id @default(cuid())
+  firm            Firm                    @relation("InvoiceLine_firm", fields: [firmId], references: [id])
+  firmId          String                  @map("firm")
+  matter          Matter                  @relation("InvoiceLine_matter", fields: [matterId], references: [id])
+  matterId        String                  @map("matter")
+  invoice         Invoice                 @relation("InvoiceLine_invoice", fields: [invoiceId], references: [id])
+  invoiceId       String                  @map("invoice")
+  timeEntry       TimeEntry?              @relation("InvoiceLine_timeEntry", fields: [timeEntryId], references: [id])
+  timeEntryId     String?                 @unique @map("timeEntry")
+  expense         Expense?                @relation("Expense_invoiceLine")
+  lineType        InvoiceLineLineTypeType
+  description     String                  @default("")
+  quantity        Int?                    @default(1)
+  unitAmountMinor Int
+  subtotalMinor   Int
+  discountMinor   Int?                    @default(0)
+  taxMinor        Int?                    @default(0)
+  lineTotalMinor  Int
+  currencyCode    String                  @default("USD")
+  sourceRecordId  String                  @default("")
+  serviceDate     DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([invoiceId])
+}
+
+model TrustAccount {
+  id                        String                      @id @default(cuid())
+  firm                      Firm                        @relation("TrustAccount_firm", fields: [firmId], references: [id])
+  firmId                    String                      @map("firm")
+  office                    Office?                     @relation("TrustAccount_office", fields: [officeId], references: [id])
+  officeId                  String?                     @map("office")
+  name                      String                      @default("")
+  accountType               TrustAccountAccountTypeType @default(trust)
+  status                    TrustAccountStatusType      @default(pending)
+  currencyCode              String                      @default("USD")
+  financialInstitutionName  String                      @default("")
+  bankAccountLastFour       String                      @default("")
+  externalAccountReference  String                      @default("")
+  openedAt                  DateTime?
+  closedAt                  DateTime?
+  ledgerAccounts            TrustLedgerAccount[]        @relation("TrustLedgerAccount_trustAccount")
+  transactions              TrustTransaction[]          @relation("TrustTransaction_trustAccount")
+  entries                   TrustLedgerEntry[]          @relation("TrustLedgerEntry_trustAccount")
+  snapshots                 TrustBalanceSnapshot[]      @relation("TrustBalanceSnapshot_trustAccount")
+  reconciliations           TrustReconciliation[]       @relation("TrustReconciliation_trustAccount")
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @default(now()) @updatedAt
+  from_Payment_trustAccount Payment[]                   @relation("Payment_trustAccount")
+
+  @@index([firmId])
+  @@index([officeId])
+}
+
+model TrustLedgerAccount {
+  id                                        String                       @id @default(cuid())
+  firm                                      Firm                         @relation("TrustLedgerAccount_firm", fields: [firmId], references: [id])
+  firmId                                    String                       @map("firm")
+  matter                                    Matter?                      @relation("TrustLedgerAccount_matter", fields: [matterId], references: [id])
+  matterId                                  String?                      @map("matter")
+  trustAccount                              TrustAccount                 @relation("TrustLedgerAccount_trustAccount", fields: [trustAccountId], references: [id])
+  trustAccountId                            String                       @map("trustAccount")
+  client                                    Contact                      @relation("TrustLedgerAccount_client", fields: [clientId], references: [id])
+  clientId                                  String                       @map("client")
+  ledgerNumber                              String                       @default("")
+  status                                    TrustLedgerAccountStatusType @default(active)
+  currencyCode                              String                       @default("USD")
+  openedAt                                  DateTime?                    @default(now())
+  closedAt                                  DateTime?
+  freezeReason                              String                       @default("")
+  entries                                   TrustLedgerEntry[]           @relation("TrustLedgerEntry_ledgerAccount")
+  snapshots                                 TrustBalanceSnapshot[]       @relation("TrustBalanceSnapshot_ledgerAccount")
+  createdAt                                 DateTime                     @default(now())
+  updatedAt                                 DateTime                     @default(now()) @updatedAt
+  from_RetainerAgreement_trustLedgerAccount RetainerAgreement[]          @relation("RetainerAgreement_trustLedgerAccount")
+
+  @@unique([firmId, ledgerNumber])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([trustAccountId])
+  @@index([clientId])
+  @@index([ledgerNumber])
+}
+
+model TrustTransaction {
+  id                                      String                              @id @default(cuid())
+  firm                                    Firm                                @relation("TrustTransaction_firm", fields: [firmId], references: [id])
+  firmId                                  String                              @map("firm")
+  transactionNumber                       String                              @default("")
+  idempotencyKey                          String                              @unique @default("")
+  postingDigest                           String                              @default("")
+  trustAccount                            TrustAccount                        @relation("TrustTransaction_trustAccount", fields: [trustAccountId], references: [id])
+  trustAccountId                          String                              @map("trustAccount")
+  transactionType                         TrustTransactionTransactionTypeType
+  status                                  TrustTransactionStatusType          @default(posted)
+  currencyCode                            String                              @default("")
+  description                             String                              @default("")
+  occurredAt                              DateTime
+  postedAt                                DateTime                            @default(now())
+  postedBy                                User?                               @relation("TrustTransaction_postedBy", fields: [postedById], references: [id])
+  postedById                              String?                             @map("postedBy")
+  postedByAgent                           AgentPrincipal?                     @relation("TrustTransaction_postedByAgent", fields: [postedByAgentId], references: [id])
+  postedByAgentId                         String?                             @map("postedByAgent")
+  sourcePayment                           Payment?                            @relation("TrustTransaction_sourcePayment", fields: [sourcePaymentId], references: [id])
+  sourcePaymentId                         String?                             @map("sourcePayment")
+  sourceRefund                            Refund?                             @relation("TrustTransaction_sourceRefund", fields: [sourceRefundId], references: [id])
+  sourceRefundId                          String?                             @map("sourceRefund")
+  reversesTransaction                     TrustTransaction?                   @relation("TrustTransaction_reversesTransaction", fields: [reversesTransactionId], references: [id])
+  reversesTransactionId                   String?                             @map("reversesTransaction")
+  reversalTransactions                    TrustTransaction[]                  @relation("TrustTransaction_reversesTransaction")
+  entries                                 TrustLedgerEntry[]                  @relation("TrustLedgerEntry_transaction")
+  createdAt                               DateTime                            @default(now())
+  updatedAt                               DateTime                            @default(now()) @updatedAt
+  from_PaymentAllocation_trustTransaction PaymentAllocation[]                 @relation("PaymentAllocation_trustTransaction")
+  from_AuditEvent_trustTransaction        AuditEvent[]                        @relation("AuditEvent_trustTransaction")
+  from_AgentAction_trustTransaction       AgentAction[]                       @relation("AgentAction_trustTransaction")
+
+  @@unique([firmId, transactionNumber])
+  @@unique([reversesTransactionId])
+  @@unique([sourcePaymentId])
+  @@unique([sourceRefundId])
+  @@index([firmId])
+  @@index([transactionNumber])
+  @@index([postingDigest])
+  @@index([trustAccountId])
+  @@index([postedById])
+  @@index([postedByAgentId])
+  @@index([sourcePaymentId])
+  @@index([sourceRefundId])
+  @@index([reversesTransactionId])
+}
+
+model TrustLedgerEntry {
+  id               String                               @id @default(cuid())
+  firm             Firm                                 @relation("TrustLedgerEntry_firm", fields: [firmId], references: [id])
+  firmId           String                               @map("firm")
+  matter           Matter?                              @relation("TrustLedgerEntry_matter", fields: [matterId], references: [id])
+  matterId         String?                              @map("matter")
+  transaction      TrustTransaction                     @relation("TrustLedgerEntry_transaction", fields: [transactionId], references: [id])
+  transactionId    String                               @map("transaction")
+  trustAccount     TrustAccount                         @relation("TrustLedgerEntry_trustAccount", fields: [trustAccountId], references: [id])
+  trustAccountId   String                               @map("trustAccount")
+  ledgerAccount    TrustLedgerAccount?                  @relation("TrustLedgerEntry_ledgerAccount", fields: [ledgerAccountId], references: [id])
+  ledgerAccountId  String?                              @map("ledgerAccount")
+  accountingBucket TrustLedgerEntryAccountingBucketType
+  direction        TrustLedgerEntryDirectionType
+  amountMinor      Int
+  currencyCode     String                               @default("")
+  memo             String                               @default("")
+  occurredAt       DateTime
+  createdAt        DateTime                             @default(now())
+  updatedAt        DateTime                             @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([transactionId])
+  @@index([trustAccountId])
+  @@index([ledgerAccountId])
+}
+
+model TrustBalanceSnapshot {
+  id               String                               @id @default(cuid())
+  firm             Firm                                 @relation("TrustBalanceSnapshot_firm", fields: [firmId], references: [id])
+  firmId           String                               @map("firm")
+  matter           Matter?                              @relation("TrustBalanceSnapshot_matter", fields: [matterId], references: [id])
+  matterId         String?                              @map("matter")
+  trustAccount     TrustAccount                         @relation("TrustBalanceSnapshot_trustAccount", fields: [trustAccountId], references: [id])
+  trustAccountId   String                               @map("trustAccount")
+  ledgerAccount    TrustLedgerAccount?                  @relation("TrustBalanceSnapshot_ledgerAccount", fields: [ledgerAccountId], references: [id])
+  ledgerAccountId  String?                              @map("ledgerAccount")
+  reconciliation   TrustReconciliation?                 @relation("TrustBalanceSnapshot_reconciliation", fields: [reconciliationId], references: [id])
+  reconciliationId String?                              @map("reconciliation")
+  snapshotType     TrustBalanceSnapshotSnapshotTypeType
+  balanceMinor     Int
+  currencyCode     String                               @default("")
+  asOf             DateTime
+  createdBy        User?                                @relation("TrustBalanceSnapshot_createdBy", fields: [createdById], references: [id])
+  createdById      String?                              @map("createdBy")
+  createdAt        DateTime                             @default(now())
+  updatedAt        DateTime                             @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([trustAccountId])
+  @@index([ledgerAccountId])
+  @@index([reconciliationId])
+  @@index([createdById])
+}
+
+model TrustReconciliation {
+  id                    String                        @id @default(cuid())
+  firm                  Firm                          @relation("TrustReconciliation_firm", fields: [firmId], references: [id])
+  firmId                String                        @map("firm")
+  trustAccount          TrustAccount                  @relation("TrustReconciliation_trustAccount", fields: [trustAccountId], references: [id])
+  trustAccountId        String                        @map("trustAccount")
+  status                TrustReconciliationStatusType @default(draft)
+  periodStart           DateTime
+  periodEnd             DateTime
+  statementBalanceMinor Int
+  bookBalanceMinor      Int
+  differenceMinor       Int
+  currencyCode          String                        @default("")
+  createdBy             User?                         @relation("TrustReconciliation_createdBy", fields: [createdById], references: [id])
+  createdById           String?                       @map("createdBy")
+  reviewedBy            User?                         @relation("TrustReconciliation_reviewedBy", fields: [reviewedById], references: [id])
+  reviewedById          String?                       @map("reviewedBy")
+  reviewedAt            DateTime?
+  completedAt           DateTime?
+  notes                 String                        @default("")
+  snapshots             TrustBalanceSnapshot[]        @relation("TrustBalanceSnapshot_reconciliation")
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @default(now()) @updatedAt
+
+  @@unique([trustAccountId, periodStart, periodEnd])
+  @@index([firmId])
+  @@index([trustAccountId])
+  @@index([createdById])
+  @@index([reviewedById])
+}
+
+model Payment {
+  id                              String                 @id @default(cuid())
+  firm                            Firm                   @relation("Payment_firm", fields: [firmId], references: [id])
+  firmId                          String                 @map("firm")
+  matter                          Matter?                @relation("Payment_matter", fields: [matterId], references: [id])
+  matterId                        String?                @map("matter")
+  invoice                         Invoice?               @relation("Payment_invoice", fields: [invoiceId], references: [id])
+  invoiceId                       String?                @map("invoice")
+  trustAccount                    TrustAccount?          @relation("Payment_trustAccount", fields: [trustAccountId], references: [id])
+  trustAccountId                  String?                @map("trustAccount")
+  payer                           Contact                @relation("Payment_payer", fields: [payerId], references: [id])
+  payerId                         String                 @map("payer")
+  paymentNumber                   String                 @default("")
+  idempotencyKey                  String                 @default("")
+  paymentType                     PaymentPaymentTypeType
+  status                          PaymentStatusType      @default(pending)
+  amountMinor                     Int
+  refundedMinor                   Int?                   @default(0)
+  currencyCode                    String                 @default("USD")
+  providerCode                    String                 @default("")
+  integrationConnection           IntegrationConnection? @relation("Payment_integrationConnection", fields: [integrationConnectionId], references: [id])
+  integrationConnectionId         String?                @map("integrationConnection")
+  providerPaymentId               String                 @default("")
+  authorizedAt                    DateTime?
+  capturedAt                      DateTime?
+  settledAt                       DateTime?
+  failedAt                        DateTime?
+  failureReason                   String                 @default("")
+  receivedBy                      User?                  @relation("Payment_receivedBy", fields: [receivedById], references: [id])
+  receivedById                    String?                @map("receivedBy")
+  allocations                     PaymentAllocation[]    @relation("PaymentAllocation_payment")
+  refunds                         Refund[]               @relation("Refund_payment")
+  trustTransactions               TrustTransaction[]     @relation("TrustTransaction_sourcePayment")
+  createdAt                       DateTime               @default(now())
+  updatedAt                       DateTime               @default(now()) @updatedAt
+  from_ExternalRecordLink_payment ExternalRecordLink[]   @relation("ExternalRecordLink_payment")
+  from_AuditEvent_payment         AuditEvent[]           @relation("AuditEvent_payment")
+  from_AgentAction_payment        AgentAction[]          @relation("AgentAction_payment")
+
+  @@unique([firmId, paymentNumber])
+  @@unique([firmId, idempotencyKey])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([invoiceId])
+  @@index([trustAccountId])
+  @@index([payerId])
+  @@index([paymentNumber])
+  @@index([idempotencyKey])
+  @@index([integrationConnectionId])
+  @@index([providerPaymentId])
+  @@index([receivedById])
+}
+
+model PaymentAllocation {
+  id                   String                              @id @default(cuid())
+  firm                 Firm                                @relation("PaymentAllocation_firm", fields: [firmId], references: [id])
+  firmId               String                              @map("firm")
+  matter               Matter?                             @relation("PaymentAllocation_matter", fields: [matterId], references: [id])
+  matterId             String?                             @map("matter")
+  payment              Payment                             @relation("PaymentAllocation_payment", fields: [paymentId], references: [id])
+  paymentId            String                              @map("payment")
+  idempotencyKey       String?
+  invoice              Invoice?                            @relation("PaymentAllocation_invoice", fields: [invoiceId], references: [id])
+  invoiceId            String?                             @map("invoice")
+  trustTransaction     TrustTransaction?                   @relation("PaymentAllocation_trustTransaction", fields: [trustTransactionId], references: [id])
+  trustTransactionId   String?                             @map("trustTransaction")
+  allocationType       PaymentAllocationAllocationTypeType
+  amountMinor          Int
+  currencyCode         String                              @default("")
+  allocatedBy          User?                               @relation("PaymentAllocation_allocatedBy", fields: [allocatedById], references: [id])
+  allocatedById        String?                             @map("allocatedBy")
+  allocatedAt          DateTime                            @default(now())
+  reversesAllocation   PaymentAllocation?                  @relation("PaymentAllocation_reversesAllocation", fields: [reversesAllocationId], references: [id])
+  reversesAllocationId String?                             @map("reversesAllocation")
+  reversalAllocations  PaymentAllocation[]                 @relation("PaymentAllocation_reversesAllocation")
+  note                 String                              @default("")
+  createdAt            DateTime                            @default(now())
+  updatedAt            DateTime                            @default(now()) @updatedAt
+
+  @@unique([firmId, idempotencyKey])
+  @@unique([reversesAllocationId])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([paymentId])
+  @@index([idempotencyKey])
+  @@index([invoiceId])
+  @@index([trustTransactionId])
+  @@index([allocatedById])
+  @@index([reversesAllocationId])
+}
+
+model Refund {
+  id                String             @id @default(cuid())
+  firm              Firm               @relation("Refund_firm", fields: [firmId], references: [id])
+  firmId            String             @map("firm")
+  matter            Matter?            @relation("Refund_matter", fields: [matterId], references: [id])
+  matterId          String?            @map("matter")
+  payment           Payment            @relation("Refund_payment", fields: [paymentId], references: [id])
+  paymentId         String             @map("payment")
+  invoice           Invoice?           @relation("Refund_invoice", fields: [invoiceId], references: [id])
+  invoiceId         String?            @map("invoice")
+  refundNumber      String             @default("")
+  idempotencyKey    String             @default("")
+  status            RefundStatusType   @default(requested)
+  reason            RefundReasonType
+  amountMinor       Int
+  currencyCode      String             @default("")
+  explanation       String             @default("")
+  requestedBy       User               @relation("Refund_requestedBy", fields: [requestedById], references: [id])
+  requestedById     String             @map("requestedBy")
+  approvedBy        User?              @relation("Refund_approvedBy", fields: [approvedById], references: [id])
+  approvedById      String?            @map("approvedBy")
+  requestedAt       DateTime?          @default(now())
+  approvedAt        DateTime?
+  processedAt       DateTime?
+  providerRefundId  String             @default("")
+  failureReason     String             @default("")
+  trustTransactions TrustTransaction[] @relation("TrustTransaction_sourceRefund")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @default(now()) @updatedAt
+
+  @@unique([firmId, refundNumber])
+  @@unique([firmId, idempotencyKey])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([paymentId])
+  @@index([invoiceId])
+  @@index([refundNumber])
+  @@index([idempotencyKey])
+  @@index([requestedById])
+  @@index([approvedById])
+  @@index([providerRefundId])
+}
+
+model PortalAccount {
+  id                                          String                     @id @default(cuid())
+  firm                                        Firm                       @relation("PortalAccount_firm", fields: [firmId], references: [id])
+  firmId                                      String                     @map("firm")
+  contact                                     Contact                    @relation("PortalAccount_contact", fields: [contactId], references: [id])
+  contactId                                   String                     @map("contact")
+  user                                        User?                      @relation("PortalAccount_user", fields: [userId], references: [id])
+  userId                                      String?                    @map("user")
+  email                                       String                     @default("")
+  status                                      PortalAccountStatusType    @default(invited)
+  inviteTokenDigest                           String?                    @unique
+  inviteTokenPrefix                           String                     @default("")
+  resetTokenDigest                            String                     @default("")
+  inviteExpiresAt                             DateTime?
+  resetExpiresAt                              DateTime?
+  invitedAt                                   DateTime?
+  acceptedAt                                  DateTime?
+  lastLoginAt                                 DateTime?
+  suspendedAt                                 DateTime?
+  closedAt                                    DateTime?
+  matterAccesses                              PortalMatterAccess[]       @relation("PortalMatterAccess_portalAccount")
+  shares                                      PortalShare[]              @relation("PortalShare_portalAccount")
+  sessions                                    PortalSession[]            @relation("PortalSession_portalAccount")
+  createdAt                                   DateTime                   @default(now())
+  updatedAt                                   DateTime                   @default(now()) @updatedAt
+  from_CommunicationParticipant_portalAccount CommunicationParticipant[] @relation("CommunicationParticipant_portalAccount")
+  from_DocumentSigner_portalAccount           DocumentSigner[]           @relation("DocumentSigner_portalAccount")
+  from_PortalGrantIntent_portalAccount        PortalGrantIntent[]        @relation("PortalGrantIntent_portalAccount")
+
+  @@unique([firmId, email])
+  @@index([firmId])
+  @@index([contactId])
+  @@index([userId])
+  @@index([email])
+  @@index([inviteTokenPrefix])
+}
+
+model PortalMatterAccess {
+  id                           String                       @id @default(cuid())
+  firm                         Firm                         @relation("PortalMatterAccess_firm", fields: [firmId], references: [id])
+  firmId                       String                       @map("firm")
+  matter                       Matter                       @relation("PortalMatterAccess_matter", fields: [matterId], references: [id])
+  matterId                     String                       @map("matter")
+  portalAccount                PortalAccount                @relation("PortalMatterAccess_portalAccount", fields: [portalAccountId], references: [id])
+  portalAccountId              String                       @map("portalAccount")
+  policyRevision               Int                          @default(0)
+  version                      Int                          @default(0)
+  contact                      Contact?                     @relation("PortalMatterAccess_contact", fields: [contactId], references: [id])
+  contactId                    String?                      @map("contact")
+  status                       PortalMatterAccessStatusType @default(active)
+  canReadDocuments             Boolean                      @default(false)
+  canUploadDocuments           Boolean                      @default(false)
+  canReadInvoices              Boolean                      @default(false)
+  canReadMessages              Boolean                      @default(false)
+  grantedBy                    User                         @relation("PortalMatterAccess_grantedBy", fields: [grantedById], references: [id])
+  grantedById                  String                       @map("grantedBy")
+  grantedAt                    DateTime                     @default(now())
+  expiresAt                    DateTime?
+  revokedBy                    User?                        @relation("PortalMatterAccess_revokedBy", fields: [revokedById], references: [id])
+  revokedById                  String?                      @map("revokedBy")
+  revokedAt                    DateTime?
+  revocationReason             String                       @default("")
+  shares                       PortalShare[]                @relation("PortalShare_matterAccess")
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @default(now()) @updatedAt
+  from_PortalGrantIntent_grant PortalGrantIntent[]          @relation("PortalGrantIntent_grant")
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([portalAccountId])
+  @@index([contactId])
+  @@index([grantedById])
+  @@index([revokedById])
+}
+
+model PortalShare {
+  id                    String                      @id @default(cuid())
+  firm                  Firm                        @relation("PortalShare_firm", fields: [firmId], references: [id])
+  firmId                String                      @map("firm")
+  matter                Matter                      @relation("PortalShare_matter", fields: [matterId], references: [id])
+  matterId              String                      @map("matter")
+  portalAccount         PortalAccount               @relation("PortalShare_portalAccount", fields: [portalAccountId], references: [id])
+  portalAccountId       String                      @map("portalAccount")
+  matterAccess          PortalMatterAccess          @relation("PortalShare_matterAccess", fields: [matterAccessId], references: [id])
+  matterAccessId        String                      @map("matterAccess")
+  grantVersion          Int                         @default(0)
+  policyRevision        Int                         @default(0)
+  contact               Contact?                    @relation("PortalShare_contact", fields: [contactId], references: [id])
+  contactId             String?                     @map("contact")
+  status                PortalShareStatusType       @default(active)
+  resourceType          PortalShareResourceTypeType
+  document              Document?                   @relation("PortalShare_document", fields: [documentId], references: [id])
+  documentId            String?                     @map("document")
+  documentVersion       DocumentVersion?            @relation("PortalShare_documentVersion", fields: [documentVersionId], references: [id])
+  documentVersionId     String?                     @map("documentVersion")
+  invoice               Invoice?                    @relation("PortalShare_invoice", fields: [invoiceId], references: [id])
+  invoiceId             String?                     @map("invoice")
+  communicationThread   CommunicationThread?        @relation("PortalShare_communicationThread", fields: [communicationThreadId], references: [id])
+  communicationThreadId String?                     @map("communicationThread")
+  grantedBy             User                        @relation("PortalShare_grantedBy", fields: [grantedById], references: [id])
+  grantedById           String                      @map("grantedBy")
+  grantedAt             DateTime                    @default(now())
+  expiresAt             DateTime?
+  revokedBy             User?                       @relation("PortalShare_revokedBy", fields: [revokedById], references: [id])
+  revokedById           String?                     @map("revokedBy")
+  revokedAt             DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([portalAccountId])
+  @@index([matterAccessId])
+  @@index([contactId])
+  @@index([documentId])
+  @@index([documentVersionId])
+  @@index([invoiceId])
+  @@index([communicationThreadId])
+  @@index([grantedById])
+  @@index([revokedById])
+}
+
+model PortalSession {
+  id              String                  @id @default(cuid())
+  firm            Firm                    @relation("PortalSession_firm", fields: [firmId], references: [id])
+  firmId          String                  @map("firm")
+  portalAccount   PortalAccount           @relation("PortalSession_portalAccount", fields: [portalAccountId], references: [id])
+  portalAccountId String                  @map("portalAccount")
+  tokenDigest     String                  @unique @default("")
+  tokenPrefix     String                  @default("")
+  status          PortalSessionStatusType @default(active)
+  expiresAt       DateTime
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([portalAccountId])
+  @@index([tokenPrefix])
+}
+
+model PortalDiscoveryPolicy {
+  id           String   @id @default(cuid())
+  firm         Firm     @relation("PortalDiscoveryPolicy_firm", fields: [firmId], references: [id])
+  firmId       String   @map("firm")
+  revision     Int
+  mode         String   @default("")
+  statuses     Json?
+  admission    String   @default("")
+  reasonDigest String   @default("")
+  recordedBy   User     @relation("PortalDiscoveryPolicy_recordedBy", fields: [recordedById], references: [id])
+  recordedById String   @map("recordedBy")
+  recordedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@unique([firmId, revision])
+  @@index([firmId])
+  @@index([recordedById])
+}
+
+model PortalGrantIntent {
+  id              String             @id @default(cuid())
+  firm            Firm               @relation("PortalGrantIntent_firm", fields: [firmId], references: [id])
+  firmId          String             @map("firm")
+  actor           User               @relation("PortalGrantIntent_actor", fields: [actorId], references: [id])
+  actorId         String             @map("actor")
+  matter          Matter             @relation("PortalGrantIntent_matter", fields: [matterId], references: [id])
+  matterId        String             @map("matter")
+  portalAccount   PortalAccount      @relation("PortalGrantIntent_portalAccount", fields: [portalAccountId], references: [id])
+  portalAccountId String             @map("portalAccount")
+  contact         Contact            @relation("PortalGrantIntent_contact", fields: [contactId], references: [id])
+  contactId       String             @map("contact")
+  grant           PortalMatterAccess @relation("PortalGrantIntent_grant", fields: [grantId], references: [id])
+  grantId         String             @map("grant")
+  idempotencyKey  String             @default("")
+  intentDigest    String             @default("")
+  operation       String             @default("")
+  policyRevision  Int
+  resultVersion   Int
+  completedAt     DateTime           @default(now())
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @default(now()) @updatedAt
+
+  @@unique([firmId, actorId, idempotencyKey])
+  @@index([firmId])
+  @@index([actorId])
+  @@index([matterId])
+  @@index([portalAccountId])
+  @@index([contactId])
+  @@index([grantId])
+}
+
+model IntegrationConnection {
+  id                                               String                            @id @default(cuid())
+  firm                                             Firm                              @relation("IntegrationConnection_firm", fields: [firmId], references: [id])
+  firmId                                           String                            @map("firm")
+  office                                           Office?                           @relation("IntegrationConnection_office", fields: [officeId], references: [id])
+  officeId                                         String?                           @map("office")
+  owner                                            User?                             @relation("IntegrationConnection_owner", fields: [ownerId], references: [id])
+  ownerId                                          String?                           @map("owner")
+  name                                             String                            @default("")
+  provider                                         String                            @default("")
+  category                                         IntegrationConnectionCategoryType
+  status                                           IntegrationConnectionStatusType   @default(pending)
+  credentialsEncrypted                             String                            @default("")
+  oauthAccessToken                                 String                            @default("")
+  oauthRefreshToken                                String                            @default("")
+  webhookSecretDigest                              String                            @default("")
+  configuration                                    Json?
+  externalAccountId                                String                            @default("")
+  lastSyncedAt                                     DateTime?
+  lastErrorAt                                      DateTime?
+  lastError                                        String                            @default("")
+  externalLinks                                    ExternalRecordLink[]              @relation("ExternalRecordLink_connection")
+  webhookSubscriptions                             WebhookSubscription[]             @relation("WebhookSubscription_connection")
+  webhookDeliveries                                WebhookDelivery[]                 @relation("WebhookDelivery_connection")
+  createdAt                                        DateTime                          @default(now())
+  updatedAt                                        DateTime                          @default(now()) @updatedAt
+  from_CommunicationDelivery_integrationConnection CommunicationDelivery[]           @relation("CommunicationDelivery_integrationConnection")
+  from_SignatureRequest_integrationConnection      SignatureRequest[]                @relation("SignatureRequest_integrationConnection")
+  from_Payment_integrationConnection               Payment[]                         @relation("Payment_integrationConnection")
+
+  @@index([firmId])
+  @@index([officeId])
+  @@index([ownerId])
+}
+
+model ExternalRecordLink {
+  id               String                             @id @default(cuid())
+  firm             Firm                               @relation("ExternalRecordLink_firm", fields: [firmId], references: [id])
+  firmId           String                             @map("firm")
+  connection       IntegrationConnection              @relation("ExternalRecordLink_connection", fields: [connectionId], references: [id])
+  connectionId     String                             @map("connection")
+  resourceType     ExternalRecordLinkResourceTypeType
+  externalId       String                             @default("")
+  externalUrl      String                             @default("")
+  status           ExternalRecordLinkStatusType?      @default(linked)
+  contact          Contact?                           @relation("ExternalRecordLink_contact", fields: [contactId], references: [id])
+  contactId        String?                            @map("contact")
+  intake           Intake?                            @relation("ExternalRecordLink_intake", fields: [intakeId], references: [id])
+  intakeId         String?                            @map("intake")
+  matter           Matter?                            @relation("ExternalRecordLink_matter", fields: [matterId], references: [id])
+  matterId         String?                            @map("matter")
+  document         Document?                          @relation("ExternalRecordLink_document", fields: [documentId], references: [id])
+  documentId       String?                            @map("document")
+  invoice          Invoice?                           @relation("ExternalRecordLink_invoice", fields: [invoiceId], references: [id])
+  invoiceId        String?                            @map("invoice")
+  payment          Payment?                           @relation("ExternalRecordLink_payment", fields: [paymentId], references: [id])
+  paymentId        String?                            @map("payment")
+  docket           Docket?                            @relation("ExternalRecordLink_docket", fields: [docketId], references: [id])
+  docketId         String?                            @map("docket")
+  fingerprint      String                             @default("")
+  providerMetadata Json?
+  lastSyncedAt     DateTime?
+  lastError        String                             @default("")
+  createdAt        DateTime                           @default(now())
+  updatedAt        DateTime                           @default(now()) @updatedAt
+
+  @@unique([connectionId, resourceType, externalId])
+  @@index([firmId])
+  @@index([connectionId])
+  @@index([externalId])
+  @@index([contactId])
+  @@index([intakeId])
+  @@index([matterId])
+  @@index([documentId])
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@index([docketId])
+}
+
+model WebhookSubscription {
+  id                     String                        @id @default(cuid())
+  firm                   Firm                          @relation("WebhookSubscription_firm", fields: [firmId], references: [id])
+  firmId                 String                        @map("firm")
+  office                 Office?                       @relation("WebhookSubscription_office", fields: [officeId], references: [id])
+  officeId               String?                       @map("office")
+  connection             IntegrationConnection         @relation("WebhookSubscription_connection", fields: [connectionId], references: [id])
+  connectionId           String                        @map("connection")
+  name                   String                        @default("")
+  status                 WebhookSubscriptionStatusType @default(active)
+  endpointUrl            String                        @default("")
+  eventTypes             Json                          @default("[]")
+  signingSecretDigest    String                        @default("")
+  signingSecretEncrypted String                        @default("")
+  lastDeliveredAt        DateTime?
+  deliveries             WebhookDelivery[]             @relation("WebhookDelivery_subscription")
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([officeId])
+  @@index([connectionId])
+}
+
+model WebhookDelivery {
+  id             String                    @id @default(cuid())
+  firm           Firm                      @relation("WebhookDelivery_firm", fields: [firmId], references: [id])
+  firmId         String                    @map("firm")
+  matter         Matter?                   @relation("WebhookDelivery_matter", fields: [matterId], references: [id])
+  matterId       String?                   @map("matter")
+  connection     IntegrationConnection     @relation("WebhookDelivery_connection", fields: [connectionId], references: [id])
+  connectionId   String                    @map("connection")
+  subscription   WebhookSubscription       @relation("WebhookDelivery_subscription", fields: [subscriptionId], references: [id])
+  subscriptionId String                    @map("subscription")
+  eventId        String                    @default("")
+  eventType      String                    @default("")
+  status         WebhookDeliveryStatusType @default(pending)
+  payload        Json?
+  destinationUrl String                    @default("")
+  attemptCount   Int?                      @default(0)
+  nextAttemptAt  DateTime?
+  completedAt    DateTime?
+  lastError      String                    @default("")
+  attempts       WebhookDeliveryAttempt[]  @relation("WebhookDeliveryAttempt_delivery")
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @default(now()) @updatedAt
+
+  @@unique([firmId, eventId])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([connectionId])
+  @@index([subscriptionId])
+  @@index([eventId])
+}
+
+model WebhookDeliveryAttempt {
+  id             String                              @id @default(cuid())
+  firm           Firm                                @relation("WebhookDeliveryAttempt_firm", fields: [firmId], references: [id])
+  firmId         String                              @map("firm")
+  matter         Matter?                             @relation("WebhookDeliveryAttempt_matter", fields: [matterId], references: [id])
+  matterId       String?                             @map("matter")
+  delivery       WebhookDelivery                     @relation("WebhookDeliveryAttempt_delivery", fields: [deliveryId], references: [id])
+  deliveryId     String                              @map("delivery")
+  attemptNumber  Int
+  attemptedAt    DateTime                            @default(now())
+  requestDigest  String                              @default("")
+  responseStatus Int?
+  responseDigest String                              @default("")
+  succeeded      WebhookDeliveryAttemptSucceededType
+  errorCode      String                              @default("")
+  errorMessage   String                              @default("")
+  createdAt      DateTime                            @default(now())
+  updatedAt      DateTime                            @default(now()) @updatedAt
+
+  @@unique([deliveryId, attemptNumber])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([deliveryId])
+}
+
+model RetentionPolicy {
+  id                    String                         @id @default(cuid())
+  firm                  Firm                           @relation("RetentionPolicy_firm", fields: [firmId], references: [id])
+  firmId                String                         @map("firm")
+  name                  String                         @default("")
+  code                  String                         @default("")
+  status                RetentionPolicyStatusType      @default(draft)
+  recordClass           RetentionPolicyRecordClassType
+  trigger               RetentionPolicyTriggerType
+  retentionDays         Int
+  practiceArea          PracticeArea?                  @relation("RetentionPolicy_practiceArea", fields: [practiceAreaId], references: [id])
+  practiceAreaId        String?                        @map("practiceArea")
+  description           String                         @default("")
+  jurisdictionReference String                         @default("")
+  documents             Document[]                     @relation("Document_retentionPolicy")
+  holds                 RetentionHold[]                @relation("RetentionHold_policy")
+  actions               RetentionAction[]              @relation("RetentionAction_policy")
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @default(now()) @updatedAt
+
+  @@unique([firmId, code])
+  @@index([firmId])
+  @@index([code])
+  @@index([practiceAreaId])
+}
+
+model RetentionHold {
+  id                 String                  @id @default(cuid())
+  firm               Firm                    @relation("RetentionHold_firm", fields: [firmId], references: [id])
+  firmId             String                  @map("firm")
+  policy             RetentionPolicy?        @relation("RetentionHold_policy", fields: [policyId], references: [id])
+  policyId           String?                 @map("policy")
+  name               String                  @default("")
+  status             RetentionHoldStatusType @default(active)
+  matter             Matter?                 @relation("RetentionHold_matter", fields: [matterId], references: [id])
+  matterId           String?                 @map("matter")
+  document           Document?               @relation("RetentionHold_document", fields: [documentId], references: [id])
+  documentId         String?                 @map("document")
+  contact            Contact?                @relation("RetentionHold_contact", fields: [contactId], references: [id])
+  contactId          String?                 @map("contact")
+  reason             String                  @default("")
+  authorityReference String                  @default("")
+  createdBy          User                    @relation("RetentionHold_createdBy", fields: [createdById], references: [id])
+  createdById        String                  @map("createdBy")
+  effectiveAt        DateTime                @default(now())
+  releasedBy         User?                   @relation("RetentionHold_releasedBy", fields: [releasedById], references: [id])
+  releasedById       String?                 @map("releasedBy")
+  releasedAt         DateTime?
+  releaseReason      String                  @default("")
+  actions            RetentionAction[]       @relation("RetentionAction_hold")
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([policyId])
+  @@index([matterId])
+  @@index([documentId])
+  @@index([contactId])
+  @@index([createdById])
+  @@index([releasedById])
+}
+
+model RetentionAction {
+  id                    String                          @id @default(cuid())
+  firm                  Firm                            @relation("RetentionAction_firm", fields: [firmId], references: [id])
+  firmId                String                          @map("firm")
+  policy                RetentionPolicy?                @relation("RetentionAction_policy", fields: [policyId], references: [id])
+  policyId              String?                         @map("policy")
+  hold                  RetentionHold?                  @relation("RetentionAction_hold", fields: [holdId], references: [id])
+  holdId                String?                         @map("hold")
+  actionType            RetentionActionActionTypeType
+  resourceType          RetentionActionResourceTypeType
+  matter                Matter?                         @relation("RetentionAction_matter", fields: [matterId], references: [id])
+  matterId              String?                         @map("matter")
+  document              Document?                       @relation("RetentionAction_document", fields: [documentId], references: [id])
+  documentId            String?                         @map("document")
+  contact               Contact?                        @relation("RetentionAction_contact", fields: [contactId], references: [id])
+  contactId             String?                         @map("contact")
+  communicationThread   CommunicationThread?            @relation("RetentionAction_communicationThread", fields: [communicationThreadId], references: [id])
+  communicationThreadId String?                         @map("communicationThread")
+  invoice               Invoice?                        @relation("RetentionAction_invoice", fields: [invoiceId], references: [id])
+  invoiceId             String?                         @map("invoice")
+  performedBy           User?                           @relation("RetentionAction_performedBy", fields: [performedById], references: [id])
+  performedById         String?                         @map("performedBy")
+  performedByAgent      AgentPrincipal?                 @relation("RetentionAction_performedByAgent", fields: [performedByAgentId], references: [id])
+  performedByAgentId    String?                         @map("performedByAgent")
+  approvedBy            User?                           @relation("RetentionAction_approvedBy", fields: [approvedById], references: [id])
+  approvedById          String?                         @map("approvedBy")
+  evidenceDigest        String                          @default("")
+  occurredAt            DateTime                        @default(now())
+  metadata              Json?
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([policyId])
+  @@index([holdId])
+  @@index([matterId])
+  @@index([documentId])
+  @@index([contactId])
+  @@index([communicationThreadId])
+  @@index([invoiceId])
+  @@index([performedById])
+  @@index([performedByAgentId])
+  @@index([approvedById])
+}
+
+model AuditEvent {
+  id                 String                 @id @default(cuid())
+  firm               Firm                   @relation("AuditEvent_firm", fields: [firmId], references: [id])
+  firmId             String                 @map("firm")
+  eventId            String                 @default("")
+  eventType          String                 @default("")
+  category           AuditEventCategoryType
+  outcome            AuditEventOutcomeType
+  actorUser          User?                  @relation("AuditEvent_actorUser", fields: [actorUserId], references: [id])
+  actorUserId        String?                @map("actorUser")
+  actorAgent         AgentPrincipal?        @relation("AuditEvent_actorAgent", fields: [actorAgentId], references: [id])
+  actorAgentId       String?                @map("actorAgent")
+  actorType          String                 @default("")
+  matter             Matter?                @relation("AuditEvent_matter", fields: [matterId], references: [id])
+  matterId           String?                @map("matter")
+  contact            Contact?               @relation("AuditEvent_contact", fields: [contactId], references: [id])
+  contactId          String?                @map("contact")
+  intake             Intake?                @relation("AuditEvent_intake", fields: [intakeId], references: [id])
+  intakeId           String?                @map("intake")
+  document           Document?              @relation("AuditEvent_document", fields: [documentId], references: [id])
+  documentId         String?                @map("document")
+  invoice            Invoice?               @relation("AuditEvent_invoice", fields: [invoiceId], references: [id])
+  invoiceId          String?                @map("invoice")
+  payment            Payment?               @relation("AuditEvent_payment", fields: [paymentId], references: [id])
+  paymentId          String?                @map("payment")
+  trustTransaction   TrustTransaction?      @relation("AuditEvent_trustTransaction", fields: [trustTransactionId], references: [id])
+  trustTransactionId String?                @map("trustTransaction")
+  agentAction        AgentAction?           @relation("AuditEvent_agentAction", fields: [agentActionId], references: [id])
+  agentActionId      String?                @map("agentAction")
+  sourceIp           String                 @default("")
+  userAgent          String                 @default("")
+  occurredAt         DateTime               @default(now())
+  metadata           Json?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @default(now()) @updatedAt
+
+  @@unique([firmId, eventId])
+  @@index([firmId])
+  @@index([eventId])
+  @@index([actorUserId])
+  @@index([actorAgentId])
+  @@index([matterId])
+  @@index([contactId])
+  @@index([intakeId])
+  @@index([documentId])
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@index([trustTransactionId])
+  @@index([agentActionId])
+}
+
+model AgentPrincipal {
+  id                                    String                      @id @default(cuid())
+  firm                                  Firm                        @relation("AgentPrincipal_firm", fields: [firmId], references: [id])
+  firmId                                String                      @map("firm")
+  owner                                 User                        @relation("AgentPrincipal_owner", fields: [ownerId], references: [id])
+  ownerId                               String                      @map("owner")
+  name                                  String                      @default("")
+  agentType                             AgentPrincipalAgentTypeType
+  status                                AgentPrincipalStatusType    @default(draft)
+  provider                              String                      @default("")
+  model                                 String                      @default("")
+  description                           String                      @default("")
+  lastActiveAt                          DateTime?
+  credentials                           AgentCredential[]           @relation("AgentCredential_agentPrincipal")
+  grants                                AgentGrant[]                @relation("AgentGrant_agentPrincipal")
+  actions                               AgentAction[]               @relation("AgentAction_agentPrincipal")
+  actionEvents                          AgentActionEvent[]          @relation("AgentActionEvent_actorAgent")
+  createdAt                             DateTime                    @default(now())
+  updatedAt                             DateTime                    @default(now()) @updatedAt
+  from_MatterStatusEvent_actorAgent     MatterStatusEvent[]         @relation("MatterStatusEvent_actorAgent")
+  from_CommunicationMessage_senderAgent CommunicationMessage[]      @relation("CommunicationMessage_senderAgent")
+  from_TrustTransaction_postedByAgent   TrustTransaction[]          @relation("TrustTransaction_postedByAgent")
+  from_RetentionAction_performedByAgent RetentionAction[]           @relation("RetentionAction_performedByAgent")
+  from_AuditEvent_actorAgent            AuditEvent[]                @relation("AuditEvent_actorAgent")
+
+  @@index([firmId])
+  @@index([ownerId])
+}
+
+model AgentCredential {
+  id               String                    @id @default(cuid())
+  firm             Firm                      @relation("AgentCredential_firm", fields: [firmId], references: [id])
+  firmId           String                    @map("firm")
+  agentPrincipal   AgentPrincipal            @relation("AgentCredential_agentPrincipal", fields: [agentPrincipalId], references: [id])
+  agentPrincipalId String                    @map("agentPrincipal")
+  name             String                    @default("")
+  prefix           String                    @unique @default("")
+  secretHash       String                    @default("")
+  status           AgentCredentialStatusType @default(active)
+  scopes           Json                      @default("[]")
+  createdBy        User                      @relation("AgentCredential_createdBy", fields: [createdById], references: [id])
+  createdById      String                    @map("createdBy")
+  expiresAt        DateTime?
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  revokedBy        User?                     @relation("AgentCredential_revokedBy", fields: [revokedById], references: [id])
+  revokedById      String?                   @map("revokedBy")
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([agentPrincipalId])
+  @@index([createdById])
+  @@index([revokedById])
+}
+
+model AgentGrant {
+  id               String               @id @default(cuid())
+  firm             Firm                 @relation("AgentGrant_firm", fields: [firmId], references: [id])
+  firmId           String               @map("firm")
+  matter           Matter?              @relation("AgentGrant_matter", fields: [matterId], references: [id])
+  matterId         String?              @map("matter")
+  agentPrincipal   AgentPrincipal       @relation("AgentGrant_agentPrincipal", fields: [agentPrincipalId], references: [id])
+  agentPrincipalId String               @map("agentPrincipal")
+  status           AgentGrantStatusType @default(proposed)
+  capabilities     Json                 @default("[]")
+  reason           String               @default("")
+  requestedBy      User                 @relation("AgentGrant_requestedBy", fields: [requestedById], references: [id])
+  requestedById    String               @map("requestedBy")
+  approvedBy       User?                @relation("AgentGrant_approvedBy", fields: [approvedById], references: [id])
+  approvedById     String?              @map("approvedBy")
+  approvedAt       DateTime?
+  startsAt         DateTime?
+  expiresAt        DateTime?
+  suspendedAt      DateTime?
+  revokedAt        DateTime?
+  actions          AgentAction[]        @relation("AgentAction_grant")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([agentPrincipalId])
+  @@index([requestedById])
+  @@index([approvedById])
+}
+
+model AgentAction {
+  id                          String                   @id @default(cuid())
+  firm                        Firm                     @relation("AgentAction_firm", fields: [firmId], references: [id])
+  firmId                      String                   @map("firm")
+  matter                      Matter?                  @relation("AgentAction_matter", fields: [matterId], references: [id])
+  matterId                    String?                  @map("matter")
+  agentPrincipal              AgentPrincipal           @relation("AgentAction_agentPrincipal", fields: [agentPrincipalId], references: [id])
+  agentPrincipalId            String                   @map("agentPrincipal")
+  grant                       AgentGrant               @relation("AgentAction_grant", fields: [grantId], references: [id])
+  grantId                     String                   @map("grant")
+  actionNumber                String                   @default("")
+  idempotencyKey              String                   @unique @default("")
+  actionType                  String
+  status                      AgentActionStatusType    @default(requested)
+  riskLevel                   AgentActionRiskLevelType @default(high)
+  requestDigest               String                   @default("")
+  requestEnvelope             Json?
+  requiresApproval            Boolean                  @default(true)
+  requestedByUser             User?                    @relation("AgentAction_requestedByUser", fields: [requestedByUserId], references: [id])
+  requestedByUserId           String?                  @map("requestedByUser")
+  approvedBy                  User?                    @relation("AgentAction_approvedBy", fields: [approvedById], references: [id])
+  approvedById                String?                  @map("approvedBy")
+  approvalDigest              String                   @default("")
+  approvalExpiresAt           DateTime?
+  reviewedAt                  DateTime?
+  rejectionReason             String                   @default("")
+  contact                     Contact?                 @relation("AgentAction_contact", fields: [contactId], references: [id])
+  contactId                   String?                  @map("contact")
+  intake                      Intake?                  @relation("AgentAction_intake", fields: [intakeId], references: [id])
+  intakeId                    String?                  @map("intake")
+  document                    Document?                @relation("AgentAction_document", fields: [documentId], references: [id])
+  documentId                  String?                  @map("document")
+  invoice                     Invoice?                 @relation("AgentAction_invoice", fields: [invoiceId], references: [id])
+  invoiceId                   String?                  @map("invoice")
+  payment                     Payment?                 @relation("AgentAction_payment", fields: [paymentId], references: [id])
+  paymentId                   String?                  @map("payment")
+  trustTransaction            TrustTransaction?        @relation("AgentAction_trustTransaction", fields: [trustTransactionId], references: [id])
+  trustTransactionId          String?                  @map("trustTransaction")
+  deadline                    Deadline?                @relation("AgentAction_deadline", fields: [deadlineId], references: [id])
+  deadlineId                  String?                  @map("deadline")
+  task                        LegalTask?               @relation("AgentAction_task", fields: [taskId], references: [id])
+  taskId                      String?                  @map("task")
+  startedAt                   DateTime?
+  completedAt                 DateTime?
+  resultDigest                String                   @default("")
+  resultEnvelope              Json?
+  errorMessage                String                   @default("")
+  events                      AgentActionEvent[]       @relation("AgentActionEvent_action")
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @default(now()) @updatedAt
+  from_AuditEvent_agentAction AuditEvent[]             @relation("AuditEvent_agentAction")
+
+  @@unique([firmId, actionNumber])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([agentPrincipalId])
+  @@index([grantId])
+  @@index([actionNumber])
+  @@index([requestedByUserId])
+  @@index([approvedById])
+  @@index([contactId])
+  @@index([intakeId])
+  @@index([documentId])
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@index([trustTransactionId])
+  @@index([deadlineId])
+  @@index([taskId])
+}
+
+model AgentActionEvent {
+  id           String          @id @default(cuid())
+  firm         Firm            @relation("AgentActionEvent_firm", fields: [firmId], references: [id])
+  firmId       String          @map("firm")
+  matter       Matter?         @relation("AgentActionEvent_matter", fields: [matterId], references: [id])
+  matterId     String?         @map("matter")
+  action       AgentAction     @relation("AgentActionEvent_action", fields: [actionId], references: [id])
+  actionId     String          @map("action")
+  eventType    String          @default("")
+  fromStatus   String          @default("")
+  toStatus     String          @default("")
+  actorUser    User?           @relation("AgentActionEvent_actorUser", fields: [actorUserId], references: [id])
+  actorUserId  String?         @map("actorUser")
+  actorAgent   AgentPrincipal? @relation("AgentActionEvent_actorAgent", fields: [actorAgentId], references: [id])
+  actorAgentId String?         @map("actorAgent")
+  reason       String          @default("")
+  occurredAt   DateTime        @default(now())
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([actionId])
+  @@index([actorUserId])
+  @@index([actorAgentId])
+}
+
+model PublicSitePolicy {
+  id                        String                     @id @default(cuid())
+  firm                      Firm                       @relation("PublicSitePolicy_firm", fields: [firmId], references: [id])
+  firmId                    String                     @map("firm")
+  status                    PublicSitePolicyStatusType @default(draft)
+  publicAccountsEnabled     Boolean                    @default(false)
+  publicBookingEnabled      Boolean                    @default(false)
+  privacyNotice             String                     @default("")
+  privacyNoticeVersion      Int?                       @default(0)
+  firstContactNotice        String                     @default("")
+  firstContactNoticeVersion Int?                       @default(0)
+  aboutStatement            String                     @default("")
+  publishedAt               DateTime?
+  publishedByUserId         String                     @default("")
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @default(now()) @updatedAt
+
+  @@unique([firmId])
+  @@index([firmId])
+}
+
+enum UserStatusType {
+  invited
+  active
+  suspended
+  deactivated
+}
+
+enum UserOnboardingStatusType {
+  not_started
+  in_progress
+  completed
+  dismissed
+}
+
+enum RoleStatusType {
+  active
+  archived
+}
+
+enum FirmStatusType {
+  onboarding
+  active
+  suspended
+  closed
+}
+
+enum OfficeStatusType {
+  active
+  inactive
+  closed
+}
+
+enum FirmMembershipStatusType {
+  invited
+  active
+  suspended
+  ended
+}
+
+enum ApiKeyStatusType {
+  active
+  revoked
+  expired
+}
+
+enum OAuthClientStatusType {
+  active
+  suspended
+  revoked
+}
+
+enum OAuthConsentStatusType {
+  active
+  revoked
+}
+
+enum OAuthTokenTokenTypeType {
+  authorization_code
+  access_token
+  refresh_token
+}
+
+enum OAuthTokenStatusType {
+  pending
+  active
+  consumed
+  revoked
+  expired
+}
+
+enum OAuthTokenCodeChallengeMethodType {
+  S256
+}
+
+enum ContactContactTypeType {
+  person
+  organization
+}
+
+enum ContactStatusType {
+  prospective_client
+  client
+  former_client
+  opposing
+  other
+  archived
+}
+
+enum AddressAddressTypeType {
+  home
+  work
+  billing
+  mailing
+  other
+}
+
+enum ContactMethodMethodTypeType {
+  email
+  phone
+  portal
+  other
+}
+
+enum IntakeStatusType {
+  new
+  screening
+  conflict_review
+  consultation
+  decision
+  converted
+  declined
+  withdrawn
+}
+
+enum IntakeSourceType {
+  website
+  referral
+  phone
+  walk_in
+  import
+  other
+}
+
+enum IntakeParticipantParticipantRoleType {
+  prospective_client
+  adverse_party
+  related_party
+  witness
+  referrer
+  other
+}
+
+enum IntakeParticipantStatusType {
+  active
+  removed
+}
+
+enum IntakeSubmissionStatusType {
+  submitted
+  under_review
+  accepted
+  superseded
+}
+
+enum ConsultationStatusType {
+  requested
+  scheduled
+  completed
+  cancelled
+  no_show
+}
+
+enum ConsultationOutcomeType {
+  pending
+  recommend_engagement
+  decline
+  follow_up
+}
+
+enum ConflictCheckStatusType {
+  requested
+  running
+  review_required
+  cleared
+  conflict_found
+  failed
+  cancelled
+}
+
+enum ConflictCheckSearchScopeType {
+  active_firm
+  contacts
+  matters
+  contacts_and_matters
+}
+
+enum ConflictSearchTermTermTypeType {
+  person
+  organization
+  alias
+  matter
+  other
+}
+
+enum ConflictMatchStatusType {
+  potential
+  reviewing
+  cleared
+  escalated
+}
+
+enum ConflictMatchMatchTypeType {
+  exact_name
+  alias
+  fuzzy_name
+  related_party
+  matter_text
+  manual
+}
+
+enum ConflictDispositionOutcomeType {
+  clear
+  conflict
+  needs_more_information
+  approved_exception
+}
+
+enum PracticeAreaStatusType {
+  active
+  archived
+}
+
+enum MatterStatusType {
+  proposed
+  pending_conflict
+  open
+  on_hold
+  closing
+  closed
+  declined
+}
+
+enum MatterConfidentialityType {
+  standard
+  restricted
+}
+
+enum MatterBillingTypeType {
+  hourly
+  flat_fee
+  contingency
+  pro_bono
+  other
+}
+
+enum MatterPartyPartyRoleType {
+  client
+  claimant
+  respondent
+  opposing_party
+  witness
+  expert
+  counsel
+  adjudicator
+  other
+}
+
+enum MatterPartySideType {
+  our_client
+  adverse
+  neutral
+  unknown
+}
+
+enum MatterPartyStatusType {
+  active
+  removed
+}
+
+enum MatterTeamMemberTeamRoleType {
+  responsible_attorney
+  attorney
+  paralegal
+  assistant
+  billing
+  observer
+}
+
+enum MatterTeamMemberStatusType {
+  active
+  removed
+}
+
+enum EthicalWallStatusType {
+  draft
+  active
+  lifted
+}
+
+enum EthicalWallMemberDecisionType {
+  allowed
+  blocked
+}
+
+enum EthicalWallMemberStatusType {
+  active
+  revoked
+}
+
+enum CourtCourtTypeType {
+  federal
+  state
+  local
+  administrative
+  arbitration
+  other
+}
+
+enum CourtStatusType {
+  active
+  inactive
+}
+
+enum DocketStatusType {
+  active
+  stayed
+  appealed
+  closed
+}
+
+enum DocketEntryEntryTypeType {
+  filing
+  order
+  hearing
+  notice
+  service
+  correspondence
+  other
+}
+
+enum DocketEntryStatusType {
+  draft
+  filed
+  entered
+  rejected
+  withdrawn
+}
+
+enum DeadlineStatusType {
+  draft
+  pending
+  completed
+  missed
+  waived
+  cancelled
+}
+
+enum DeadlineDeadlineTypeType {
+  court
+  statutory
+  contractual
+  internal
+  limitation
+  other
+}
+
+enum DeadlineSourceType {
+  manual
+  court_rule
+  docket_integration
+  agent_proposed
+  imported
+}
+
+enum LegalTaskStatusType {
+  open
+  in_progress
+  blocked
+  completed
+  cancelled
+}
+
+enum LegalTaskPriorityType {
+  low
+  normal
+  high
+  urgent
+}
+
+enum CommunicationThreadStatusType {
+  open
+  archived
+  closed
+}
+
+enum CommunicationThreadPrimaryChannelType {
+  email
+  sms
+  phone
+  portal
+  internal
+  other
+}
+
+enum CommunicationParticipantParticipantRoleType {
+  staff
+  client
+  external_counsel
+  third_party
+  system
+}
+
+enum CommunicationParticipantStatusType {
+  active
+  removed
+}
+
+enum CommunicationMessageDirectionType {
+  inbound
+  outbound
+  internal
+}
+
+enum CommunicationMessageChannelType {
+  email
+  sms
+  phone
+  portal
+  internal
+  other
+}
+
+enum CommunicationMessageStatusType {
+  draft
+  queued
+  sent
+  delivered
+  failed
+  received
+  cancelled
+}
+
+enum CommunicationDeliveryChannelType {
+  email
+  sms
+  portal
+}
+
+enum CommunicationDeliveryStatusType {
+  pending
+  sent
+  delivered
+  failed
+  bounced
+}
+
+enum DocumentStatusType {
+  draft
+  active
+  archived
+  disposed
+}
+
+enum DocumentCategoryType {
+  pleading
+  correspondence
+  evidence
+  contract
+  research
+  billing
+  internal
+  other
+}
+
+enum DocumentConfidentialityType {
+  matter
+  restricted
+  client_shareable
+}
+
+enum DocumentVersionSourceType {
+  upload
+  generated
+  email
+  court
+  signature_provider
+  import
+}
+
+enum SignatureRequestStatusType {
+  draft
+  sent
+  partially_signed
+  completed
+  declined
+  expired
+  cancelled
+}
+
+enum DocumentSignerStatusType {
+  pending
+  viewed
+  signed
+  declined
+}
+
+enum RateCardStatusType {
+  draft
+  active
+  retired
+}
+
+enum RateRuleRateTypeType {
+  hourly
+  flat_fee
+  per_appearance
+  per_item
+}
+
+enum TimeEntryStatusType {
+  draft
+  submitted
+  approved
+  billed
+  written_off
+}
+
+enum ExpenseStatusType {
+  draft
+  submitted
+  approved
+  billed
+  reimbursed
+  written_off
+}
+
+enum ExpenseExpenseTypeType {
+  filing_fee
+  travel
+  expert
+  copying
+  service
+  other
+}
+
+enum RetainerAgreementStatusType {
+  draft
+  sent
+  accepted
+  active
+  completed
+  terminated
+}
+
+enum RetainerAgreementFeeStructureType {
+  hourly
+  flat_fee
+  contingency
+  hybrid
+  pro_bono
+}
+
+enum InvoiceStatusType {
+  draft
+  approved
+  issued
+  partially_paid
+  paid
+  overdue
+  void
+}
+
+enum InvoiceLineLineTypeType {
+  time
+  expense
+  flat_fee
+  discount
+  tax
+  other
+}
+
+enum TrustAccountAccountTypeType {
+  trust
+  pooled_trust
+  dedicated_client
+  other
+}
+
+enum TrustAccountStatusType {
+  pending
+  active
+  frozen
+  closed
+}
+
+enum TrustLedgerAccountStatusType {
+  active
+  frozen
+  closed
+}
+
+enum TrustTransactionTransactionTypeType {
+  deposit
+  disbursement
+  transfer
+  reversal
+  bank_fee
+  adjustment
+}
+
+enum TrustTransactionStatusType {
+  posted
+  reversed
+}
+
+enum TrustLedgerEntryAccountingBucketType {
+  bank_control
+  client_liability
+  bank_fee
+  suspense
+}
+
+enum TrustLedgerEntryDirectionType {
+  debit
+  credit
+}
+
+enum TrustBalanceSnapshotSnapshotTypeType {
+  client_balance
+  book_balance
+  statement_balance
+  reconciliation
+}
+
+enum TrustReconciliationStatusType {
+  draft
+  in_review
+  completed
+  reopened
+}
+
+enum PaymentPaymentTypeType {
+  operating
+  trust_deposit
+  other
+}
+
+enum PaymentStatusType {
+  pending
+  authorized
+  captured
+  settled
+  failed
+  cancelled
+}
+
+enum PaymentAllocationAllocationTypeType {
+  invoice
+  trust_deposit
+  trust_application
+  reversal
+}
+
+enum RefundStatusType {
+  requested
+  approved
+  processing
+  succeeded
+  failed
+  cancelled
+}
+
+enum RefundReasonType {
+  overpayment
+  duplicate
+  matter_closed
+  client_request
+  other
+}
+
+enum PortalAccountStatusType {
+  invited
+  active
+  suspended
+  closed
+}
+
+enum PortalMatterAccessStatusType {
+  active
+  revoked
+  expired
+}
+
+enum PortalShareStatusType {
+  active
+  revoked
+  expired
+}
+
+enum PortalShareResourceTypeType {
+  document
+  document_version
+  invoice
+  communication_thread
+}
+
+enum PortalSessionStatusType {
+  active
+  revoked
+  expired
+}
+
+enum IntegrationConnectionCategoryType {
+  email
+  calendar
+  document_storage
+  signature
+  payment
+  court
+  accounting
+  other
+}
+
+enum IntegrationConnectionStatusType {
+  pending
+  active
+  needs_reauth
+  disabled
+  revoked
+}
+
+enum ExternalRecordLinkResourceTypeType {
+  contact
+  intake
+  matter
+  document
+  invoice
+  payment
+  docket
+  other
+}
+
+enum ExternalRecordLinkStatusType {
+  linked
+  conflict
+  unlinked
+}
+
+enum WebhookSubscriptionStatusType {
+  active
+  paused
+  revoked
+}
+
+enum WebhookDeliveryStatusType {
+  pending
+  processing
+  succeeded
+  failed
+  dead_letter
+}
+
+enum WebhookDeliveryAttemptSucceededType {
+  yes
+  no
+}
+
+enum RetentionPolicyStatusType {
+  draft
+  active
+  retired
+}
+
+enum RetentionPolicyRecordClassType {
+  matter
+  document
+  communication
+  billing
+  contact
+  audit
+  other
+}
+
+enum RetentionPolicyTriggerType {
+  matter_closed
+  document_archived
+  record_created
+  manual
+}
+
+enum RetentionHoldStatusType {
+  active
+  released
+}
+
+enum RetentionActionActionTypeType {
+  archived
+  disposed
+  restored
+  hold_applied
+  hold_released
+}
+
+enum RetentionActionResourceTypeType {
+  matter
+  document
+  contact
+  communication_thread
+  invoice
+}
+
+enum AuditEventCategoryType {
+  authentication
+  authorization
+  legal_workflow
+  financial
+  integration
+  retention
+  agent
+}
+
+enum AuditEventOutcomeType {
+  succeeded
+  denied
+  failed
+}
+
+enum AgentPrincipalAgentTypeType {
+  assistant
+  workflow
+  integration
+  service_account
+}
+
+enum AgentPrincipalStatusType {
+  draft
+  active
+  suspended
+  revoked
+}
+
+enum AgentCredentialStatusType {
+  active
+  revoked
+  expired
+}
+
+enum AgentGrantStatusType {
+  proposed
+  active
+  suspended
+  revoked
+  expired
+}
+
+enum AgentActionStatusType {
+  requested
+  awaiting_approval
+  approved
+  rejected
+  executing
+  succeeded
+  failed
+  cancelled
+}
+
+enum AgentActionRiskLevelType {
+  low
+  high
+  financial
+  access_control
+}
+
+enum PublicSitePolicyStatusType {
+  draft
+  published
 }

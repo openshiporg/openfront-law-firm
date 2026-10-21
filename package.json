@@ -1,14 +1,24 @@
 {
-  "name": "weekday-keystone",
+  "name": "openfront-law-firm",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "description": "Agent-native legal practice operations built on Openfront and Keystone.",
   "scripts": {
-    "dev": "keystone build --no-ui && npm run migrate && next dev",
-    "build": "keystone build --no-ui && npm run migrate && next build",
+    "dev": "npm run schema:build && next dev --webpack",
+    "build": "npm run schema:build && npm run build:app",
+    "build:app": "next build",
+    "schema:build": "keystone build --no-ui && prisma generate && tsx features/keystone/view-order/generate-view-order.ts",
+    "schema:verify:runtime": "tsx scripts/verify-schema-runtime.ts",
+    "typecheck": "tsc --noEmit --pretty false",
+    "test": "tsx --test tests/*.test.ts",
     "start": "next start",
-    "lint": "next lint",
-    "migrate:gen": "keystone build --no-ui && tsx features/keystone/view-order/generate-view-order.ts && keystone prisma migrate dev",
-    "migrate": "prisma migrate deploy"
+    "lint": "eslint . --max-warnings=0",
+    "migrate:gen": "keystone build --no-ui && tsx features/keystone/view-order/generate-view-order.ts && prisma migrate dev",
+    "migrate": "prisma migrate deploy",
+    "migrate:maintained": "tsx scripts/deploy-maintained-migrations.ts",
+    "seed:runtime": "tsx scripts/seed-runtime-demo.ts",
+    "verify:complete-runtime": "tsx scripts/verify-complete-runtime.ts"
   },
   "dependencies": {
     "@ai-sdk/mcp": "^1.0.13",
@@ -16,10 +26,10 @@
     "@ai-sdk/react": "^3.0.51",
     "@graphql-tools/schema": "^10.0.23",
     "@keystone-6/auth": "^8.1.0",
-    "@keystone-6/core": "^6.5.1",
+    "@keystone-6/core": "6.5.3",
     "@keystone-6/document-renderer": "^1.1.2",
     "@keystone-6/fields-document": "^9.1.1",
-    "@modelcontextprotocol/sdk": "^1.15.1",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@prisma/client": "6.5.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -71,7 +81,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.511.0",
     "marked": "^16.1.1",
-    "next": "^16.0.10",
+    "next": "16.3.8",
     "next-themes": "^0.4.6",
     "nodemailer": "^7.0.5",
     "pluralize": "^8.0.0",
@@ -103,7 +113,7 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.10",
+    "eslint-config-next": "16.3.8",
     "node-fetch": "^3.3.2",
     "prisma": "6.5.0",
     "tailwindcss": "^4",
@@ -112,11 +122,12 @@
     "typescript": "^5"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "^20.9.0 || >=21.1.0"
   },
   "overrides": {
     "react": "^19.2.2",
     "react-dom": "^19.2.2",
+    "fast-xml-parser": "5.7.0",
     "@keystone-6/core": {
       "next": "14.2.35"
     }

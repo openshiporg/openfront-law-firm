@@ -2,11 +2,8 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  allowedDevOrigins: ['law-firm.local'],
   serverExternalPackages: ['graphql'],
-  // Workaround since we diverged from Keystone reltionship and document views
-  // typescript: {
-  //   ignoreBuildErrors: true,
-  // },
   images: {
     remotePatterns: [
       {

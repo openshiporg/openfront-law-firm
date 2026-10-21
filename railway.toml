@@ -1,7 +1,11 @@
-# Railway can't access internal databases during build, so we move
-# npm run migrate from build to start command
 [build]
-buildCommand = "keystone build --no-ui && next build"
+builder = "NIXPACKS"
+buildCommand = "npm run build"
 
 [deploy]
-startCommand = "npm run migrate && next start"
+preDeployCommand = "npm run migrate"
+startCommand = "npm run start -- -p $PORT"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

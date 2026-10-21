@@ -1,26 +1,41 @@
 import { createAuth } from "@keystone-6/auth";
 import { config } from "@keystone-6/core";
-import "dotenv/config";
-import { models } from "./models";
 import { statelessSessions } from "@keystone-6/core/session";
-import { extendGraphqlSchema } from "./mutations";
-import { sendPasswordResetEmail } from "./lib/mail";
+import "dotenv/config";
 
-const databaseURL = process.env.DATABASE_URL || "file:./keystone.db";
+import { permissions } from "./access";
+import { passwordResetPurpose, sendPasswordResetEmail } from "./lib/mail";
+import { models } from "./models";
+import { permissionKeys } from "./access";
+import { extendGraphqlSchema } from "./mutations";
+
+const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
+
+function runtimeEnvironment(name: "DATABASE_URL" | "SESSION_SECRET", buildFallback: string) {
+  const value = process.env[name];
+  if (value) return value;
+  if (process.env.NODE_ENV === "production" && !isProductionBuild) {
+    throw new Error(`${name} is required in production.`);
+  }
+  return buildFallback;
+}
+
+const databaseURL = runtimeEnvironment(
+  "DATABASE_URL",
+  "postgresql://localhost/openfront_law_firm_build",
+);
 
 const sessionConfig = {
-  maxAge: 60 * 60 * 24 * 360, // How long they stay signed in?
-  secret:
-    process.env.SESSION_SECRET || "this secret should only be used in testing",
+  maxAge: 60 * 60 * 24 * 30,
+  secret: runtimeEnvironment(
+    "SESSION_SECRET",
+    "local-build-only-session-secret-do-not-deploy",
+  ),
 };
 
-const {
-  S3_BUCKET_NAME: bucketName = "keystone-test",
-  S3_REGION: region = "ap-southeast-2",
-  S3_ACCESS_KEY_ID: accessKeyId = "keystone",
-  S3_SECRET_ACCESS_KEY: secretAccessKey = "keystone",
-  S3_ENDPOINT: endpoint = "https://sfo3.digitaloceanspaces.com",
-} = process.env;
+const initialPermissions = Object.fromEntries(
+  permissionKeys.map((permission) => [permission, true]),
+);
 
 const { withAuth } = createAuth({
   listKey: "User",
@@ -29,39 +44,48 @@ const { withAuth } = createAuth({
   initFirstItem: {
     fields: ["name", "email", "password"],
     itemData: {
-      role: {
+      bootstrapKey: "openfront-law-firm-initial-user",
+      status: "active",
+      bootstrapRole: {
         create: {
-          name: "Admin",
-          canCreateTodos: true,
-          canManageAllTodos: true,
-          canSeeOtherPeople: true,
-          canEditOtherPeople: true,
-          canManagePeople: true,
-          canManageRoles: true,
-          canAccessDashboard: true,
+          name: "Bootstrap administrator",
+          status: "active",
+          ...initialPermissions,
         },
       },
     },
   },
   passwordResetLink: {
-    async sendToken(args) {
-      // send the email
-      await sendPasswordResetEmail(args.token, args.identity);
+    // Staff (any firm membership or the bootstrap principal) recover on the dashboard;
+    // storefront customers recover on /account/reset.
+    async sendToken({ itemId, identity, token, context }) {
+      const purpose = await passwordResetPurpose(context.sudo().prisma, String(itemId));
+      await sendPasswordResetEmail(token, identity, undefined, purpose);
     },
   },
   sessionData: `
     name
     email
-    role {
+    status
+    activeFirm { id name displayName shortName brandTagline brandColor supportEmail status }
+    role: bootstrapRole {
       id
       name
-      canCreateTodos
-      canManageAllTodos
-      canSeeOtherPeople
-      canEditOtherPeople
-      canManagePeople
-      canManageRoles
-      canAccessDashboard
+      status
+      firm { id }
+      ${permissionKeys.join("\n")}
+    }
+    firmMemberships {
+      id
+      status
+      firm { id }
+      role {
+        id
+        name
+        status
+        firm { id }
+        ${permissionKeys.join("\n")}
+      }
     }
   `,
 });
@@ -73,25 +97,18 @@ export default withAuth(
       url: databaseURL,
     },
     lists: models,
-    storage: {
-      my_images: {
-        kind: "s3",
-        type: "image",
-        bucketName,
-        region,
-        accessKeyId,
-        secretAccessKey,
-        endpoint,
-        signed: { expiry: 5000 },
-        forcePathStyle: true,
-      },
-    },
     ui: {
-      isAccessAllowed: ({ session }) => session?.data.role?.canAccessDashboard ?? false,
+      isAccessAllowed: ({ session }) => permissions.canAccessDashboard({ session }),
     },
     session: statelessSessions(sessionConfig),
     graphql: {
+      debug: false,
+      playground: false,
+      apolloConfig: {
+        introspection: false,
+        includeStacktraceInErrorResponses: false,
+      },
       extendGraphqlSchema,
     },
-  })
+  }),
 );

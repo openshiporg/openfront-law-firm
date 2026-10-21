@@ -1,6 +1,5 @@
-'use server' 
-
-import { createTransport, getTestMessageUrl } from "nodemailer";
+// Internal Keystone mail helper, not a public Next Server Action.
+import { createTransport } from "nodemailer";
 
 // Utility function to get base URL for emails
 function getBaseUrlForEmails(): string {
@@ -8,20 +7,8 @@ function getBaseUrlForEmails(): string {
     return process.env.SMTP_STORE_LINK;
   }
   
-  // Fallback warning - this should be set in production
-  console.warn('SMTP_STORE_LINK not set. Please add SMTP_STORE_LINK to your environment variables for email links to work properly.');
-  return '';
+  throw new Error('Email link origin is not configured.');
 }
-
-const transport = createTransport({
-  // @ts-ignore
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
 
 function passwordResetEmail({ url }: { url: string }): string {
   const backgroundColor = "#f9f9f9";
@@ -58,20 +45,71 @@ function passwordResetEmail({ url }: { url: string }): string {
   `;
 }
 
-export async function sendPasswordResetEmail(resetToken: string, to: string, baseUrl?: string): Promise<void> {
-  // Use provided baseUrl or fall back to utility function
-  const frontendUrl = baseUrl || getBaseUrlForEmails();
-  
-  // email the user a token
-  const info = await transport.sendMail({
+export type PasswordResetPurpose = "staff" | "customer";
+
+type ResetPurposeClient = {
+  user: { findUnique(args: unknown): Promise<{ bootstrapKey?: string | null; firmMemberships?: unknown[] } | null> };
+};
+
+/**
+ * The reset link follows the account, never the caller: an identity with any
+ * firm membership or the bootstrap key is staff (dashboard reset); every other
+ * account is a storefront customer (/account/reset).
+ */
+export async function passwordResetPurpose(prisma: ResetPurposeClient, userId: string): Promise<PasswordResetPurpose> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { bootstrapKey: true, firmMemberships: { select: { id: true }, take: 1 } },
+  });
+  return !user || user.bootstrapKey || user.firmMemberships?.length ? "staff" : "customer";
+}
+
+const resetPaths: Record<PasswordResetPurpose, string> = { staff: "/dashboard/reset", customer: "/account/reset" };
+
+export async function sendPasswordResetEmail(resetToken: string, to: string, baseUrl?: string, purpose: PasswordResetPurpose = "staff"): Promise<void> {
+  const host = process.env.SMTP_HOST?.trim();
+  const from = process.env.SMTP_FROM?.trim();
+  const port = Number(process.env.SMTP_PORT);
+  if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Email delivery is not configured.');
+  }
+  if (to.length > 254 || !/^[^\s@<>,;()]+@[^\s@<>,;()]+\.[^\s@<>,;()]+$/.test(to)) {
+    throw new Error('A single valid recipient is required.');
+  }
+  const origin = new URL(baseUrl || getBaseUrlForEmails());
+  if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password) throw new Error('Email link origin is invalid.');
+  const resetUrl = new URL(resetPaths[purpose], origin.origin);
+  resetUrl.searchParams.set('token', resetToken);
+  const transport = createTransport({ host, port, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } });
+  await transport.sendMail({
     to,
-    from: process.env.SMTP_FROM,
+    from,
     subject: "Your password reset token!",
     html: passwordResetEmail({
-      url: `${frontendUrl}/dashboard/reset?token=${resetToken}`,
+      url: resetUrl.href,
     }),
   });
-  if (process.env.MAIL_USER?.includes("ethereal.email")) {
-    console.log(`📧 Message Sent!  Preview it at ${getTestMessageUrl(info as any)}`);
+}
+/** One-use portal sign-in link for a returning client (portal-scoped; never staff). */
+export async function sendPortalSignInEmail(signInToken: string, to: string, baseUrl?: string): Promise<void> {
+  const host = process.env.SMTP_HOST?.trim();
+  const from = process.env.SMTP_FROM?.trim();
+  const port = Number(process.env.SMTP_PORT);
+  if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Email delivery is not configured.');
   }
+  if (to.length > 254 || !/^[^\s@<>,;()]+@[^\s@<>,;()]+\.[^\s@<>,;()]+$/.test(to)) {
+    throw new Error('A single valid recipient is required.');
+  }
+  const origin = new URL(baseUrl || getBaseUrlForEmails());
+  if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password) throw new Error('Email link origin is invalid.');
+  const signInUrl = new URL('/portal/signin', origin.origin);
+  signInUrl.searchParams.set('token', signInToken);
+  const transport = createTransport({ host, port, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } });
+  await transport.sendMail({
+    to,
+    from,
+    subject: "Your client portal sign-in link",
+    html: passwordResetEmail({ url: signInUrl.href }).replace('Please click below to reset your password', 'Use this one-time link within 15 minutes to open your client portal').replace('>Reset Password<', '>Open client portal<'),
+  });
 }

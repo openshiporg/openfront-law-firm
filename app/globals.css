@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../tokens.css";
+@import "../features/storefront/storefront.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -112,9 +114,23 @@
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
+/* Actual application-owned phone hit boxes. No pseudo-element inflation or
+   parent-only target counting; decorative and hidden UA controls stay excluded. */
+@media (max-width: 639px) {
+  :where(button, input:not([type="hidden"]):not([aria-hidden="true"]), select:not([aria-hidden="true"]), textarea, summary, [role="button"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="combobox"], a[href]) { min-height: 44px; min-width: 44px; }
+  :where(a[href]:not([class*="flex"]):not([class*="grid"]):not([class*="block"])) { display: inline-block; }
+  :where([role="tablist"]) { min-height: 52px; max-width: 100%; overflow-x: auto; }
+  input[type="number"] { appearance: textfield; }
+  input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    overflow-x: clip;
   }
   body {
     @apply bg-background text-foreground;

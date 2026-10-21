@@ -1,0 +1,90 @@
+/* Hallmark · macrostructure: Long Document · tone: austere · anchor hue: 35 (warm walnut)
+ * genre: editorial · theme: Newsprint-derived (light paper band · roman-serif display · warm russet accent)
+ * nav: N6 Newspaper masthead (letterhead variant) · footer: Ft4 Dense typographic colophon
+ * pre-emit critique: P5 H4 E5 S5 R5 V4
+ *
+ * Openfront Law Firm — public storefront tokens.
+ * The public storefront renders inside a .storefront scope (see features/storefront/storefront.css)
+ * so the dashboard/platform (Quiet theme) is untouched.
+ *
+ * Colour holds the "file is a legal document" register: warm paper, walnut ink,
+ * russet accent used only as a highlighter (underline / focus / small mark).
+ */
+:root {
+  /* Paper band — warm cream, never pure white */
+  --color-paper:    oklch(0.955 0.010 78);
+  --color-paper-2:  oklch(0.930 0.013 76);
+  --color-paper-3:  oklch(0.895 0.015 74);
+
+  /* Ink band — warm near-black, never pure black */
+  --color-ink:      oklch(0.200 0.018 35);
+  --color-ink-2:    oklch(0.340 0.022 38);
+  --color-muted:    oklch(0.470 0.020 38);
+  --color-faint:    oklch(0.600 0.016 42);
+
+  /* Rules & boundary hairlines */
+  --color-rule:     oklch(0.840 0.012 70);
+  --color-rule-2:   oklch(0.620 0.022 55);
+
+  /* Single accent — russet. Highlighter only: underline, focus ring, small square.
+   * The storefront scope overrides these from persisted settings via --sf-accent,
+   * constrained to the public accent palette (see storefront-settings.ts). */
+  --color-accent-default: oklch(0.460 0.100 30);
+  --color-accent: var(--color-accent-default);
+  --color-accent-2: var(--color-accent-default);
+  --color-focus-default: oklch(0.540 0.140 32);
+  --color-focus: var(--color-focus-default);
+
+  /* Error state (form) */
+  --color-destructive: oklch(0.520 0.180 27);
+
+  /* Type — the 2+1 ceiling: Newsreader display + Geist body + Geist Mono outlier. */
+  --font-display: var(--font-newsreader), "Newsreader", Georgia, ui-serif, serif;
+  --font-body:    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+
+  /* 4pt spacing scale */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  /* Type scale — major third (1.25) */
+  --text-2xs: 0.6875rem;
+  --text-xs:  0.75rem;
+  --text-sm:  0.875rem;
+  --text-base: 1rem;
+  --text-md:  1.125rem;
+  --text-lg:  1.375rem;
+  --text-xl:  1.75rem;
+  --text-2xl: 2rem;
+  --text-3xl: 2.5rem;
+  --text-display: clamp(2.5rem, 5vw + 1rem, 4.5rem);
+
+  /* Motion — print-still register. Kept tokenised so nothing can drift. */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:     cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long:  420ms;
+
+  /* Hairlines & radii — square (editorial print discipline) */
+  --rule-hair: 1px;
+  --rule-thick: 2px;
+  --radius-card: 0;
+  --radius-field: 0;
+
+  /* Z scale */
+  --z-base: 1;
+  --z-raised: 10;
+  --z-sticky: 200;
+  --z-modal: 400;
+  --z-toast: 500;
+}

@@ -1,0 +1,12 @@
+{
+  "firmName": "Harbor & Pine",
+  "officeName": "Cedar Street Office",
+  "currencyCode": "USD",
+  "timezone": "UTC",
+  "logoIcon": "3portals",
+  "logoColor": "0",
+  "accentId": "muted",
+  "templates": ["minimal", "full"],
+  "full": "Existing server-owned applySyntheticDemoScenario; strictly owned offline fictional workspace only",
+  "minimal": "Firm, office, role, membership and practice area; no sample records"
+}

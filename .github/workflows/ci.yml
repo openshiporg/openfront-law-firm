@@ -1,0 +1,38 @@
+name: source-gates
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: law-firm-source-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci_placeholder?schema=public
+      SESSION_SECRET: ci-only-session-secret-at-least-thirty-two-characters
+      MACHINE_CREDENTIAL_PEPPER: ci-only-machine-pepper-at-least-thirty-two-characters
+      INTEGRATION_CREDENTIAL_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Keep RAM-heavy gates serialized; schema generation must precede tests that
+      # validate the generated GraphQL boundary.
+      - run: npm run schema:build
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build:app
+      - run: git diff --exit-code -- schema.graphql schema.prisma

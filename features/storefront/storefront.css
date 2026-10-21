@@ -1,0 +1,617 @@
+/* Hallmark · macrostructure: Long Document · tone: austere · anchor hue: 35 (warm walnut)
+ * genre: editorial · theme: Newsprint-derived (light paper · roman-serif display · warm russet accent)
+ * nav: N6 Newspaper masthead (letterhead variant) · footer: Ft4 Dense typographic colophon
+ * enrichment: none (typography only) · designed-as-app: storefront (design.md)
+ *
+ * Openfront Law Firm — public storefront design system.
+ * Everything below is scoped to `.storefront` so the dashboard/platform (Quiet theme)
+ * resolves its own tokens. Tailwind utilities in the storefront read the shadcn
+ * variables we remap here, so the whole public site shares the legal-document register.
+ */
+
+.storefront {
+  /* Map the shadcn/Tailwind theme variables to the storefront palette so utilities
+     (bg-background, text-muted-foreground, border-border, …) resolve to warm paper/ink. */
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-paper-2);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-paper);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-ink);
+  --primary-foreground: var(--color-paper);
+  --secondary: var(--color-paper-2);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-paper-2);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-paper-2);
+  --accent-foreground: var(--color-ink);
+  --border: var(--color-rule);
+  --input: var(--color-rule);
+  --ring: var(--color-focus);
+  --destructive: var(--color-destructive);
+
+  /* Accent/focus from the persisted logo hue or the operator's explicit accent
+     (storefrontThemeVariables in lib/accent.ts) — else the default. */
+  --color-accent: var(--sf-accent, var(--color-accent-default));
+  --color-accent-2: var(--sf-accent, var(--color-accent-default));
+  --color-focus: var(--sf-focus, var(--color-focus-default));
+
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-feature-settings: "kern" 1;
+  letter-spacing: 0;
+}
+
+/* Keyboard skip link — remains available to assistive technology and appears on focus. */
+.storefront .sf-skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: var(--space-md);
+  left: var(--space-md);
+  transform: translateY(calc(-100% - var(--space-md)));
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.storefront .sf-skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Letterhead masthead (N6 variant) — the firm's masthead.
+ * ------------------------------------------------------------------ */
+.sf-mast {
+  --page-gutter: clamp(1rem, 4vw, 2.5rem);
+  padding: var(--space-md) var(--page-gutter) 0;
+}
+
+.sf-mast__issue {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.sf-mast__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md) var(--space-lg);
+  padding-block: var(--space-md);
+}
+
+.sf-firm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-right: auto;
+  min-height: 2.75rem;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--color-ink);
+}
+.sf-firm__mark {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border: var(--rule-hair) solid var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  color: var(--color-ink);
+}
+.sf-firm__name {
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.4vw + 0.5rem, 1.75rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sf-mast__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.sf-mast__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-lg);
+  margin-block: var(--space-sm) var(--space-md);
+}
+.sf-mast__nav .sf-nav-link { font-family: var(--font-body); }
+.sf-mobile-menu { display: none; position: relative; }
+.sf-mobile-menu summary::-webkit-details-marker { display: none; }
+@media (max-width: 39.999rem) {
+  .sf-mobile-menu { display: block; }
+  .sf-mast__actions, .sf-mast__nav { display: none; }
+  .storefront .sf-nav-link, .storefront .sf-foot__links a, .storefront .sf-link {
+    display: inline-flex; align-items: center; min-height: 2.75rem; min-width: 2.75rem;
+  }
+}
+
+.sf-rule-double {
+  border: 0;
+  border-top: var(--rule-hair) solid var(--color-rule);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+  height: 3px;
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Dense colophon footer (Ft4) — the legal fine print leads.
+ * ------------------------------------------------------------------ */
+.sf-foot {
+  --page-gutter: clamp(1rem, 4vw, 2.5rem);
+  margin-top: var(--space-4xl);
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  padding: var(--space-xl) var(--page-gutter) var(--space-2xl);
+}
+/* The shared lockup sits on ink here: its name takes the footer's paper foreground,
+   and library/custom marks keep a paper chip so dark artwork stays visible. */
+.sf-foot .sf-firm { color: var(--color-paper); }
+.sf-foot [data-store-logo] { background-color: var(--color-paper); padding: var(--space-3xs); }
+.sf-foot__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-lg);
+  margin-block-end: var(--space-xl);
+}
+.sf-foot__links a {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-paper);
+  text-underline-offset: 0.3em;
+  text-decoration: underline;
+  text-decoration-color: var(--color-rule-2);
+  white-space: nowrap;
+}
+.sf-foot__links a:hover { text-decoration-color: var(--color-accent); }
+.sf-foot__links a.sf-nav-link--muted { color: var(--color-paper-3); }
+
+.sf-foot__notice {
+  max-width: 62ch;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  color: var(--color-paper-3);
+  margin-block-end: var(--space-md);
+}
+.sf-foot__meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * Long Document — the firm note to prospective clients (homepage).
+ * ------------------------------------------------------------------ */
+.sf-doc {
+  --page-gutter: clamp(1rem, 4vw, 2.5rem);
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: var(--space-2xl) var(--page-gutter) var(--space-3xl);
+}
+
+.sf-doc__head { margin-block-end: var(--space-2xl); }
+.sf-doc__meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-block-end: var(--space-md);
+}
+.sf-doc__title {
+  font-family: var(--font-display);
+  font-size: var(--text-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+  max-width: 16ch;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  margin: 0 0 var(--space-lg);
+}
+.sf-doc__lede {
+  font-family: var(--font-display);
+  font-size: clamp(1.125rem, 1.6vw + 0.5rem, 1.375rem);
+  font-weight: 400;
+  line-height: 1.5;
+  max-width: 62ch;
+  color: var(--color-ink-2);
+  margin: 0;
+}
+
+.sf-doc__head-inline {
+  font-family: var(--font-display);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+  margin: var(--space-3xl) 0 var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.sf-prose {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  line-height: 1.65;
+  max-width: 62ch;
+  color: var(--color-ink-2);
+}
+.sf-prose p { margin: 0 0 var(--space-md); }
+.sf-prose strong { font-weight: 600; color: var(--color-ink); }
+
+/* ------------------------------------------------------------------ *
+ * Register / ledger — practice areas as a docket of matters.
+ * ------------------------------------------------------------------ */
+.sf-ledger {
+  border-top: var(--rule-thick) solid var(--color-ink);
+}
+.sf-ledger__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm) var(--space-xl);
+  padding-block: var(--space-lg);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+.sf-ledger__name {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  margin: 0 0 var(--space-xs);
+}
+.sf-ledger__sum { font-family: var(--font-body); font-size: var(--text-sm); line-height: 1.6; color: var(--color-muted); margin: 0; max-width: 52ch; }
+.sf-ledger__matters { margin: var(--space-sm) 0 0; padding: 0; list-style: none; }
+.sf-ledger__matters li {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.02em;
+  color: var(--color-ink-2);
+  padding-block: var(--space-2xs);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+.sf-ledger__matters li:first-child { border-top: 0; }
+
+/* ------------------------------------------------------------------ *
+ * Numbered intake stages (F4) — genuinely ordinal, so numbering is honest.
+ * ------------------------------------------------------------------ */
+.sf-steps { list-style: none; margin: 0; padding: 0; max-width: 62ch; }
+.sf-steps__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-md) var(--space-lg);
+  padding-block: var(--space-lg);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+.sf-steps__item:first-child { border-top: var(--rule-thick) solid var(--color-ink); }
+.sf-steps__no {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--color-accent);
+}
+.sf-steps__body h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 var(--space-xs);
+}
+.sf-steps__body p {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Attorney register — monogram seals (honest: no invented portraits).
+ * ------------------------------------------------------------------ */
+.sf-register { border-top: var(--rule-thick) solid var(--color-ink); }
+.sf-register__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+  padding-block: var(--space-lg);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+.sf-seal {
+  width: 3.25rem;
+  height: 3.25rem;
+  display: grid;
+  place-items: center;
+  border: var(--rule-hair) solid var(--color-rule-2);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  letter-spacing: 0.03em;
+  background: var(--color-paper-2);
+}
+.sf-register__name {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  margin: 0 0 var(--space-2xs);
+}
+.sf-register__role { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); margin: 0 0 var(--space-xs); }
+.sf-register__sum { font-family: var(--font-body); font-size: var(--text-sm); line-height: 1.6; color: var(--color-muted); margin: 0; max-width: 52ch; }
+.sf-register__foot { margin-top: var(--space-sm); }
+
+/* ------------------------------------------------------------------ *
+ * Boundary note — what a request does and does not create.
+ * ------------------------------------------------------------------ */
+.sf-bound { margin: 0; max-width: 62ch; }
+.sf-bound__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-md) var(--space-lg);
+  padding-block: var(--space-md);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+.sf-bound__row:first-child { border-top: var(--rule-thick) solid var(--color-ink); }
+.sf-bound__mark { width: 0.5rem; height: 0.5rem; margin-top: 0.45em; background-color: var(--color-accent); }
+.sf-bound__body { margin: 0; }
+.sf-bound__body dt {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-base);
+  line-height: 1.3;
+  margin: 0 0 var(--space-2xs);
+}
+.sf-bound__body dd {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Document close — CTA sign-off (C3 typographic links).
+ * ------------------------------------------------------------------ */
+.sf-doc__close {
+  margin-top: var(--space-3xl);
+  padding-top: var(--space-lg);
+  border-top: var(--rule-thick) solid var(--color-ink);
+  max-width: 62ch;
+}
+.sf-doc__close p { font-family: var(--font-display); font-size: var(--text-md); line-height: 1.6; color: var(--color-ink-2); margin: 0 0 var(--space-sm); }
+
+/* ------------------------------------------------------------------ *
+ * Buttons & links (C3 typographic link + ink-filled primary button).
+ * ------------------------------------------------------------------ */
+.sf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 2.75rem;
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: var(--rule-hair) solid var(--color-ink);
+  border-radius: var(--radius-card);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+.sf-btn:hover { background-color: var(--color-ink-2); }
+.sf-btn:active { transform: translateY(1px); }
+.sf-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.sf-btn--ghost {
+  background-color: transparent;
+  color: var(--color-ink);
+}
+.sf-btn--ghost:hover { background-color: var(--color-paper-2); }
+.sf-btn--block { width: 100%; }
+
+.sf-nav-link {
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  text-underline-offset: 0.3em;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.sf-nav-link:hover { text-decoration: underline; text-decoration-color: var(--color-accent); }
+.sf-nav-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.sf-nav-link--muted { color: var(--color-muted); font-weight: 500; }
+
+.sf-link {
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 0.25em;
+  text-decoration: underline;
+  text-decoration-color: var(--color-rule-2);
+  transition: text-decoration-color var(--dur-short) var(--ease-out);
+  white-space: nowrap;
+}
+.sf-link:hover { text-decoration-color: var(--color-accent); }
+.sf-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.sf-link--muted { color: var(--color-muted); }
+
+/* ------------------------------------------------------------------ *
+ * Legal/document pages (privacy, disclaimer, accessibility, about body).
+ * ------------------------------------------------------------------ */
+.sf-legal {
+  max-width: 44rem;
+  margin-inline: auto;
+  padding: var(--space-2xl) clamp(1rem, 4vw, 2.5rem) var(--space-3xl);
+}
+.sf-legal h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  margin: 0 0 var(--space-lg);
+}
+.sf-legal h2 {
+  font-family: var(--font-display);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+  font-size: var(--text-base);
+  margin: var(--space-xl) 0 var(--space-sm);
+}
+.sf-legal p {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  line-height: 1.65;
+  color: var(--color-ink-2);
+  margin: 0 0 var(--space-md);
+  max-width: 62ch;
+}
+
+/* ------------------------------------------------------------------ *
+ * Consultation form (behaviour preserved; skin only).
+ * ------------------------------------------------------------------ */
+.sf-form {
+  background-color: var(--color-paper-2);
+  border: var(--rule-hair) solid var(--color-rule);
+  padding: var(--space-lg);
+}
+.sf-form .sf-field-label { display: block; font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
+.sf-form .sf-field-label .sf-field-opt { font-weight: 400; color: var(--color-muted); }
+.sf-field {
+  margin-top: var(--space-2xs);
+  width: 100%;
+  min-height: 2.75rem;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-field);
+  background-color: var(--color-paper);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  outline: none;
+  transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+}
+.sf-field:focus-visible { border-color: var(--color-focus); box-shadow: 0 0 0 1px var(--color-focus); }
+.sf-field::placeholder { color: var(--color-faint); }
+textarea.sf-field { line-height: 1.5; }
+select.sf-field { appearance: none; }
+.sf-field-hint { display: block; margin-top: var(--space-2xs); font-family: var(--font-body); font-size: var(--text-xs); line-height: 1.5; color: var(--color-muted); }
+.sf-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-field);
+  padding: var(--space-md);
+  background-color: var(--color-paper);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-ink-2);
+}
+.sf-check input[type="checkbox"] { margin-top: 0.25rem; width: 1rem; height: 1rem; flex: 0 0 auto; accent-color: var(--color-ink); }
+.sf-error {
+  border: var(--rule-hair) solid var(--color-destructive);
+  background-color: color-mix(in oklch, var(--color-destructive) 8%, var(--color-paper));
+  color: var(--color-destructive);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  border-radius: var(--radius-field);
+}
+.sf-form-note { font-family: var(--font-body); font-size: var(--text-xs); line-height: 1.6; color: var(--color-muted); }
+
+/* ------------------------------------------------------------------ *
+ * Received page.
+ * ------------------------------------------------------------------ */
+.sf-reference {
+  margin-top: var(--space-lg);
+  border: var(--rule-thick) solid var(--color-ink);
+  background-color: var(--color-paper-2);
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  word-break: break-all;
+}
+.sf-reference__label { display: block; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-muted); margin-block-end: var(--space-2xs); }
+
+/* ------------------------------------------------------------------ *
+ * Focus visibility — instant, never animated.
+ * ------------------------------------------------------------------ */
+.sf-mast a:focus-visible,
+.sf-foot a:focus-visible,
+.sf-doc a:focus-visible,
+.sf-legal a:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+
+/* ------------------------------------------------------------------ *
+ * Motion — print register. Only micro press feedback; reduced-motion is a first-class state.
+ * ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .storefront *,
+  .storefront *::before,
+  .storefront *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Responsive — content-driven breakpoints (mobile = single column).
+ * Registry/ledger rows default to a single column; links never wrap.
+ * ------------------------------------------------------------------ */
+.sf-consult { display: grid; gap: var(--space-2xl); grid-template-columns: minmax(0, 1fr); align-items: start; }
+
+@media (min-width: 40rem) {
+  .sf-ledger__row { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+  .sf-register__row { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+@media (min-width: 60rem) {
+  .sf-ledger__row { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1fr); }
+  .sf-ledger__matters { margin: 0; }
+  .sf-form { padding: var(--space-xl); }
+  .sf-consult { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); }
+}
