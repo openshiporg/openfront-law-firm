@@ -1556,6 +1556,7 @@ type Intake {
   source: IntakeSourceType
   primaryContact: Contact
   office: Office
+  practiceArea: PracticeArea
   openedBy: User
   assignedTo: User
   receivedAt: DateTime
@@ -1614,6 +1615,7 @@ input IntakeWhereInput {
   source: IntakeSourceTypeNullableFilter
   primaryContact: ContactWhereInput
   office: OfficeWhereInput
+  practiceArea: PracticeAreaWhereInput
   openedBy: UserWhereInput
   assignedTo: UserWhereInput
   receivedAt: DateTimeFilter
@@ -1684,6 +1686,7 @@ input IntakeUpdateInput {
   title: String
   source: IntakeSourceType
   office: OfficeRelateToOneForUpdateInput
+  practiceArea: PracticeAreaRelateToOneForUpdateInput
   openedBy: UserRelateToOneForUpdateInput
   assignedTo: UserRelateToOneForUpdateInput
   summary: String
@@ -1696,6 +1699,12 @@ input IntakeUpdateInput {
 input OfficeRelateToOneForUpdateInput {
   create: OfficeCreateInput
   connect: OfficeWhereUniqueInput
+  disconnect: Boolean
+}
+
+input PracticeAreaRelateToOneForUpdateInput {
+  create: PracticeAreaCreateInput
+  connect: PracticeAreaWhereUniqueInput
   disconnect: Boolean
 }
 
@@ -1718,6 +1727,7 @@ input IntakeCreateInput {
   source: IntakeSourceType
   primaryContact: ContactRelateToOneForCreateInput
   office: OfficeRelateToOneForCreateInput
+  practiceArea: PracticeAreaRelateToOneForCreateInput
   openedBy: UserRelateToOneForCreateInput
   assignedTo: UserRelateToOneForCreateInput
   receivedAt: DateTime
@@ -1733,6 +1743,11 @@ input IntakeCreateInput {
 input OfficeRelateToOneForCreateInput {
   create: OfficeCreateInput
   connect: OfficeWhereUniqueInput
+}
+
+input PracticeAreaRelateToOneForCreateInput {
+  create: PracticeAreaCreateInput
+  connect: PracticeAreaWhereUniqueInput
 }
 
 input UserRelateToOneForCreateInput {
@@ -2668,12 +2683,6 @@ input MatterUpdateInput {
   updatedAt: DateTime
 }
 
-input PracticeAreaRelateToOneForUpdateInput {
-  create: PracticeAreaCreateInput
-  connect: PracticeAreaWhereUniqueInput
-  disconnect: Boolean
-}
-
 input MatterUpdateArgs {
   where: MatterWhereUniqueInput!
   data: MatterUpdateInput!
@@ -2700,11 +2709,6 @@ input MatterCreateInput {
   blockedUsers: UserRelateToManyForCreateInput
   createdAt: DateTime
   updatedAt: DateTime
-}
-
-input PracticeAreaRelateToOneForCreateInput {
-  create: PracticeAreaCreateInput
-  connect: PracticeAreaWhereUniqueInput
 }
 
 type MatterParty {
@@ -8625,6 +8629,118 @@ input PublicSitePolicyCreateInput {
   updatedAt: DateTime
 }
 
+type AttorneyProfile {
+  id: ID!
+  firm: Firm
+  name: String
+  slug: String
+  title: String
+  focus: String
+  biography: String
+  admissions: String
+  email: String
+  practiceAreas(where: PracticeAreaWhereInput! = {}, orderBy: [PracticeAreaOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: PracticeAreaWhereUniqueInput): [PracticeArea!]
+  practiceAreasCount(where: PracticeAreaWhereInput! = {}): Int
+  isPublic: Boolean
+  sortOrder: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input AttorneyProfileWhereUniqueInput {
+  id: ID
+}
+
+input AttorneyProfileWhereInput {
+  AND: [AttorneyProfileWhereInput!]
+  OR: [AttorneyProfileWhereInput!]
+  NOT: [AttorneyProfileWhereInput!]
+  id: IDFilter
+  firm: FirmWhereInput
+  name: StringFilter
+  slug: StringFilter
+  title: StringFilter
+  focus: StringFilter
+  biography: StringFilter
+  admissions: StringFilter
+  email: StringFilter
+  practiceAreas: PracticeAreaManyRelationFilter
+  isPublic: BooleanFilter
+  sortOrder: IntNullableFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input PracticeAreaManyRelationFilter {
+  every: PracticeAreaWhereInput
+  some: PracticeAreaWhereInput
+  none: PracticeAreaWhereInput
+}
+
+input AttorneyProfileOrderByInput {
+  id: OrderDirection
+  name: OrderDirection
+  slug: OrderDirection
+  title: OrderDirection
+  focus: OrderDirection
+  biography: OrderDirection
+  admissions: OrderDirection
+  email: OrderDirection
+  isPublic: OrderDirection
+  sortOrder: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input AttorneyProfileUpdateInput {
+  firm: FirmRelateToOneForUpdateInput
+  name: String
+  slug: String
+  title: String
+  focus: String
+  biography: String
+  admissions: String
+  email: String
+  practiceAreas: PracticeAreaRelateToManyForUpdateInput
+  isPublic: Boolean
+  sortOrder: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input PracticeAreaRelateToManyForUpdateInput {
+  disconnect: [PracticeAreaWhereUniqueInput!]
+  set: [PracticeAreaWhereUniqueInput!]
+  create: [PracticeAreaCreateInput!]
+  connect: [PracticeAreaWhereUniqueInput!]
+}
+
+input AttorneyProfileUpdateArgs {
+  where: AttorneyProfileWhereUniqueInput!
+  data: AttorneyProfileUpdateInput!
+}
+
+input AttorneyProfileCreateInput {
+  firm: FirmRelateToOneForCreateInput
+  name: String
+  slug: String
+  title: String
+  focus: String
+  biography: String
+  admissions: String
+  email: String
+  practiceAreas: PracticeAreaRelateToManyForCreateInput
+  isPublic: Boolean
+  sortOrder: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input PracticeAreaRelateToManyForCreateInput {
+  create: [PracticeAreaCreateInput!]
+  connect: [PracticeAreaWhereUniqueInput!]
+}
+
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
 """
@@ -8815,6 +8931,12 @@ type Mutation {
   updatePublicSitePolicies(data: [PublicSitePolicyUpdateArgs!]!): [PublicSitePolicy]
   deletePublicSitePolicy(where: PublicSitePolicyWhereUniqueInput!): PublicSitePolicy
   deletePublicSitePolicies(where: [PublicSitePolicyWhereUniqueInput!]!): [PublicSitePolicy]
+  createAttorneyProfile(data: AttorneyProfileCreateInput!): AttorneyProfile
+  createAttorneyProfiles(data: [AttorneyProfileCreateInput!]!): [AttorneyProfile]
+  updateAttorneyProfile(where: AttorneyProfileWhereUniqueInput!, data: AttorneyProfileUpdateInput!): AttorneyProfile
+  updateAttorneyProfiles(data: [AttorneyProfileUpdateArgs!]!): [AttorneyProfile]
+  deleteAttorneyProfile(where: AttorneyProfileWhereUniqueInput!): AttorneyProfile
+  deleteAttorneyProfiles(where: [AttorneyProfileWhereUniqueInput!]!): [AttorneyProfile]
   endSession: Boolean!
   authenticateUserWithPassword(email: String!, password: String!): UserAuthenticationWithPasswordResult
   createInitialUser(data: CreateInitialUserInput!): UserAuthenticationWithPasswordSuccess!
@@ -8861,6 +8983,7 @@ type Mutation {
   assembleDraftInvoice(idempotencyKey: String!, invoiceNumber: String!, matterId: ID!, clientId: ID!, timeEntryIds: [ID!], expenseIds: [ID!], retainerId: ID): DraftInvoiceAssemblyResult!
   transitionInvoice(invoiceId: ID!, toStatus: InvoiceCommandTarget!, reason: String, dueAt: DateTime): InvoiceTransitionResult!
   transitionPayment(paymentId: ID!, toStatus: String!, eventId: String!, providerPaymentId: String, failureReason: String): PaymentTransitionResult!
+  recordManualPayment(idempotencyKey: String!, payerId: ID!, invoiceId: ID, amountMinor: Int!, currencyCode: String!, method: String!, receivedAt: DateTime!, reference: String): PaymentTransitionResult!
   allocatePayment(paymentId: ID!, invoiceId: ID!, amountMinor: Int!, idempotencyKey: String!, note: String): PaymentAllocationResult!
   reversePaymentAllocation(allocationId: ID!, idempotencyKey: String!, reason: String!): PaymentAllocationResult!
   requestRefund(paymentId: ID!, amountMinor: Int!, reason: String!, explanation: String!, idempotencyKey: String!): RefundResult!
@@ -8896,7 +9019,7 @@ type Mutation {
   prepareCommunicationDeliveries(messageId: ID!, participantIds: [ID!]!, integrationConnectionId: ID, reason: String!): CommunicationDeliveryPreparationResult!
   applyContactImport(connectionId: ID!, idempotencyKey: String!, rows: [ContactImportRowInput!]!): ContactImportResult!
   preparePracticeExport(scope: String!, idempotencyKey: String!, limit: Int): PracticeExportResult!
-  startClientIntake(contactType: String!, firstName: String, lastName: String, organizationName: String, email: String, phone: String, title: String!, source: String, summary: String, adversePartySummary: String, officeId: ID, assignedToId: ID): ClientIntakeStartResult!
+  startClientIntake(contactType: String!, firstName: String, lastName: String, organizationName: String, email: String, phone: String, title: String!, source: String, summary: String, adversePartySummary: String, officeId: ID, practiceAreaId: ID, assignedToId: ID): ClientIntakeStartResult!
   inviteFirmMember(name: String!, email: String!, roleId: ID!, officeId: ID): StaffInvitationResult!
   changeFirmMemberAccess(membershipId: ID!, roleId: ID, officeId: ID, changeOffice: Boolean!, toStatus: String, reason: String!): ControlledRecordProjection!
   updateFirmRoleAuthority(roleId: ID!, grantedPermissions: [String!]!, status: String, reason: String!): FirmRoleAuthorityResult!
@@ -9179,6 +9302,9 @@ type Query {
   publicSitePolicy(where: PublicSitePolicyWhereUniqueInput!): PublicSitePolicy
   publicSitePolicies(where: PublicSitePolicyWhereInput! = {}, orderBy: [PublicSitePolicyOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: PublicSitePolicyWhereUniqueInput): [PublicSitePolicy!]
   publicSitePoliciesCount(where: PublicSitePolicyWhereInput! = {}): Int
+  attorneyProfile(where: AttorneyProfileWhereUniqueInput!): AttorneyProfile
+  attorneyProfiles(where: AttorneyProfileWhereInput! = {}, orderBy: [AttorneyProfileOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: AttorneyProfileWhereUniqueInput): [AttorneyProfile!]
+  attorneyProfilesCount(where: AttorneyProfileWhereInput! = {}): Int
   keystone: KeystoneMeta!
   authenticatedItem: AuthenticatedItem
   validateUserPasswordResetToken(email: String!, token: String!): ValidateUserPasswordResetTokenResult

@@ -23,10 +23,12 @@ import {
   trackItemClass,
 } from '@/features/platform/components/ui'
 import {
+  addStandardRoles,
   changeStaffAccess,
   inviteStaff,
   resendStaffSetupLink,
   type MemberAccessState,
+  type StandardRolesState,
   type StaffInviteState,
   type TeamSetup,
 } from '../actions/inviteStaff'
@@ -52,7 +54,7 @@ export function StaffInvitationPanel({ setup }: { setup: TeamSetup }) {
               <SearchableOptionSelect key={`office-${state.success ?? ''}`} id="officeId" name="officeId" label="Primary office" emptyLabel="No primary office" kind="office" total={setup.officesCount} options={setup.offices.map((office) => ({ value: office.id, label: `${office.name} · ${office.code}` }))} />
             </div>
 
-            {!setup.roles.length ? <Notice>No roles configured.</Notice> : null}
+            {!setup.roles.length ? <Notice>No roles yet. Add the standard roles below.</Notice> : null}
             {state.message ? (
               <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{state.message}</p>
             ) : state.success ? (
@@ -63,6 +65,7 @@ export function StaffInvitationPanel({ setup }: { setup: TeamSetup }) {
               <button type="submit" className={pillPrimaryClass} disabled={pending || !setup.roles.length}>{pending ? 'Creating invitation…' : 'Create invitation'}</button>
             </Track>
           </form>
+          <StandardRolesControl missing={setup.missingStandardRoles ?? []} />
         </Panel>
       </aside>
 
@@ -107,6 +110,21 @@ export function StaffInvitationPanel({ setup }: { setup: TeamSetup }) {
         ) : null}
       </section>
     </div>
+  )
+}
+
+function StandardRolesControl({ missing }: { missing: string[] }) {
+  const [state, action, pending] = useActionState(addStandardRoles, { message: null, success: null } as StandardRolesState)
+  if (!missing.length && !state.success) return null
+  return (
+    <form action={action} className="mt-4 space-y-2 border-t border-border pt-4">
+      {missing.length ? <>
+        <p className="text-xs text-muted-foreground">Missing standard roles: {missing.join(', ')}</p>
+        <Track><button type="submit" className={pillClass} disabled={pending}>{pending ? 'Adding roles…' : 'Add standard roles'}</button></Track>
+      </> : null}
+      {state.message ? <p role="alert" className="text-xs text-destructive">{state.message}</p> : null}
+      {state.success ? <p role="status" className="text-xs text-foreground">{state.success}</p> : null}
+    </form>
   )
 }
 

@@ -30,14 +30,14 @@ export function QueueRow({ item, href, actionPath, timeZone, anchor }: { item: P
     </>
   )
   return (
-    <li id={anchor ? `${anchor}-${item.id}` : undefined} className="grid min-w-0 scroll-mt-24 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 sm:grid-cols-[7.5rem_minmax(0,1fr)_auto]">
-      <span className="col-span-2 flex min-w-0 items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:col-span-1 sm:flex-col sm:items-start sm:gap-0.5">
-        <span className="truncate">{item.kind}</span>
-        <span className="truncate font-mono normal-case tracking-normal tabular-nums">{when}</span>
+    <li id={anchor ? `${anchor}-${item.id}` : undefined} className="grid min-w-0 scroll-mt-24 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
+      <span className="col-span-2 flex min-w-0 flex-wrap items-baseline gap-x-2 overflow-hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:col-span-1 sm:flex-col sm:items-start sm:gap-0.5">
+        <span className="max-w-full truncate">{item.kind}</span>
+        <span className="max-w-full font-mono normal-case leading-4 tracking-normal tabular-nums">{when}</span>
       </span>
       {href ? <Link href={href} className="group min-w-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">{title}</Link> : <div className="min-w-0">{title}</div>}
       <div className="justify-self-end">
-        <PracticeRowAction id={item.id} kind={item.kind} status={item.status} path={actionPath} canAct={item.canAct} />
+        <PracticeRowAction id={item.id} kind={item.kind} status={item.status} path={actionPath} canAct={item.canAct} timeZone={timeZone} />
       </div>
     </li>
   )

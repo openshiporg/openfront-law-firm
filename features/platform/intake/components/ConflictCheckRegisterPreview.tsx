@@ -1,7 +1,10 @@
 import { Pager, RowList, StatusDot, statusLabel, statusTone } from '@/features/platform/components/ui'
 import type { PracticeWorkspaceSection } from '@/features/platform/operations/types'
+import { formatInstant } from '@/features/platform/lib/datetime'
 
 export type ConflictCheckRegisterRow = {
+  title: string
+  subtitle: string
   status: string
   createdAt: string | null
 }
@@ -11,11 +14,13 @@ export function ConflictCheckRegisterPreview({
   total,
   pagination,
   paginationHrefs,
+  timeZone,
 }: {
   rows: ConflictCheckRegisterRow[]
   total: number
   pagination: PracticeWorkspaceSection['pagination']
   paginationHrefs: { previous: string | null; next: string | null }
+  timeZone: string
 }) {
   return (
     <section className="min-w-0 space-y-3" aria-labelledby="conflict-status-preview-heading">
@@ -27,13 +32,17 @@ export function ConflictCheckRegisterPreview({
       {rows.length ? (
         <RowList label="Pending conflict checks, oldest first">
           {rows.map((row, index) => (
-            <li key={`${pagination?.page ?? 1}-${index}`} className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+            <li key={`${pagination?.page ?? 1}-${index}`} className="grid min-w-0 gap-1 px-4 py-3">
               <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
                 <StatusDot tone={statusTone(row.status)} />
-                <span className="truncate">{statusLabel(row.status)}</span>
+                <span className="min-w-0 truncate">{row.title}</span>
+                <span className="shrink-0 whitespace-nowrap text-xs font-medium text-muted-foreground">{statusLabel(row.status)}</span>
               </span>
-              <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                {row.createdAt ? <time dateTime={row.createdAt}>{formatUtcTimestamp(row.createdAt)}</time> : 'Time unavailable'}
+              <span className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 pl-4 text-xs text-muted-foreground">
+                <span className="min-w-0 truncate">{row.subtitle}</span>
+                <span className="tabular-nums">
+                  {row.createdAt ? <time dateTime={row.createdAt}>{formatInstant(row.createdAt, timeZone, { missing: 'Time unavailable' })}</time> : 'Time unavailable'}
+                </span>
               </span>
             </li>
           ))}
@@ -58,9 +67,4 @@ export function ConflictCheckRegisterPreview({
       ) : null}
     </section>
   )
-}
-
-function formatUtcTimestamp(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? 'Time unavailable' : `${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`
 }

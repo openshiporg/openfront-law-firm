@@ -8,6 +8,7 @@ import { DEFAULT_STORE_LOGO_ICON, normalizeStoreLogoColor } from "../../shared/s
 import { assertCurrentCommandActor } from "./command-authority";
 import { applySyntheticDemoScenario, SYNTHETIC_DEMO_MARKER } from "./syntheticScenario";
 import { recordAuditEvent } from "./workflow-helpers";
+import { standardFirmRoles, standardRolePermissionData } from "./roleWorkflows";
 
 function bounded(value: string, label: string, max: number) {
   const text = value?.trim();
@@ -207,6 +208,15 @@ export async function completeFirmOnboarding(
         status: "active",
         ...Object.fromEntries(permissionKeys.map((permission) => [permission, true])),
       },
+    });
+    // Least-privilege staff roles so new members need not be invited as administrators.
+    await tx.role.createMany({
+      data: standardFirmRoles.map((standard) => ({
+        firmId: firm.id,
+        name: standard.name,
+        status: "active",
+        ...standardRolePermissionData(standard),
+      })),
     });
     const now = new Date();
     const membership = await tx.firmMembership.create({

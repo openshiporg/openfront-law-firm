@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { keystoneContext } from '@/features/keystone/context'
 import { revokePortalSession } from '@/features/keystone/lib/portal-auth'
 import { acceptPortalInvitation, redeemPortalSignInLink, requestPortalSignInLink } from '@/features/keystone/mutations/portalWorkflows'
-import { sendPortalSignInEmail } from '@/features/keystone/lib/mail'
+import { isEmailDeliveryConfigured, sendPortalSignInEmail } from '@/features/keystone/lib/mail'
 import { PORTAL_SESSION_COOKIE, type PortalAcceptState, type PortalSignInState } from './constants'
 
 export async function acceptPortalInvite(
@@ -55,6 +55,8 @@ export async function signOutPortal() {
 export async function requestPortalSignIn(_previous: PortalSignInState, formData: FormData): Promise<PortalSignInState> {
   const email = String(formData.get('email') ?? '').trim().slice(0, 320)
   if (!email) return { sent: false, error: 'Enter the email address your firm invited.' }
+  // Without email delivery no link can arrive; say so instead of implying one was sent.
+  if (!isEmailDeliveryConfigured()) return { sent: false, error: 'Email sign-in links are not available for this firm. Ask your firm for a new invitation link.' }
   await requestPortalSignInLink(email, keystoneContext.prisma, (token, to) => sendPortalSignInEmail(token, to))
   return { sent: true, error: null }
 }

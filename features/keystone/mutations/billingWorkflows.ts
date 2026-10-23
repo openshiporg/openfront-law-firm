@@ -760,3 +760,112 @@ export async function recordRefundProviderOutcome(
     return { refund: updated, replayed: false };
   });
 }
+
+const manualPaymentMethods = new Set(["check", "ach", "wire", "cash", "card", "other"]);
+
+// Records an operating receipt the firm received outside any provider (cheque, wire,
+// ACH, cash, card terminal). It is booked as captured so it can be allocated to an open
+// issued invoice through allocatePayment; trust deposits use the trust posting workflow.
+// The method is kept in providerCode ("manual:<method>") and the bank or cheque reference
+// in providerPaymentId, so no schema change is needed.
+export async function recordManualPayment(
+  _root: unknown,
+  args: {
+    idempotencyKey: string;
+    payerId: string;
+    invoiceId?: string | null;
+    amountMinor: number;
+    currencyCode: string;
+    method: string;
+    receivedAt: string;
+    reference?: string | null;
+  },
+  context: Context,
+) {
+  const { firmId, userId } = requirePermission(context, "canManagePayments", { humanOnly: true });
+  const key = idempotencyKey(args.idempotencyKey);
+  if (!manualPaymentMethods.has(args.method)) throw new Error("Unsupported payment method.");
+  if (!isGraphqlInt(args.amountMinor) || args.amountMinor <= 0) {
+    throw new Error("Payment amount must be a positive database-range integer minor-unit value.");
+  }
+  const currencyCode = String(args.currencyCode ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currencyCode)) throw new Error("Use a three-letter uppercase currency code.");
+  const receivedAt = timestamp(args.receivedAt, "Payment received date");
+  if (!receivedAt) throw new Error("Payment received date is required.");
+  const now = new Date();
+  if (receivedAt.getTime() > now.getTime() + 36 * 3_600_000) throw new Error("Payment received date cannot be in the future.");
+  const reference = optionalBoundedText(args.reference, "Payment reference", 200) ?? "";
+  const invoiceId = args.invoiceId?.trim() || null;
+  const providerCode = `manual:${args.method}`;
+  const prisma = context.prisma as any;
+
+  return runSerializableTransaction(prisma, async (tx: any) => {
+    await assertCurrentCommandActor(tx, context, "canManagePayments");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`manual-payment:${firmId}:${key}`}))`;
+    const replay = await tx.payment.findFirst({ where: { firmId, idempotencyKey: key } });
+    if (replay) {
+      if (
+        replay.payerId !== args.payerId ||
+        (replay.invoiceId ?? null) !== invoiceId ||
+        replay.amountMinor !== args.amountMinor ||
+        replay.currencyCode !== currencyCode ||
+        replay.providerCode !== providerCode ||
+        (replay.providerPaymentId ?? "") !== reference
+      ) {
+        throw new Error("Payment idempotency key was reused with a different payload.");
+      }
+      if (replay.matterId) {
+        await assertMatterAccess(tx, firmId, replay.matterId, userId);
+        await assertMatterTeamCapability(tx, firmId, replay.matterId, userId, "canBill");
+      }
+      return { payment: replay, replayed: true };
+    }
+    const payer = await tx.contact.findFirst({ where: { id: args.payerId, firmId }, select: { id: true } });
+    if (!payer) throw new Error("Payer was not found in the active firm.");
+    let matterId: string | null = null;
+    if (invoiceId) {
+      const invoice = await tx.invoice.findFirst({
+        where: { id: invoiceId, firmId },
+        select: { id: true, matterId: true, status: true, currencyCode: true },
+      });
+      if (!invoice) throw new Error("Invoice was not found in the active firm.");
+      await assertMatterAccess(tx, firmId, invoice.matterId, userId);
+      await assertMatterTeamCapability(tx, firmId, invoice.matterId, userId, "canBill");
+      if (!new Set(["issued", "partially_paid", "overdue"]).has(invoice.status)) {
+        throw new Error("A payment can be recorded against an open issued invoice only.");
+      }
+      if (invoice.currencyCode !== currencyCode) throw new Error("Payment and invoice currencies must match.");
+      matterId = invoice.matterId;
+    }
+    const payment = await tx.payment.create({
+      data: {
+        firmId,
+        matterId,
+        invoiceId,
+        payerId: payer.id,
+        paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+        idempotencyKey: key,
+        paymentType: "operating",
+        status: "captured",
+        amountMinor: args.amountMinor,
+        refundedMinor: 0,
+        currencyCode,
+        providerCode,
+        providerPaymentId: reference,
+        capturedAt: receivedAt,
+        receivedById: userId,
+      },
+    });
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "payment.recorded",
+      category: "financial",
+      actorUserId: userId,
+      matterId,
+      invoiceId,
+      paymentId: payment.id,
+      metadata: { method: args.method, amountMinor: args.amountMinor, currencyCode, receivedAt: receivedAt.toISOString() },
+    });
+    return { payment, replayed: false };
+  });
+}

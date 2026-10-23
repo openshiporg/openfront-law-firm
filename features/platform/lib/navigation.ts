@@ -9,6 +9,7 @@ import {
   Clock3,
   ContactRound,
   FileSignature,
+  Globe,
   Inbox,
   Landmark,
   LayoutDashboard,
@@ -107,6 +108,7 @@ export const practiceNavGroups: PracticeNavGroup[] = [
     title: 'Storefront',
     icon: Store,
     items: [
+      { title: 'Public site', href: '/dashboard/platform/public-site', description: 'Publication, notices, practice areas and attorney profiles.', icon: Globe },
       { title: 'Store Settings', href: '/dashboard/platform/branding', description: 'Public site identity, logo, accent color, and support contact.', icon: Palette },
     ],
   },

@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState, useState, useTransition } from 'react'
+import { useActionState, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { FormSelect } from '@/components/ui/form-select'
 import { Search } from 'lucide-react'
 
@@ -17,11 +18,14 @@ import {
   pillPrimaryClass,
   statusLabel,
   statusTone,
+  trackClass,
+  trackItemClass,
 } from '@/features/platform/components/ui'
+import { formatInstant } from '@/features/platform/lib/datetime'
 import { loadConflictCheckDetail, manageConflictReview, searchConflictSources, type ConflictReviewSetup, type ConflictReviewSource, type ConflictReviewState } from '../actions/manageConflictReview'
 import { shouldShowDispositionForm } from '../lib/conflictReviewState'
 
-export function ConflictReviewPanel({ setup, pageHrefs }: { setup: ConflictReviewSetup; pageHrefs?: { previous: string | null; next: string | null } }) {
+export function ConflictReviewPanel({ setup, pageHrefs, timeZone }: { setup: ConflictReviewSetup; pageHrefs?: { previous: string | null; next: string | null }; timeZone: string }) {
   return (
     <section id="conflict-review" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="manual-conflicts-heading">
       <h2 id="manual-conflicts-heading" className="flex min-w-0 items-baseline gap-2 text-base font-semibold tracking-tight text-foreground">
@@ -30,7 +34,7 @@ export function ConflictReviewPanel({ setup, pageHrefs }: { setup: ConflictRevie
       </h2>
       {!setup.conflictChecks.length ? <EmptyState title="No conflict checks awaiting work" /> : (
         <div className="space-y-4">
-          {setup.conflictChecks.map((check) => <ConflictCheck key={check.id} check={check} setup={setup} />)}
+          {setup.conflictChecks.map((check) => <ConflictCheck key={check.id} check={check} setup={setup} timeZone={timeZone} />)}
         </div>
       )}
       {setup.pageCount > 1 && pageHrefs ? (
@@ -40,14 +44,24 @@ export function ConflictReviewPanel({ setup, pageHrefs }: { setup: ConflictRevie
   )
 }
 
-function ConflictCheck({ check, setup }: { check: ConflictReviewSetup['conflictChecks'][number]; setup: ConflictReviewSetup }) {
+function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup['conflictChecks'][number]; setup: ConflictReviewSetup; timeZone: string }) {
+  const router = useRouter()
   const [state, action, pending] = useActionState<ConflictReviewState, FormData>(manageConflictReview, { ok: false, message: '' })
+  const [outcome, setOutcome] = useState('')
   const [extraTerms, setExtraTerms] = useState<ConflictReviewSetup['conflictChecks'][number]['terms']>([])
   const [extraMatches, setExtraMatches] = useState<ConflictReviewSetup['conflictChecks'][number]['matches']>([])
   const [sourceQuery, setSourceQuery] = useState('')
   const [sources, setSources] = useState<ConflictReviewSource[] | null>(null)
   const [detailError, setDetailError] = useState('')
   const [loading, startLoading] = useTransition()
+  // A successful command changes server state: reload this check from the server so the
+  // card shows its new status at once. Loaded continuation pages are dropped with it.
+  useEffect(() => {
+    if (!state.ok) return
+    setExtraTerms([])
+    setExtraMatches([])
+    router.refresh()
+  }, [state, router])
   const terms = [...check.terms, ...extraTerms]
   const matches = [...check.matches, ...extraMatches]
 
@@ -94,7 +108,7 @@ function ConflictCheck({ check, setup }: { check: ConflictReviewSetup['conflictC
               <label htmlFor={`source-search-${check.id}`}>Contact or matter</label>
               <div className="flex min-w-0 items-center gap-2">
                 <input id={`source-search-${check.id}`} value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); findSources() } }} maxLength={100} className={cn(fieldClass, 'text-foreground')} />
-                <Track><button type="button" className={pillClass} onClick={findSources} disabled={loading || !sourceQuery.trim()}><Search className="size-3.5" aria-hidden="true" />Find</button></Track>
+                <Track className="shrink-0 overflow-visible"><button type="button" className={pillClass} onClick={findSources} disabled={loading || !sourceQuery.trim()}><Search className="size-3.5" aria-hidden="true" />Find</button></Track>
               </div>
             </div>
             {sources ? (
@@ -144,7 +158,7 @@ function ConflictCheck({ check, setup }: { check: ConflictReviewSetup['conflictC
                     <p className="break-words pl-4 text-xs text-muted-foreground">
                       {match.dispositionsCount > 0
                         ? latestDisposition
-                          ? <>{formatDispositionOutcome(latestDisposition.outcome)} · {formatDecisionDate(latestDisposition.decidedAt)} · {latestDisposition.outcome === 'needs_more_information' ? 'Further review required' : 'Final'} · {match.dispositionsCount} recorded</>
+                          ? <>{formatDispositionOutcome(latestDisposition.outcome)} · {formatInstant(latestDisposition.decidedAt, timeZone, { missing: 'date unavailable' })} · {latestDisposition.outcome === 'needs_more_information' ? 'Further review required' : 'Final'} · {match.dispositionsCount} recorded</>
                           : <>Disposition unavailable under current source access · {match.dispositionsCount} recorded</>
                         : <>No disposition · {match.status.replaceAll('_', ' ')}</>}
                     </p>
@@ -174,9 +188,19 @@ function ConflictCheck({ check, setup }: { check: ConflictReviewSetup['conflictC
       {setup.canResolve && check.status === 'review_required' ? (
         <form action={action} className="grid gap-3 border-t border-border px-4 py-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-end">
           <input type="hidden" name="operation" value="finalize" /><input type="hidden" name="checkId" value={check.id} />
-          <Select id={`final-${check.id}`} name="outcome" label="Outcome" options={[["cleared", "Cleared"], ["conflict_found", "Conflict found"]]} />
+          <fieldset className="min-w-0">
+            <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Outcome</legend>
+            <div role="radiogroup" aria-required="true" className={trackClass}>
+              {([['cleared', 'Cleared'], ['conflict_found', 'Conflict found']] as const).map(([value, text]) => (
+                <label key={value} className={cn(trackItemClass(outcome === value), 'cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50')}>
+                  <input type="radio" name="outcome" value={value} required checked={outcome === value} onChange={() => setOutcome(value)} className="sr-only" />
+                  {text}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <Field id={`summary-${check.id}`} name="summary" label="Final summary" minLength={10} />
-          <Track className="justify-self-start sm:col-span-2"><button type="submit" className={pillPrimaryClass} disabled={pending}>Record final review</button></Track>
+          <Track className="justify-self-start sm:col-span-2"><button type="submit" className={pillPrimaryClass} disabled={pending || !outcome}>Record final review</button></Track>
         </form>
       ) : null}
 
@@ -219,11 +243,6 @@ const dispositionLabels: Record<string, string> = {
 
 function formatDispositionOutcome(outcome: string) {
   return dispositionLabels[outcome] ?? 'Disposition recorded'
-}
-
-function formatDecisionDate(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? 'date unavailable' : `${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`
 }
 
 function Field({ id, name, label, minLength }: { id: string; name: string; label: string; minLength?: number }) {

@@ -101,12 +101,14 @@ export function PracticeRowAction({
   status,
   path,
   canAct,
+  timeZone,
 }: {
   id: string
   kind: string
   status: string
   path: string
   canAct: boolean
+  timeZone?: string
 }) {
   const action = canAct ? transitions[kind]?.[status] : undefined
   const [state, formAction, pending] = useActionState(runPracticeAction, initialState)
@@ -153,7 +155,7 @@ export function PracticeRowAction({
         ) : null}
         {selectedOperation === 'issueInvoice' ? (
           <label className={labelClass} htmlFor={`due-${id}`}>
-            Due date (end of day UTC)
+            Due date (end of day, {timeZone ?? 'firm time'})
             <input id={`due-${id}`} name="dueAt" type="date" required className={fieldClass} />
           </label>
         ) : null}

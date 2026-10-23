@@ -18,7 +18,10 @@ export default async function ContactPage() {
         <p className="sf-label">Existing clients</p>
         <h2 id="contact-existing" className="sf-h3">Client portal</h2>
         <div className="sf-track"><Link href="/portal" className="sf-pill sf-pill--raised">Open portal</Link><Link href="/portal/accept" className="sf-pill">Use invitation</Link></div>
-        <p className="sf-muted text-sm leading-6">New invitation: {settings.supportEmail ? <>email <a className="sf-link" href={`mailto:${settings.supportEmail}?subject=${encodeURIComponent('Client portal invitation request')}`}>{settings.supportEmail}</a> with your name only, not matter details.</> : 'ask your attorney using the contact details in your engagement materials.'} Invitations go only to the address the firm has on file.</p>
+        <div className="grid gap-1 text-sm leading-6">
+          <p className="font-medium">New invitation</p>
+          {settings.supportEmail ? <><a className="sf-link break-all" href={`mailto:${settings.supportEmail}?subject=${encodeURIComponent('Client portal invitation request')}`}>{settings.supportEmail}</a><p className="sf-muted">Send your name only, not matter details. Invitations go only to the address the firm has on file.</p></> : <p className="sf-muted">Ask your attorney using the contact details in your engagement materials.</p>}
+        </div>
       </div></section>
       <section className="sf-card" aria-labelledby="contact-public"><div className="sf-card__body grid h-full content-start gap-4">
         <p className="sf-label">General</p>

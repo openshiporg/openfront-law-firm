@@ -43,15 +43,23 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       key: "pipeline", title: "Intake pipeline", description: "Prospects requiring screening, consultation, or an engagement decision.",
       model: "Intake", permissions: ["canReadIntake"],
       where: { status: { in: ["new", "screening", "conflict_review", "consultation", "decision"] } },
-      orderBy: [{ receivedAt: "desc" }, { id: "asc" }], query: "id intakeNumber status receivedAt", kind: "Intake",
-      map: (record) => ({ id: record.id, title: record.intakeNumber, subtitle: "Prospective-client intake · open the pipeline to act", status: record.status, at: iso(record.receivedAt) }),
+      orderBy: [{ receivedAt: "desc" }, { id: "asc" }], query: "id intakeNumber title status receivedAt primaryContact { displayName }", kind: "Intake",
+      map: (record) => ({ id: record.id, title: record.title || record.intakeNumber, subtitle: [record.primaryContact?.displayName ?? "Client unavailable", record.intakeNumber].join(" · "), status: record.status, at: iso(record.receivedAt) }),
     },
     {
       key: "conflicts", title: "Conflict review status", description: "Conflict checks awaiting review, oldest first. Review each check in the conflict review panel.",
       model: "ConflictCheck", permissions: ["canReadIntake", "canRunConflictChecks", "canResolveConflicts"],
       where: { status: { in: ["requested", "running", "review_required"] } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      query: "status createdAt", kind: "Conflict check", previewOnly: true,
-      map: (record) => ({ id: "conflict-preview", title: "Conflict check", subtitle: "Awaiting conflict review", status: record.status, at: iso(record.createdAt) }),
+      query: "status createdAt intake { intakeNumber title primaryContact { displayName } } matter { matterNumber title }", kind: "Conflict check", previewOnly: true,
+      map: (record) => ({
+        id: "conflict-preview",
+        title: record.intake?.title ?? (record.matter ? `${record.matter.matterNumber} · ${record.matter.title}` : "Conflict check"),
+        subtitle: record.intake
+          ? [record.intake.primaryContact?.displayName ?? "Client unavailable", record.intake.intakeNumber].join(" · ")
+          : record.matter ? "Matter conflict check" : "Awaiting conflict review",
+        status: record.status,
+        at: iso(record.createdAt),
+      }),
     },
   ],
   matters: [
@@ -256,13 +264,13 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
   ],
   data: [
     {
-      key: "connections", title: "Import connections", description: "Active provider connections that can own source identity mappings for controlled imports.",
+      key: "connections", title: "Import sources", description: "Connections that contacts can be imported from.",
       model: "IntegrationConnection", permissions: ["canManageIntegrations"], where: { status: { equals: "active" } }, orderBy: { updatedAt: "desc" },
       query: "id name provider category status updatedAt externalLinksCount", kind: "Import connection",
       map: (record) => ({ id: record.id, title: record.name, subtitle: `${record.provider} · ${record.category} · ${record.externalLinksCount ?? 0} linked records`, status: record.status, at: iso(record.updatedAt) }),
     },
     {
-      key: "links", title: "Migration identity map", description: "External record links and synchronization fingerprints used to stage portable data.",
+      key: "links", title: "Imported records", description: "Records linked to their original source.",
       model: "ExternalRecordLink", permissions: ["canReadIntegrations", "canManageIntegrations"], orderBy: { updatedAt: "desc" },
       query: "id resourceType externalId status lastSyncedAt updatedAt connection { name provider } matter { matterNumber } contact { displayName }", kind: "External link",
       map: (record) => ({ id: record.id, title: `${record.resourceType} · ${record.externalId}`, subtitle: `${record.connection?.name ?? record.connection?.provider ?? "Provider"} · ${record.matter?.matterNumber ?? record.contact?.displayName ?? "Firm record"}`, status: record.status, at: iso(record.lastSyncedAt ?? record.updatedAt) }),
@@ -282,7 +290,7 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       map: (record) => ({ id: record.id, title: record.name, subtitle: `${record.provider} · ${record.category} · ${record.office?.name ?? "all offices"}`, status: record.status, at: iso(record.lastErrorAt ?? record.lastSyncedAt ?? record.updatedAt) }),
     },
     {
-      key: "webhooks", title: "Delivery operations", description: "Queued, admitted, unresolved and rejected handoffs. Unknown outcomes require reconciliation, not resend.",
+      key: "webhooks", title: "Webhook deliveries", description: "Queued, sent, unresolved and rejected deliveries. A delivery with an unknown outcome must be checked, not resent.",
       model: "WebhookDelivery", permissions: ["canReadIntegrations", "canManageIntegrations"], where: { status: { in: ["pending", "processing", "failed", "dead_letter"] } }, orderBy: { updatedAt: "desc" },
       query: "id eventId eventType status lastError attemptCount nextAttemptAt updatedAt subscription { name } matter { matterNumber }", kind: "Webhook delivery",
       map: (record) => ({ id: record.id, title: record.eventType, subtitle: `${record.subscription?.name ?? "Subscription"} · ${record.eventId} · ${record.attemptCount ?? 0} attempts · ${webhookDispatchState(record.status, record.lastError).guidance}`, status: webhookDispatchState(record.status, record.lastError).status, at: iso(record.nextAttemptAt ?? record.updatedAt) }),

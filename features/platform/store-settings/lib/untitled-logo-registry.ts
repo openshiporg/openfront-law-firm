@@ -255,12 +255,18 @@ export const LOGO_ICONS = [
 ] as const;
 
 // Preset hue values (0-360 degrees) for common color shifts
+/**
+ * Logo colour presets. Library marks are drawn around hue 260 (blue) and the stored
+ * logoColor is a hue-rotate offset, so each preset stores the offset that lands on its
+ * named hue; `hue` is the resulting colour for swatches.
+ */
 export const HUE_PRESETS = [
-  { name: 'Original', value: 0 },
-  { name: 'Orange', value: 30 },
-  { name: 'Yellow', value: 60 },
-  { name: 'Green', value: 120 },
-  { name: 'Cyan', value: 180 },
-  { name: 'Purple', value: 270 },
-  { name: 'Pink', value: 330 },
+  { name: 'Original', value: 0, hue: 260 },
+  { name: 'Red', value: 125, hue: 25 },
+  { name: 'Orange', value: 150, hue: 50 },
+  { name: 'Yellow', value: 190, hue: 90 },
+  { name: 'Green', value: 245, hue: 145 },
+  { name: 'Teal', value: 290, hue: 190 },
+  { name: 'Purple', value: 45, hue: 305 },
+  { name: 'Pink', value: 85, hue: 345 },
 ] as const;

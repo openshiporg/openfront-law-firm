@@ -56,7 +56,7 @@ import {
   WebhookDeliveryAttempt,
 } from "./integrations";
 import { RetentionPolicy, RetentionHold, RetentionAction, AuditEvent } from "./governance";
-import { PublicSitePolicy } from "./publicSite";
+import { AttorneyProfile, PublicSitePolicy } from "./publicSite";
 import {
   AgentPrincipal,
   AgentCredential,
@@ -144,6 +144,7 @@ const modelDefinitions = {
   AgentAction,
   AgentActionEvent,
   PublicSitePolicy,
+  AttorneyProfile,
 };
 
 export const models = Object.fromEntries(

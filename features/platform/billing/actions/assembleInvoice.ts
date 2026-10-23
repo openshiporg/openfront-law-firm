@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
+import { formatInstant } from '@/features/platform/lib/datetime'
 
 export type BillingMatterOption = {
   id: string
@@ -37,9 +39,10 @@ export type BillingExpenseSource = {
 
 export type BillingAssemblySetup = {
   matters: BillingMatterOption[]
+  suggestedInvoiceNumber: string
 }
 
-export type InvoiceAssemblyState = { ok: boolean; message: string }
+export type InvoiceAssemblyState = { ok: boolean; message: string; unpricedIds?: string[] }
 
 export type MatterBillingSources = {
   timeEntries: BillingTimeSource[]
@@ -74,7 +77,28 @@ export async function getBillingAssemblySetup() {
   for (const row of [...response.data.timeEntries, ...response.data.expenses]) {
     if (row.matter?.client && ['open', 'on_hold', 'closing'].includes(row.matter.status)) matters.set(row.matter.id, row.matter)
   }
-  return { success: true as const, data: { matters: [...matters.values()] } }
+  return { success: true as const, data: { matters: [...matters.values()], suggestedInvoiceNumber: await suggestInvoiceNumber() } }
+}
+
+// Next number in the firm's INV-YYYY-NNNN sequence for the current year in the firm time
+// zone, from the invoices the viewer can read. It is a suggestion: staff may edit it, and
+// assembly still rejects a number that is already used.
+async function suggestInvoiceNumber() {
+  const year = new Intl.DateTimeFormat('en', { timeZone: await getFirmTimeZone(), year: 'numeric' }).format(new Date())
+  const prefix = `INV-${year}-`
+  const response = await keystoneClient<{ invoices: Array<{ invoiceNumber: string }> }>(`
+    query InvoiceNumberSequence($prefix: String!) {
+      invoices(where: { invoiceNumber: { startsWith: $prefix } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 500) { invoiceNumber }
+    }
+  `, { prefix })
+  let highest = 0
+  if (response.success) {
+    for (const { invoiceNumber } of response.data.invoices) {
+      const match = /^INV-\d{4}-(\d+)$/.exec(invoiceNumber)
+      if (match) highest = Math.max(highest, Number(match[1]))
+    }
+  }
+  return `${prefix}${String(highest + 1).padStart(4, '0')}`
 }
 
 export async function searchBillingMatters(query: string): Promise<{ success: true; data: BillingMatterOption[] } | { success: false; error: string }> {
@@ -160,6 +184,27 @@ export async function assembleInvoice(
   }
   const clientId = matter.data.matter.client.id
 
+  // The shared GraphQL client replaces every server error with a generic message, so the
+  // conditions staff can fix are checked here first and named exactly.
+  const precheck = await keystoneClient<{
+    timeEntries: Array<{ id: string; description: string; workDate: string; durationMinutes: number; amountMinor: number | null }>
+    invoicesCount: number
+  }>(`
+    query InvoiceAssemblyPrecheck($ids: [ID!], $invoiceNumber: String!) {
+      timeEntries(where: { id: { in: $ids } }, take: 200) { id description workDate durationMinutes amountMinor }
+      invoicesCount(where: { invoiceNumber: { equals: $invoiceNumber, mode: insensitive } })
+    }
+  `, { ids: timeEntryIds, invoiceNumber })
+  if (!precheck.success) return { ok: false, message: precheck.error }
+  if (precheck.data.invoicesCount > 0) return { ok: false, message: `Invoice number ${invoiceNumber} is already used.` }
+  const unpriced = precheck.data.timeEntries.filter((entry) => entry.amountMinor === null)
+  if (unpriced.length) {
+    const timeZone = await getFirmTimeZone()
+    const named = unpriced.slice(0, 5).map((entry) => `"${entry.description.slice(0, 60)}" (${formatInstant(entry.workDate, timeZone, { includeTime: false })}, ${entry.durationMinutes} min)`).join(', ')
+    const more = unpriced.length > 5 ? ` and ${unpriced.length - 5} more` : ''
+    return { ok: false, message: `Set a rate for this time before billing it: ${named}${more}.`, unpricedIds: unpriced.map((entry) => entry.id) }
+  }
+
   const response = await keystoneClient<{ assembleDraftInvoice: { invoice: { id: string; status: string; invoiceNumber: string }; replayed: boolean } }>(`
     mutation AssembleInvoice(
       $idempotencyKey: String!
@@ -186,7 +231,7 @@ export async function assembleInvoice(
     timeEntryIds,
     expenseIds,
   })
-  if (!response.success) return { ok: false, message: response.error }
+  if (!response.success) return { ok: false, message: 'The draft was not assembled. Reload the sources and try again.' }
   revalidatePath('/dashboard/platform/billing')
-  return { ok: true, message: `Draft ${response.data.assembleDraftInvoice.invoice.invoiceNumber} assembled through the controlled source-locking workflow.` }
+  return { ok: true, message: `Draft ${response.data.assembleDraftInvoice.invoice.invoiceNumber} assembled.` }
 }

@@ -93,30 +93,42 @@ export async function manageConflictReview(_previous: ConflictReviewState, formD
   const checkId = String(formData.get('checkId') ?? '').trim()
   if (!checkId) return { ok: false, message: 'Conflict check is required.' }
   let response: KeystoneResponse<unknown>
+  let message = 'Review updated'
   if (operation === 'term') {
     const term = String(formData.get('term') ?? '').trim(), termType = String(formData.get('termType') ?? 'other')
     if (!term) return { ok: false, message: 'Search term is required.' }
+    message = 'Term added'
     response = await keystoneClient(`mutation AddManualConflictTerm($checkId: ID!, $term: String!, $normalized: String!, $termType: String!) { addConflictSearchTerm(checkId: $checkId, term: $term, normalizedTerm: $normalized, termType: $termType, includeAliases: true) { id } }`, { checkId, term, normalized: normalize(term), termType })
   } else if (operation === 'match') {
     const [kind, id, ...extra] = String(formData.get('source') ?? '').split(':')
     if (!['contact', 'matter'].includes(kind) || !id || id.length > 100 || extra.length) return { ok: false, message: 'Choose one current source record.' }
     const matchType = kind === 'matter' ? 'matter_text' : String(formData.get('matchType') ?? 'manual')
+    message = 'Candidate linked'
     response = await keystoneClient(`mutation LinkConflictSource($checkId: ID!, $matchType: String!, $contact: ID, $matter: ID) { addConflictMatch(checkId: $checkId, matchType: $matchType, matchedContactId: $contact, matchedMatterId: $matter) { id } }`, { checkId, matchType, contact: kind === 'contact' ? id : null, matter: kind === 'matter' ? id : null })
   } else if (operation === 'transition') {
     const toStatus = String(formData.get('toStatus') ?? ''), summary = String(formData.get('summary') ?? '').trim()
     if (!['running', 'review_required', 'cancelled'].includes(toStatus) || toStatus === 'review_required' && summary.length < 10) return { ok: false, message: 'A review state and completed review summary are required.' }
+    message = toStatus === 'running' ? 'Manual review started' : toStatus === 'review_required' ? 'Sent to final review' : 'Check cancelled'
     response = await keystoneClient(`mutation MoveConflictReview($checkId: ID!, $status: ConflictCheckCommandTarget!, $summary: String) { transitionConflictCheck(checkId: $checkId, toStatus: $status, summary: $summary) { check { id status } replayed } }`, { checkId, status: toStatus, summary })
   } else if (operation === 'finalize') {
     const outcome = String(formData.get('outcome') ?? ''), summary = String(formData.get('summary') ?? '').trim()
-    if (!['cleared', 'conflict_found'].includes(outcome) || summary.length < 10) return { ok: false, message: 'An outcome and review summary of at least 10 characters are required.' }
+    if (!['cleared', 'conflict_found'].includes(outcome)) return { ok: false, message: 'Choose an outcome.' }
+    if (summary.length < 10) return { ok: false, message: 'Final summary must be at least 10 characters.' }
+    message = outcome === 'cleared' ? 'Cleared' : 'Conflict found recorded'
     response = await keystoneClient(`mutation FinishConflictReview($checkId: ID!, $outcome: String!, $summary: String!) { finalizeConflictCheck(checkId: $checkId, outcome: $outcome, summary: $summary) { check { id status } replayed } }`, { checkId, outcome, summary })
   } else if (operation === 'disposition') {
     const matchId = String(formData.get('matchId') ?? '').trim(), outcome = String(formData.get('outcome') ?? ''), rationale = String(formData.get('rationale') ?? '').trim()
     if (!matchId || rationale.length < 10) return { ok: false, message: 'Candidate, outcome, and a 10-character rationale are required.' }
+    message = 'Disposition recorded'
     response = await keystoneClient(`mutation RecordConflictDecision($checkId: ID!, $matchId: ID!, $outcome: String!, $rationale: String!) { recordConflictDisposition(checkId: $checkId, matchId: $matchId, outcome: $outcome, rationale: $rationale) { id outcome } }`, { checkId, matchId, outcome, rationale })
   } else return { ok: false, message: 'Unsupported conflict-review operation.' }
   if (!response.success) return { ok: false, message: response.error }
+  if (operation === 'finalize' && String(formData.get('outcome')) === 'cleared') {
+    const after = await keystoneClient<{ conflictCheck: { intake: { status: string } | null } | null }>(`query ClearedConflictIntake($id: ID!) { conflictCheck(where: { id: $id }) { intake { status } } }`, { id: checkId })
+    const intakeStatus = after.success ? after.data.conflictCheck?.intake?.status : undefined
+    if (intakeStatus === 'decision') message = 'Cleared · intake ready to open'
+  }
   revalidatePath('/dashboard/platform/intake')
   revalidatePath('/dashboard')
-  return { ok: true, message: 'Review updated.' }
+  return { ok: true, message }
 }

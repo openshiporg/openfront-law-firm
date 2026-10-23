@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { zonedWallTimeToInstant } from '@/features/platform/lib/datetime'
+import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 
 export type PracticeActionState = { ok: boolean; message: string }
 
@@ -99,13 +101,16 @@ export async function runPracticeAction(
     if (operation === 'issueInvoice' && !dueAt) throw new Error('A due date is required to issue an invoice.')
     const path = field(formData, 'path', 300)
     if (!path.startsWith('/dashboard/platform/')) throw new Error('Invalid workspace path.')
+    // The due date is the end of that calendar day in the firm's time zone.
+    const dueInstant = dueAt ? zonedWallTimeToInstant(`${dueAt}T23:59`, await getFirmTimeZone()) : null
+    if (dueAt && !dueInstant) throw new Error('Enter a valid due date.')
 
     const response = await keystoneClient<Record<string, unknown>>(mutation, {
       id,
       ...(command.toStatus ? { to: command.toStatus } : {}),
       reason,
       ...(outcome ? { outcome } : {}),
-      ...(dueAt ? { dueAt: new Date(`${dueAt}T23:59:59.999Z`).toISOString() } : {}),
+      ...(dueInstant ? { dueAt: new Date(dueInstant.getTime() + 59_999).toISOString() } : {}),
     })
     if (!response.success) return { ok: false, message: response.error }
 

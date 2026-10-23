@@ -113,3 +113,44 @@ export async function sendPortalSignInEmail(signInToken: string, to: string, bas
     html: passwordResetEmail({ url: signInUrl.href }).replace('Please click below to reset your password', 'Use this one-time link within 15 minutes to open your client portal').replace('>Reset Password<', '>Open client portal<'),
   });
 }
+
+/**
+ * Whether outbound email can be sent: the same SMTP host, sender, port and link-origin
+ * checks the senders above apply. Returns only a boolean; never exposes the values.
+ */
+export function isEmailDeliveryConfigured(): boolean {
+  const host = process.env.SMTP_HOST?.trim();
+  const from = process.env.SMTP_FROM?.trim();
+  const port = Number(process.env.SMTP_PORT);
+  if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535) return false;
+  try {
+    const origin = new URL(getBaseUrlForEmails());
+    return ['http:', 'https:'].includes(origin.protocol) && !origin.username && !origin.password;
+  } catch {
+    return false;
+  }
+}
+
+/** One-time client portal invitation link (portal-scoped; never staff). */
+export async function sendPortalInvitationEmail(inviteToken: string, to: string, baseUrl?: string): Promise<void> {
+  const host = process.env.SMTP_HOST?.trim();
+  const from = process.env.SMTP_FROM?.trim();
+  const port = Number(process.env.SMTP_PORT);
+  if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Email delivery is not configured.');
+  }
+  if (to.length > 254 || !/^[^\s@<>,;()]+@[^\s@<>,;()]+\.[^\s@<>,;()]+$/.test(to)) {
+    throw new Error('A single valid recipient is required.');
+  }
+  const origin = new URL(baseUrl || getBaseUrlForEmails());
+  if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password) throw new Error('Email link origin is invalid.');
+  const acceptUrl = new URL('/portal/accept', origin.origin);
+  acceptUrl.searchParams.set('token', inviteToken);
+  const transport = createTransport({ host, port, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } });
+  await transport.sendMail({
+    to,
+    from,
+    subject: "You're invited to your client portal",
+    html: passwordResetEmail({ url: acceptUrl.href }).replace('Please click below to reset your password', 'Your law firm invited you to its client portal. Use this one-time link to accept').replace('>Reset Password<', '>Open client portal<').replace('If you did not request this email you can safely ignore it.', 'If you were not expecting this invitation you can safely ignore it.'),
+  });
+}

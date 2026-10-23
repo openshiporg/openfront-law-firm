@@ -1,13 +1,15 @@
 import Link from 'next/link'
-import { ArrowLeft, BrainCircuit, Settings2 } from 'lucide-react'
+import { ArrowLeft, BrainCircuit, ReceiptText, Settings2 } from 'lucide-react'
 
 import { PracticePage, PracticeStatus, SectionJumps } from '@/features/platform/components/PracticeSurface'
 import { EmptyState, ErrorBanner, Pager, StatusDot, Track, statusLabel, statusTone, trackItemClass } from '@/features/platform/components/ui'
 import type { WorkQueuePageInfo } from '@/features/platform/operations/lib/workQueuePagination'
 import { getMatterWorkspace } from '../actions/getMatterWorkspace'
+import { DeskCreatePanel } from '@/features/platform/desks/DeskCreatePanel'
+import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 
 export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 1, communicationPage = 1, deadlinePage = 1, taskPage = 1, documentPage = 1, invoicePage = 1 }: { matterId: string; teamPage?: number; partyPage?: number; communicationPage?: number; deadlinePage?: number; taskPage?: number; documentPage?: number; invoicePage?: number }) {
-  const result = await getMatterWorkspace(matterId, { teamPage, partyPage, communicationPage, deadlinePage, taskPage, documentPage, invoicePage })
+  const [result, timeZone] = await Promise.all([getMatterWorkspace(matterId, { teamPage, partyPage, communicationPage, deadlinePage, taskPage, documentPage, invoicePage }), getFirmTimeZone()])
   if (!result.success) {
     return <PracticePage title="Matter unavailable" description="The requested matter was not returned within the current authorization scope." trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: 'Matter unavailable' }]}><ErrorBanner>{result.error}</ErrorBanner></PracticePage>
   }
@@ -22,6 +24,7 @@ export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 
       actions={<Track>
         <Link href="/dashboard/platform/matters" className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />Matters</Link>
         <Link href={`/dashboard/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(false)}><Settings2 className="size-4" aria-hidden="true" />Fields</Link>
+        <Link href="/dashboard/platform/billing" className={trackItemClass(false)}><ReceiptText className="size-4" aria-hidden="true" />Bill</Link>
         <Link href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(true)}><BrainCircuit className="size-4" aria-hidden="true" />AI evidence</Link>
       </Track>}
     >
@@ -34,6 +37,8 @@ export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 
             ['Practice area', matter.practiceArea?.name || 'No practice area'],
           ].map(([label, value]) => <div key={label} className="min-w-0 bg-card px-4 py-3"><dt className="truncate text-xs text-muted-foreground">{label}</dt><dd className="mt-1 truncate text-sm font-semibold text-foreground">{value}</dd></div>)}
         </dl>
+
+        {['open', 'on_hold', 'closing'].includes(matter.status) ? <DeskCreatePanel desk="matters" timeZone={timeZone} matter={{ id: matter.id, label: `${matter.matterNumber} · ${matter.title}` }} /> : null}
 
         <SectionJumps sections={sections.map((section) => ({ key: section.key, title: section.title, total: section.pagination ? section.total ?? 0 : section.rows.length }))} />
 

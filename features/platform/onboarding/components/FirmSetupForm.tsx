@@ -31,7 +31,7 @@ const initialState: OnboardingState = {
     supportEmail: "",
     officeName: "",
     officeCode: "",
-    timezone: "America/Los_Angeles",
+    timezone: "UTC",
     currencyCode: "USD",
     practiceAreaName: "",
     seedSyntheticDemo: false,
@@ -94,8 +94,8 @@ function Field({
 }) {
   const inputId = useId();
   return (
-    <div className="grid min-w-0 gap-1.5">
-      <label htmlFor={inputId} className={labelClass}>
+    <div className="grid min-w-0 content-start gap-1.5 self-start">
+      <label htmlFor={inputId} className={cn(labelClass, "content-start")}>
         <span>
           {label}
           {required ? null : <span className="font-normal text-muted-foreground/80"> · optional</span>}
@@ -125,7 +125,7 @@ function Field({
  * slug, first office, office code, timezone and currency. Branding, support
  * email and the practice-area name are optional and fall back to server defaults.
  */
-export function FirmSetupForm({ offlineSampleAvailable: preflight }: { offlineSampleAvailable?: boolean }) {
+export function FirmSetupForm({ offlineSampleAvailable: preflight, inDialog = false }: { offlineSampleAvailable?: boolean; inDialog?: boolean }) {
   const [state, action] = useOnboardingApi(initialState);
   const listId = useId();
   // Server pages pass the preflight; the dialog asks the same viewer query after mount.
@@ -142,11 +142,18 @@ export function FirmSetupForm({ offlineSampleAvailable: preflight }: { offlineSa
     if (state.redirectTo) window.location.assign(state.redirectTo);
   }, [state.redirectTo]);
 
+  // Default the office time zone to the browser's zone while the field is untouched.
+  useEffect(() => {
+    const input = document.querySelector<HTMLInputElement>('input[name="timezone"]');
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (input && zone && input.value === initialState.values.timezone && !state.message) input.value = zone;
+  }, [state.message]);
+
   return (
-    <section className="bg-background px-4 py-6 sm:px-8 sm:py-8">
+    <section className="bg-background px-4 pb-28 pt-6 sm:px-8 sm:pb-28 sm:pt-8">
       <div className="mx-auto max-w-3xl">
-        <div className="flex items-center gap-3"><SidebarTrigger className="size-11" /><Logo aria-hidden="true" /></div>
-        <header className="mt-8 flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-border pb-5">
+        {inDialog ? null : <div className="flex items-center gap-3"><SidebarTrigger className="size-11" /><Logo aria-hidden="true" /></div>}
+        <header className={cn(inDialog ? "" : "mt-8", "flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-border pb-5")}>
           <div className="min-w-0">
             <p className="text-xs font-medium text-muted-foreground">Firm setup</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Establish the first firm workspace</h1>
@@ -188,7 +195,7 @@ export function FirmSetupForm({ offlineSampleAvailable: preflight }: { offlineSa
             <LogoPicker initialIcon={state.values.logoIcon} initialColor={state.values.logoColor} />
             <fieldset className="min-w-0">
               <legend className="mb-3 text-sm font-semibold text-foreground">Storefront accent</legend>
-              <div className={cn(trackClass, "flex w-full sm:inline-flex sm:w-auto")}>
+              <div className={cn(trackClass, "flex w-full flex-wrap overflow-visible rounded-2xl sm:inline-flex sm:w-auto")}>
                 {STOREFRONT_ACCENT_PRESETS.map((preset) => (
                   <label key={preset.id} className={cn(trackItemClass(false), "cursor-pointer focus-within:ring-2 focus-within:ring-ring/50 has-checked:bg-background has-checked:text-foreground has-checked:shadow-sm has-checked:ring-1 has-checked:ring-black/5 dark:has-checked:bg-zinc-800 dark:has-checked:ring-white/10")}>
                     <input type="radio" name="accentId" value={preset.id} defaultChecked={state.values.accentId === preset.id} className="sr-only" />

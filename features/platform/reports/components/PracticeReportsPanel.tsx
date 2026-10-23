@@ -44,25 +44,25 @@ export async function PracticeReportsPanel({ auditPage = 1, reportDeadlinePage =
   const [reports, timeZone] = await Promise.all([getPracticeReports(auditPage, reportDeadlinePage), getFirmTimeZone()])
   const notices: string[] = []
   const arSourceRows = reports.ar.success ? reports.ar.data.invoices : null
-  if (arSourceRows === null) notices.push('Accounts receivable is unavailable to this role.')
+  if (arSourceRows === null) notices.push('Invoices are hidden for your role.')
   const ar = arSourceRows ?? []
   const arSample = summarizeAccountsReceivableSample(arSourceRows)
   const time = reports.time.success ? reports.time.data.timeEntries : null
-  if (time === null) notices.push('Time WIP is unavailable to this role.')
+  if (time === null) notices.push('Time entries are hidden for your role.')
   const expenses = reports.expenses.success ? reports.expenses.data.expenses : null
-  if (expenses === null) notices.push('Expense WIP is unavailable to this role.')
-  const deadlines = reports.deadlines.success ? reports.deadlines.data : (notices.push('Deadline control is unavailable to this role.'), null)
+  if (expenses === null) notices.push('Expenses are hidden for your role.')
+  const deadlines = reports.deadlines.success ? reports.deadlines.data : (notices.push('Deadlines are hidden for your role.'), null)
   const trustSnapshotSourceRows = reports.trust.success ? reports.trust.data.trustBalanceSnapshots : null
-  if (!reports.trust.success) notices.push('Client trust balances are unavailable to this role.')
+  if (!reports.trust.success) notices.push('Trust balances are hidden for your role.')
   const snapshots = trustSnapshotSourceRows ? latestLedgerSnapshots(trustSnapshotSourceRows) : []
   const trustSample = summarizeTrustSnapshotSample(trustSnapshotSourceRows, snapshots)
   const wipSummary = summarizeReportWipAmounts(time, expenses)
-  const audit = reports.audit.success ? reports.audit.data : (notices.push('Audit events are unavailable to this role.'), null)
+  const audit = reports.audit.success ? reports.audit.data : (notices.push('The activity log is hidden for your role.'), null)
 
   const registers: Array<[string, string]> = [
-    ['Receivables', registerHref('billing', { view: 'invoices' })],
-    ['Time WIP', registerHref('time-expenses', { view: 'time' })],
-    ['Expense WIP', registerHref('time-expenses', { view: 'expenses' })],
+    ['Invoices', registerHref('billing', { view: 'invoices' })],
+    ['Time', registerHref('time-expenses', { view: 'time' })],
+    ['Expenses', registerHref('time-expenses', { view: 'expenses' })],
     ['Client ledgers', registerHref('accounting', { view: 'ledgers' })],
   ]
 
@@ -72,7 +72,7 @@ export async function PracticeReportsPanel({ auditPage = 1, reportDeadlinePage =
         id="operational-reports-heading"
         title="Practice reports"
         actions={(
-          <nav aria-label="Complete registers">
+          <nav aria-label="Full lists">
             <Track>
               {registers.map(([label, href]) => <Link key={label} href={href} className={pillClass}>{label}</Link>)}
             </Track>
@@ -85,10 +85,10 @@ export async function PracticeReportsPanel({ auditPage = 1, reportDeadlinePage =
       <div className="space-y-3">
         <Stats
           items={[
-            ['Receivables (sample)', <Amounts key="ar" amounts={sumCurrencies(ar)} />],
-            ['Unbilled WIP (known)', <Amounts key="wip" amounts={wipSummary.knownAmountsByCurrency} />],
-            ['Client trust (sample)', <Amounts key="trust" amounts={sumCurrencies(snapshots)} />],
-            ['Pending / missed deadlines', deadlines?.total.toLocaleString() ?? '—'],
+            ['Outstanding invoices', <Amounts key="ar" amounts={sumCurrencies(ar)} />],
+            ['Unbilled work', <Amounts key="wip" amounts={wipSummary.knownAmountsByCurrency} />],
+            ['Trust balances', <Amounts key="trust" amounts={sumCurrencies(snapshots)} />],
+            ['Open deadlines', deadlines ? <span key="deadlines">{deadlines.openTotal.toLocaleString()}{deadlines.missedTotal ? <span className="block text-xs font-medium text-destructive">{deadlines.missedTotal.toLocaleString()} missed</span> : null}</span> : '—'],
           ]}
         />
         <div className="grid min-w-0 gap-3 md:grid-cols-3">
@@ -129,14 +129,14 @@ function Basis({ title, lines }: { title: string; lines: Array<ReactNode | null 
 function AccountsReceivableBasis({ sample }: { sample: ReturnType<typeof summarizeAccountsReceivableSample> }) {
   return (
     <Basis
-      title="Receivables basis"
+      title="Outstanding invoices"
       lines={[
         sample.rawSourceRows === null
-          ? 'Source unavailable.'
-          : `${sample.rawSourceRows.toLocaleString()} of ${sample.sourceCap} max rows returned; ${sample.displayedRows?.toLocaleString() ?? 0} shown (display cap ${sample.displayCap}). Total sums every returned row.`,
-        sample.sourceCapReached ? `Source cap of ${sample.sourceCap} reached; more invoices may be omitted.` : null,
-        sample.rawSourceRows === 0 ? 'No invoices returned; not a certified zero receivable.' : null,
-        'Returned-sample balances due, by currency; not a certified or as-of receivable.',
+          ? 'Hidden for your role.'
+          : sample.rawSourceRows === 0
+            ? 'No unpaid invoices.'
+            : `${sample.rawSourceRows.toLocaleString()} unpaid ${sample.rawSourceRows === 1 ? 'invoice' : 'invoices'}.`,
+        sample.sourceCapReached ? `Counts the first ${sample.sourceCap} unpaid invoices; the full total may be higher.` : null,
       ]}
     />
   )
@@ -144,19 +144,18 @@ function AccountsReceivableBasis({ sample }: { sample: ReturnType<typeof summari
 
 function WipBasis({ summary }: { summary: ReportWipAmountSummary }) {
   const unknownTimeAmountCount = [...summary.unknownTimeAmountsByCurrency.values()].reduce((total, count) => total + count, 0)
-  const sourceRows = (count: number | null, atCap: boolean) => count === null
-    ? 'unavailable'
-    : `${count.toLocaleString()} returned${atCap ? ' (cap reached)' : ''}`
   return (
     <Basis
-      title="WIP basis"
+      title="Unbilled work"
       lines={[
-        `Time ${sourceRows(summary.timeEntryRows, summary.timeEntriesAtCap)} · expenses ${sourceRows(summary.expenseRows, summary.expensesAtCap)}; each capped at ${REPORT_WIP_SOURCE_CAP} rows, no total count.`,
+        summary.timeEntriesUnavailable && summary.expensesUnavailable
+          ? 'Hidden for your role.'
+          : `${(summary.timeEntryRows ?? 0).toLocaleString()} time ${summary.timeEntryRows === 1 ? 'entry' : 'entries'} · ${(summary.expenseRows ?? 0).toLocaleString()} ${summary.expenseRows === 1 ? 'expense' : 'expenses'} submitted or approved.`,
         unknownTimeAmountCount
-          ? `${unknownTimeAmountCount.toLocaleString()} time ${unknownTimeAmountCount === 1 ? 'entry has' : 'entries have'} no amount and ${unknownTimeAmountCount === 1 ? 'is' : 'are'} excluded; WIP is partial (${[...summary.unknownTimeAmountsByCurrency].map(([currency, count]) => `${count} ${currency}`).join(', ')}).`
+          ? `${unknownTimeAmountCount.toLocaleString()} time ${unknownTimeAmountCount === 1 ? 'entry has' : 'entries have'} no amount yet and ${unknownTimeAmountCount === 1 ? 'is' : 'are'} not included.`
           : null,
-        summary.timeEntriesUnavailable || summary.expensesUnavailable ? 'A source is unavailable; the known subtotal is incomplete.' : null,
-        summary.timeEntriesAtCap || summary.expensesAtCap ? 'Row cap reached; more matching records may be omitted.' : null,
+        !(summary.timeEntriesUnavailable && summary.expensesUnavailable) && (summary.timeEntriesUnavailable || summary.expensesUnavailable) ? 'Some entries are hidden for your role.' : null,
+        summary.timeEntriesAtCap || summary.expensesAtCap ? `Counts the first ${REPORT_WIP_SOURCE_CAP} of each; the full total may be higher.` : null,
       ]}
     />
   )
@@ -165,13 +164,14 @@ function WipBasis({ summary }: { summary: ReportWipAmountSummary }) {
 function TrustBasis({ sample }: { sample: TrustSnapshotSampleSummary }) {
   return (
     <Basis
-      title="Trust basis"
+      title="Trust balances"
       lines={[
         sample.rawSourceRows === null
-          ? 'Source unavailable.'
-          : `${sample.rawSourceRows.toLocaleString()} of ${sample.sourceCap} max snapshot rows · ${sample.representedLedgers.toLocaleString()} ledgers represented.`,
-        'Latest sampled row per ledger, by currency; not complete, as-of or reconciled client balances.',
-        sample.sourceCapReached ? `Cap of ${sample.sourceCap} reached before per-ledger dedup; rows or ledgers may be omitted.` : null,
+          ? 'Hidden for your role.'
+          : sample.representedLedgers === 0
+            ? 'No trust balances recorded.'
+            : `Latest recorded balance for ${sample.representedLedgers.toLocaleString()} client ${sample.representedLedgers === 1 ? 'ledger' : 'ledgers'}. Reconcile in Accounting.`,
+        sample.sourceCapReached ? `Checks the latest ${sample.sourceCap} balance records; some ledgers may be missing.` : null,
       ]}
     />
   )
@@ -194,11 +194,11 @@ function AccountsReceivableRegister({ rows, unavailable }: { rows: ArRow[]; unav
   return (
     <section className="min-w-0 space-y-3">
       <RegisterHeading
-        title="Receivables aging sample"
-        meta={`${visibleRows.length} of ${rows.length}${rows.length === ACCOUNTS_RECEIVABLE_SOURCE_CAP ? ' · source cap' : ''}`}
+        title="Outstanding invoices"
+        meta={visibleRows.length < rows.length ? `${visibleRows.length} of ${rows.length}${rows.length === ACCOUNTS_RECEIVABLE_SOURCE_CAP ? '+' : ''}` : rows.length.toLocaleString()}
       />
       {!rows.length ? (
-        <EmptyState title={unavailable ? 'Invoice source unavailable to this role.' : 'No invoices returned.'} />
+        <EmptyState title={unavailable ? 'Invoices are hidden for your role.' : 'No unpaid invoices.'} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[34rem] text-sm tabular-nums">
@@ -240,16 +240,13 @@ function TrustSnapshotRegister({
   return (
     <section className="min-w-0 space-y-3">
       <RegisterHeading
-        title="Client trust snapshot sample"
-        meta={sample.rawSourceRows === null ? 'Unavailable' : `${visibleRows.length} of ${rows.length} ledgers${rows.length > visibleRows.length ? ' · 50 cap' : ''}`}
+        title="Trust balances"
+        meta={sample.rawSourceRows === null ? 'Hidden' : visibleRows.length < rows.length ? `${visibleRows.length} of ${rows.length}` : rows.length.toLocaleString()}
       />
-      {sample.rawSourceRows !== null && !sample.sourceCapReached ? (
-        <Notice>Fewer than {sample.sourceCap} rows returned; no total count, so ledger coverage is not established.</Notice>
-      ) : null}
       {!sample.rawSourceRows ? (
-        <EmptyState title={sample.rawSourceRows === null ? 'Trust snapshot data unavailable to this role.' : 'No snapshots returned; not a certified zero or reconciled balance.'} />
+        <EmptyState title={sample.rawSourceRows === null ? 'Trust balances are hidden for your role.' : 'No trust balances recorded.'} />
       ) : !rows.length ? (
-        <EmptyState title="No ledger-linked snapshots in this sample." />
+        <EmptyState title="No client ledger balances recorded." />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[30rem] text-sm tabular-nums">
@@ -264,7 +261,7 @@ function TrustSnapshotRegister({
                       <span className="flex min-w-0 items-center gap-2">
                         <StatusDot tone={item.balanceMinor < 0 ? 'rose' : 'emerald'} />
                         <span className="max-w-[12rem] truncate font-medium text-foreground">{item.ledgerAccount?.client.displayName ?? 'Client ledger'}</span>
-                        {item.balanceMinor < 0 ? <span className="shrink-0 text-xs font-medium text-destructive">Exception</span> : <span className="sr-only">Recorded</span>}
+                        {item.balanceMinor < 0 ? <span className="shrink-0 text-xs font-medium text-destructive">Overdrawn</span> : null}
                       </span>
                     </td>
                     <td className={`${td} whitespace-nowrap text-muted-foreground`}>{item.ledgerAccount?.ledgerNumber ?? '—'}</td>
@@ -286,21 +283,20 @@ type AuditRow = { id: string; eventId: string | null; eventType: string; categor
 function AuditEventRegister({ register, reportDeadlinePage, timeZone }: { register: { auditEvents: AuditRow[]; total: number; pagination: WorkQueuePageInfo } | null; reportDeadlinePage: number; timeZone: string }) {
   return (
     <section id="audit-evidence" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="audit-evidence-heading">
-      <RegisterHeading id="audit-evidence-heading" title="Audit evidence" meta={register ? register.total.toLocaleString() : 'Unavailable'} />
+      <RegisterHeading id="audit-evidence-heading" title="Activity log" meta={register ? register.total.toLocaleString() : 'Hidden'} />
       {!register ? (
-        <EmptyState title="Audit events are unavailable to this role." />
+        <EmptyState title="The activity log is hidden for your role." />
       ) : !register.auditEvents.length ? (
-        <EmptyState title="No audit events on this page." />
+        <EmptyState title="No activity on this page." />
       ) : (
-        <RowList label="Audit events">
+        <RowList label="Activity log">
           {register.auditEvents.map((item) => (
             <li key={item.id} className="min-w-0 px-4 py-3">
-              <TitleLine as="p" status={item.outcome} headingClassName="text-sm">{item.eventType}</TitleLine>
+              <TitleLine as="p" status={item.outcome} headingClassName="text-sm"><span title={`Ref ${item.eventId ?? item.id}`}>{humanEvent(item.eventType)}</span></TitleLine>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                {item.category} · {formatInstant(item.occurredAt, timeZone)} · {item.actorUser?.name ?? (item.actorType ? `${item.actorType.replaceAll('_', ' ')} actor` : 'actor restricted')}
+                {item.category.replaceAll('_', ' ')} · {formatInstant(item.occurredAt, timeZone)} · {item.actorUser?.name ?? (item.actorType === 'user' ? 'Staff member' : item.actorType ? item.actorType.replaceAll('_', ' ') : 'Hidden')}
                 {item.matter ? <> · <Link href={`/dashboard/platform/matters/${encodeURIComponent(item.matter.id)}`} className="underline-offset-4 hover:underline">{item.matter.matterNumber ?? 'Matter'}</Link></> : null}
               </p>
-              <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">Ref {item.eventId ?? item.id}</p>
             </li>
           ))}
         </RowList>
@@ -318,7 +314,7 @@ function AuditEventPagination({ total, pagination, reportDeadlinePage }: { total
   const href = (page: number) => `/dashboard/platform/reports?auditPage=${page}&reportDeadlinePage=${reportDeadlinePage}#audit-evidence`
   return (
     <Pager
-      label="Audit event pages"
+      label="Activity log pages"
       summary={pageSummary(pagination, total)}
       previous={pagination.hasPrevious ? href(pagination.page - 1) : null}
       next={pagination.hasNext ? href(pagination.page + 1) : null}
@@ -329,16 +325,16 @@ function AuditEventPagination({ total, pagination, reportDeadlinePage }: { total
 type ReportDeadline = { id: string; title: string | null; status: string | null; dueAt: string | null; timezone: string | null; isVerified: boolean | null; matter: { id: string; matterNumber: string | null } | null; assignedTo: { name: string | null } | null }
 
 function ReportDeadlineRegister({ register, auditPage, timeZone }: {
-  register: { deadlines: ReportDeadline[]; total: number; pagination: WorkQueuePageInfo } | null
+  register: { deadlines: ReportDeadline[]; total: number; openTotal: number; missedTotal: number; pagination: WorkQueuePageInfo } | null
   auditPage: number
   timeZone: string
 }) {
   return (
     <section id="deadline-control" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="deadline-control-heading">
-      <RegisterHeading id="deadline-control-heading" title="Deadline control" meta={register ? register.total.toLocaleString() : 'Unavailable'} />
-      <Notice>Due times in each deadline’s own time zone. Verification as recorded; not calculated from court rules.</Notice>
+      <RegisterHeading id="deadline-control-heading" title="Open and missed deadlines" meta={register ? `${register.openTotal.toLocaleString()} open · ${register.missedTotal.toLocaleString()} missed` : 'Hidden'} />
+      <Notice>Times are in each deadline’s own time zone.</Notice>
       {!register ? (
-        <EmptyState title="Deadline control is unavailable to this role." />
+        <EmptyState title="Deadlines are hidden for your role." />
       ) : !register.deadlines.length ? (
         <EmptyState title="No deadlines on this page." />
       ) : (
@@ -351,7 +347,7 @@ function ReportDeadlineRegister({ register, auditPage, timeZone }: {
               <div className="mt-1 flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                 <span className="tabular-nums">Due {formatInstant(item.dueAt, validTimeZone(item.timezone) ?? timeZone, { missing: 'time unavailable' })}</span>
                 <span>{item.matter?.matterNumber ?? 'Firm-level'}</span>
-                <span className="truncate">{item.assignedTo?.name ?? 'Unassigned or restricted'}</span>
+                <span className="truncate">{item.assignedTo?.name ?? 'Unassigned'}</span>
                 <span className={item.isVerified ? undefined : 'font-medium text-amber-700 dark:text-amber-400'}>{item.isVerified ? 'Verified' : 'Unverified'}</span>
               </div>
             </li>
@@ -367,7 +363,7 @@ function ReportDeadlinePagination({ total, pagination, auditPage }: { total: num
   const href = (page: number) => `/dashboard/platform/reports?auditPage=${auditPage}&reportDeadlinePage=${page}#deadline-control`
   return (
     <Pager
-      label="Report deadline pages"
+      label="Deadline pages"
       summary={pageSummary(pagination, total)}
       previous={pagination.hasPrevious ? href(pagination.page - 1) : null}
       next={pagination.hasNext ? href(pagination.page + 1) : null}
@@ -375,5 +371,9 @@ function ReportDeadlinePagination({ total, pagination, auditPage }: { total: num
   )
 }
 
+function humanEvent(eventType: string) {
+  const text = eventType.replaceAll('.', ' ').replaceAll('_', ' ').trim()
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Activity'
+}
 function money(value: number, currency: string) { return formatMinorUnits(value, currency) }
 function date(value: unknown) { const parsed = value ? new Date(String(value)) : null; return parsed && !Number.isNaN(parsed.getTime()) ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(parsed) : '—' }

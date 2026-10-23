@@ -12,22 +12,28 @@ import { SearchableOptionSelect } from '@/features/platform/components/Searchabl
 import { createDeskRecord, type DeskCreateState } from './actions/createDeskRecord'
 
 type DeskKind = 'matters' | 'work' | 'documents' | 'communications' | 'time-expenses'
-type CreateKind = 'task' | 'deadline' | 'document' | 'message' | 'expense'
+type CreateKind = 'task' | 'deadline' | 'document' | 'message' | 'expense' | 'time' | 'party'
 
 const forms: Record<DeskKind, Array<{ kind: CreateKind; label: string }>> = {
   matters: [],
   work: [{ kind: 'task', label: 'Task' }, { kind: 'deadline', label: 'Draft deadline' }],
   documents: [{ kind: 'document', label: 'Document record' }],
   communications: [{ kind: 'message', label: 'Draft message' }],
-  'time-expenses': [{ kind: 'expense', label: 'Expense' }],
+  'time-expenses': [{ kind: 'time', label: 'Time entry' }, { kind: 'expense', label: 'Expense' }],
 }
 
 
 // Primary create paths for each desk. Matters open only from a cleared intake, so that
 // desk links to the controlled intake and conversion workflow instead of a raw create.
-export function DeskCreatePanel({ desk, timeZone }: { desk: DeskKind; timeZone: string }) {
+/** Every create path available from a single matter's workspace. */
+const matterForms: Array<{ kind: CreateKind; label: string }> = [
+  { kind: 'task', label: 'Task' }, { kind: 'deadline', label: 'Deadline' }, { kind: 'document', label: 'Document' },
+  { kind: 'message', label: 'Message' }, { kind: 'time', label: 'Time' }, { kind: 'expense', label: 'Expense' }, { kind: 'party', label: 'Party' },
+]
+
+export function DeskCreatePanel({ desk, timeZone, matter }: { desk: DeskKind; timeZone: string; matter?: { id: string; label: string } }) {
   const [selected, setSelected] = useState<CreateKind | null>(null)
-  if (desk === 'matters') {
+  if (desk === 'matters' && !matter) {
     return (
       <section aria-labelledby="open-matter-heading" className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-xs">
         <h2 id="open-matter-heading" className="text-sm font-semibold">Open a matter</h2>
@@ -38,7 +44,7 @@ export function DeskCreatePanel({ desk, timeZone }: { desk: DeskKind; timeZone: 
       </section>
     )
   }
-  const options = forms[desk]
+  const options = matter ? matterForms : forms[desk]
   const active = options.find((form) => form.kind === selected)
   return (
     <section aria-labelledby={`create-${desk}-heading`} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -52,21 +58,22 @@ export function DeskCreatePanel({ desk, timeZone }: { desk: DeskKind; timeZone: 
           ))}
         </div>
       </header>
-      {active ? <CreateForm key={active.kind} kind={active.kind} timeZone={timeZone} /> : null}
+      {active ? <CreateForm key={active.kind} kind={active.kind} timeZone={timeZone} matter={matter} /> : null}
     </section>
   )
 }
 
-function CreateForm({ kind, timeZone }: { kind: CreateKind; timeZone: string }) {
+function CreateForm({ kind, timeZone, matter }: { kind: CreateKind; timeZone: string; matter?: { id: string; label: string } }) {
   const [state, action, pending] = useActionState<DeskCreateState, FormData>(createDeskRecord, { ok: false, message: '' })
   return (
     <form action={action} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
       <input type="hidden" name="kind" value={kind} />
-      <div className="sm:col-span-2"><SearchableOptionSelect id={`${kind}-matter`} name="matterId" label="Matter" emptyLabel="Search for the matter" required kind="matter" options={[]} /></div>
+      {matter ? <input type="hidden" name="matterId" value={matter.id} /> : <div className="sm:col-span-2"><SearchableOptionSelect id={`${kind}-matter`} name="matterId" label="Matter" emptyLabel="Choose a matter" required kind="matter" options={[]} /></div>}
       {kind === 'task' ? <>
         <Field id="task-title" name="title" label="Task" required maxLength={300} className="sm:col-span-2" />
         <ChoiceTrack name="priority" label="Priority" defaultValue="normal" options={[['low', 'Low'], ['normal', 'Normal'], ['high', 'High'], ['urgent', 'Urgent']]} />
         <Field id="task-due" name="dueAt" label={`Due (${timeZone})`} type="datetime-local" />
+        <div className="sm:col-span-2"><SearchableOptionSelect id="task-assignee" name="assignedToId" label="Assignee" emptyLabel="Unassigned" kind="member" options={[]} /></div>
         <input type="hidden" name="timezone" value={timeZone} />
       </> : null}
       {kind === 'deadline' ? <>
@@ -85,10 +92,26 @@ function CreateForm({ kind, timeZone }: { kind: CreateKind; timeZone: string }) 
         <Field id="message-subject" name="subject" label="Subject" required maxLength={300} className="sm:col-span-2" />
         <label htmlFor="message-body" className={cn(labelClass, 'sm:col-span-2')}>Message<textarea id="message-body" name="body" required maxLength={20000} rows={5} className={textareaClass} /></label>
       </> : null}
+      {kind === 'time' ? <>
+        <Field id="time-description" name="description" label="Work description" required minLength={3} maxLength={2000} className="sm:col-span-2" />
+        <Field id="time-date" name="workDate" label="Date worked" type="date" required defaultValue={today(timeZone)} />
+        <input type="hidden" name="timezone" value={timeZone} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="time-hours" name="hours" label="Hours" inputMode="decimal" defaultValue="0" />
+          <Field id="time-minutes" name="minutes" label="Minutes" inputMode="decimal" defaultValue="0" />
+        </div>
+        <label className="flex min-h-10 items-center gap-2 self-end text-sm"><input type="checkbox" name="isBillable" defaultChecked className="size-4 accent-foreground" />Billable</label>
+      </> : null}
+      {kind === 'party' ? <>
+        <div className="sm:col-span-2"><SearchableOptionSelect id="party-contact" name="contactId" label="Contact" emptyLabel="Choose a contact" required kind="contact" options={[]} /></div>
+        <ChoiceSelect id="party-role" name="partyRole" label="Role" defaultValue="opposing_party" options={[['client', 'Client'], ['opposing_party', 'Opposing party'], ['claimant', 'Claimant'], ['respondent', 'Respondent'], ['witness', 'Witness'], ['expert', 'Expert'], ['counsel', 'Counsel'], ['adjudicator', 'Adjudicator'], ['other', 'Other']]} />
+        <ChoiceTrack name="side" label="Side" defaultValue="adverse" options={[['our_client', 'Our client'], ['adverse', 'Adverse'], ['neutral', 'Neutral'], ['unknown', 'Unknown']]} />
+        <Field id="party-notes" name="notes" label="Notes" maxLength={2000} className="sm:col-span-2" />
+      </> : null}
       {kind === 'expense' ? <>
         <Field id="expense-description" name="description" label="Description" required minLength={3} maxLength={2000} className="sm:col-span-2" />
         <ChoiceSelect id="expense-type" name="expenseType" label="Type" defaultValue="other" options={[['filing_fee', 'Filing fee'], ['travel', 'Travel'], ['expert', 'Expert'], ['copying', 'Copying'], ['service', 'Service'], ['other', 'Other']]} />
-        <Field id="expense-date" name="incurredAt" label="Date incurred" type="date" required />
+        <Field id="expense-date" name="incurredAt" label="Date incurred" type="date" required defaultValue={today(timeZone)} />
         <input type="hidden" name="timezone" value={timeZone} />
         <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3">
           <Field id="expense-amount" name="amount" label="Amount" required inputMode="decimal" />
@@ -102,6 +125,10 @@ function CreateForm({ kind, timeZone }: { kind: CreateKind; timeZone: string }) 
       </div>
     </form>
   )
+}
+
+function today(timeZone: string) {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()) } catch { return '' }
 }
 
 function Field({ id, name, label, type = 'text', required = false, defaultValue, minLength, maxLength, inputMode, className }: { id: string; name: string; label: string; type?: string; required?: boolean; defaultValue?: string; minLength?: number; maxLength?: number; inputMode?: 'decimal'; className?: string }) {

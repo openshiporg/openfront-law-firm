@@ -27,10 +27,10 @@ function AuthShell({ title, label = 'Your appointments', tabs, children, foot }:
   </div></PublicPage>
 }
 
-export async function AccountAuthPage({ mode, searchParams }: { mode: 'signin' | 'signup'; searchParams: Promise<{ service?: string; reset?: string }> }) {
-  const { service = '', reset } = await searchParams
+export async function AccountAuthPage({ mode, searchParams }: { mode: 'signin' | 'signup'; searchParams: Promise<{ service?: string; reset?: string; from?: string }> }) {
+  const { service = '', reset, from = '' } = await searchParams
   const settings = await getStorefrontSettings()
-  const query = service ? `?service=${encodeURIComponent(service)}` : ''
+  const query = service ? `?service=${encodeURIComponent(service)}` : from ? `?from=${encodeURIComponent(from)}` : ''
   if (mode === 'signup' && !settings.accountsEnabled) return <AuthShell title="Accounts are not open" foot={<><Link className="sf-link" href="/portal">Client portal</Link><Link className="sf-link" href="/contact">Contact the firm</Link></>}>
     <p className="sf-muted text-sm leading-6">This firm is not accepting new online accounts.</p>
     <div className="sf-track sf-track--block"><Link className="sf-pill sf-pill--raised sf-pill--lg" href="/account/signin">Sign in</Link></div>
@@ -42,7 +42,7 @@ export async function AccountAuthPage({ mode, searchParams }: { mode: 'signin' |
   return <AuthShell title={mode === 'signup' ? 'Create account' : 'Sign in'} tabs={tabs} foot={<><span className="sf-muted">Invited by the firm?</span><Link className="sf-link" href="/portal">Client portal</Link></>}>
     {mode === 'signin' && reset === '1' ? <p role="status" className="sf-notice">Password changed. Sign in with the new password.</p> : null}
     {mode === 'signup' && settings.publication.mode === 'live' ? <p className="text-sm"><Link className="sf-link" href="/privacy">Privacy notice</Link></p> : null}
-    <CustomerAuthForm mode={mode} service={service} />
+    <CustomerAuthForm mode={mode} service={service} from={typeof from === 'string' ? from.slice(0, 300) : ''} />
   </AuthShell>
 }
 
@@ -51,7 +51,7 @@ export async function AccountPage({ searchParams }: { searchParams: Promise<{ af
   const { after } = await searchParams
   const cursor = typeof after === 'string' ? after : null
   const [result, settings] = await Promise.all([getCustomerConsultations(cursor), getStorefrontSettings()])
-  if (result.status === 'signed_out') redirect('/account/signin')
+  if (result.status === 'signed_out') redirect(cursor ? `/account/signin?from=${encodeURIComponent('/account')}` : '/account/signin')
   if (result.status === 'unavailable') return <PublicPage><div className="sf-shell sf-page"><div className="sf-narrow grid gap-6"><h1 className="sf-title">Appointments</h1><p role="alert" className="sf-notice sf-notice--plain">Your appointments could not be loaded. Nothing was changed.</p><div className="sf-track"><Link className="sf-pill sf-pill--raised" href="/account">Try again</Link><Link className="sf-pill" href="/contact">Contact the firm</Link></div></div></div></PublicPage>
   const { appointments: rows, nextCursor } = result.data
   return <PublicPage><div className="sf-shell sf-page">
@@ -73,8 +73,8 @@ export async function AccountPage({ searchParams }: { searchParams: Promise<{ af
     {cursor || nextCursor ? <nav aria-label="Appointment pages" className="sf-track mt-6">{cursor ? <Link className="sf-pill" href="/account">Most recent</Link> : null}{nextCursor ? <Link className="sf-pill sf-pill--raised" href={`/account?after=${encodeURIComponent(nextCursor)}`}>Older appointments</Link> : null}</nav> : null}
   </div></PublicPage>
 }
-export function AccountSignInPage(props: { searchParams: Promise<{ service?: string; reset?: string }> }) { return <AccountAuthPage mode="signin" {...props} /> }
-export function AccountSignUpPage(props: { searchParams: Promise<{ service?: string }> }) { return <AccountAuthPage mode="signup" {...props} /> }
+export function AccountSignInPage(props: { searchParams: Promise<{ service?: string; reset?: string; from?: string }> }) { return <AccountAuthPage mode="signin" {...props} /> }
+export function AccountSignUpPage(props: { searchParams: Promise<{ service?: string; from?: string }> }) { return <AccountAuthPage mode="signup" {...props} /> }
 export async function signInMetadata() { return firmMetadata('Sign in') }
 export async function signUpMetadata() { return firmMetadata('Create account') }
 

@@ -6,10 +6,10 @@ import { customerAuthenticate, bookConsultation } from './actions/customer-accou
 import { FIRST_CONTACT_ACKNOWLEDGMENT } from './lib/first-contact'
 import { type AvailabilitySlot, type Service } from './lib/consultation-presentation'
 
-export function CustomerAuthForm({ mode, service }: { mode: 'signin' | 'signup'; service: string }) {
+export function CustomerAuthForm({ mode, service, from = '' }: { mode: 'signin' | 'signup'; service: string; from?: string }) {
   const [state, action, pending] = useActionState(customerAuthenticate, { error: null })
   return <form action={action} className="sf-form">
-    <input type="hidden" name="mode" value={mode} /><input type="hidden" name="service" value={service} />
+    <input type="hidden" name="mode" value={mode} /><input type="hidden" name="service" value={service} /><input type="hidden" name="from" value={from} />
     {mode === 'signup' && <label className="sf-field-label">Name<input className="sf-field" name="name" required maxLength={120} autoComplete="name" /></label>}
     <label className="sf-field-label">Email<input className="sf-field" name="email" type="email" required maxLength={320} autoComplete="email" /></label>
     <label className="sf-field-label">

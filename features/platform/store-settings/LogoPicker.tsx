@@ -83,11 +83,11 @@ export function LogoPicker({ initialIcon, initialColor, onChange }: { initialIco
     <div className="grid min-w-0 gap-2">
       <span className="text-xs font-medium text-muted-foreground" id={`${editorId}-hue`}>Logo hue</span>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Track label="Logo hue presets" className="min-w-0">
+        <Track label="Logo hue presets" className="min-w-0 max-w-full flex-wrap overflow-visible rounded-2xl">
           {HUE_PRESETS.map(preset => {
             const active = normalizeStoreLogoColor(hue) === String(preset.value)
             return <button key={preset.name} type="button" aria-pressed={active} className={trackItemClass(active)} onClick={() => setHue(String(preset.value))}>
-              <span aria-hidden="true" className="size-3 rounded-full bg-[oklch(0.6_0.15_260)] ring-1 ring-black/10" style={{ filter: `hue-rotate(${preset.value}deg)` }} />
+              <span aria-hidden="true" className="size-3 rounded-full ring-1 ring-black/10" style={{ backgroundColor: `oklch(0.6 0.15 ${preset.hue})` }} />
               {preset.name}
             </button>
           })}

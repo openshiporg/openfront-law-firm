@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { FormSelect } from '@/components/ui/form-select'
 
 import { cn } from '@/lib/utils'
@@ -12,7 +13,13 @@ const contactTypes = [['person', 'Person'], ['organization', 'Organization']] as
 
 export function IntakeStartPanel({ setup }: { setup: IntakeSetup }) {
   const [contactType, setContactType] = useState('person')
+  const router = useRouter()
   const [state, action, pending] = useActionState<IntakeStartState, FormData>(startIntake, { ok: false, message: '' })
+  const [officeId, setOfficeId] = useState(setup.officesCount === 1 ? setup.offices[0]?.id ?? '' : '')
+  const [areaId, setAreaId] = useState(setup.practiceAreasCount === 1 ? setup.practiceAreas[0]?.id ?? '' : '')
+  useEffect(() => {
+    if (state.ok) router.refresh()
+  }, [state, router])
   return (
     <Panel title={<h2 id="new-intake-heading" className="min-w-0 truncate text-sm font-semibold text-foreground">New intake</h2>} bodyClassName="p-0">
       <form action={action} aria-labelledby="new-intake-heading" className="min-w-0">
@@ -38,7 +45,8 @@ export function IntakeStartPanel({ setup }: { setup: IntakeSetup }) {
           <div className="grid min-w-0 gap-4 border-t border-border pt-5 sm:grid-cols-2 xl:grid-cols-3">
             <Field id="title" label="Intake title" required />
             <Select id="source" label="Source" name="source" value="other" options={[['website', 'Website'], ['referral', 'Referral'], ['phone', 'Phone'], ['walk_in', 'Walk-in'], ['other', 'Other']]} />
-            <SearchableOptionSelect id="officeId" label="Office" name="officeId" emptyLabel="No office selected" kind="office" total={setup.officesCount} options={setup.offices.map((office) => ({ value: office.id, label: `${office.name} · ${office.code}` }))} />
+            <SearchableOptionSelect id="officeId" label="Office" name="officeId" emptyLabel="No office selected" kind="office" total={setup.officesCount} options={setup.offices.map((office) => ({ value: office.id, label: `${office.name} · ${office.code}` }))} value={officeId} onValueChange={setOfficeId} />
+            <SearchableOptionSelect id="practiceAreaId" label="Practice area" name="practiceAreaId" emptyLabel="No practice area" kind="practiceArea" total={setup.practiceAreasCount} options={setup.practiceAreas.map((area) => ({ value: area.id, label: area.name }))} value={areaId} onValueChange={setAreaId} />
             <SearchableOptionSelect id="assignedToId" label="Assignee" name="assignedToId" emptyLabel="Assign to me" kind="member" total={setup.membershipsCount} options={setup.memberships.map((membership) => ({ value: membership.user.id, label: `${membership.user.name} · ${membership.user.email}` }))} />
           </div>
 

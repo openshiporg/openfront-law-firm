@@ -33,3 +33,4 @@ export function formatAppointmentTime(value: string | null, timezone: string) {
     return new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(instant)
   }
 }
+export const CONSULTATION_HOURS_LABEL = 'Weekdays 9:00–17:00, office time'

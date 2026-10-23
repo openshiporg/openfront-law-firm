@@ -14,7 +14,7 @@ export async function TeamPage({ searchParams }: { searchParams?: Promise<Record
   return (
     <PracticePage
       title="People & access"
-      description="Invite staff into the active firm, assign a bounded role and office, and inspect membership state."
+      description="Invite staff, choose their role and office, and manage access."
       meta={result.success ? <span className="tabular-nums">{result.data.membershipsCount.toLocaleString()} {result.data.membershipsCount === 1 ? 'membership' : 'memberships'}{result.data.memberQuery ? ' matching' : ''}</span> : undefined}
     >
       {!result.success ? (

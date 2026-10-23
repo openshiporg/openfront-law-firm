@@ -93,7 +93,12 @@ export default async function PortalSharePage({ params }: { params: Promise<{ sh
 
         {invoice ? <section aria-labelledby="portal-invoice-lines" className="sf-section">
           <div className="sf-section__head"><h2 id="portal-invoice-lines" className="sf-h2">Invoice lines</h2></div>
-          {invoice.lines.length ? <div className="overflow-x-auto"><table className="sf-num w-full min-w-[32rem] text-left text-sm">
+          {invoice.lines.length ? <ul className="sf-rows sm:hidden">{invoice.lines.map((line: InvoiceLineRow) => <li key={line.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5 py-3 text-sm">
+            <span className="[overflow-wrap:anywhere]">{line.description || 'Line item'}</span>
+            <span className="sf-num row-span-2 self-center font-semibold whitespace-nowrap">{money(line.lineTotalMinor, line.currencyCode || invoice.currencyCode)}</span>
+            <span className="sf-muted sf-num text-xs">{day(line.serviceDate)} · Qty {line.quantity ?? 1}</span>
+          </li>)}<li className="flex justify-between py-3 text-sm font-semibold"><span>Total</span><span className="sf-num">{money(invoice.totalMinor, invoice.currencyCode)}</span></li></ul> : null}
+          {invoice.lines.length ? <div className="hidden overflow-x-auto sm:block"><table className="sf-num w-full text-left text-sm">
             <thead className="text-[var(--color-muted)]"><tr className="border-b border-[var(--color-rule)]"><th scope="col" className="py-2 pr-4 font-medium">Date</th><th scope="col" className="py-2 pr-4 font-medium">Description</th><th scope="col" className="py-2 pr-4 text-right font-medium">Qty</th><th scope="col" className="py-2 text-right font-medium">Amount</th></tr></thead>
             <tbody className="divide-y divide-[var(--color-rule)]">{invoice.lines.map((line: InvoiceLineRow) => <tr key={line.id}><td className="py-3 pr-4 align-top whitespace-nowrap">{day(line.serviceDate)}</td><td className="py-3 pr-4 align-top [overflow-wrap:anywhere]">{line.description || 'Line item'}</td><td className="py-3 pr-4 text-right align-top">{line.quantity ?? 1}</td><td className="py-3 text-right align-top whitespace-nowrap">{money(line.lineTotalMinor, line.currencyCode || invoice.currencyCode)}</td></tr>)}</tbody>
             <tfoot className="border-t border-[var(--color-ink)]">

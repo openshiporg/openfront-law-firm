@@ -13,6 +13,7 @@ import {
   requirePermission,
 } from "./workflow-helpers";
 import { blockingConflictCheckStatuses } from "../lib/conflict-status";
+import { advanceIntakeAfterConflictClearance } from "./intakeWorkflows";
 
 const conflictTermTypes = new Set(["person", "organization", "alias", "matter", "other"]);
 const conflictMatchTypes = new Set(["exact_name", "alias", "fuzzy_name", "related_party", "matter_text", "manual"]);
@@ -439,6 +440,10 @@ export async function finalizeConflictCheck(
       intakeId: check.intakeId,
       metadata: { checkId: check.id, outcome: args.outcome },
     });
+    // Only a clearance can move the intake on; conflict_found leaves it where it is.
+    if (args.outcome === "cleared" && check.intakeId) {
+      await advanceIntakeAfterConflictClearance(tx, context, { firmId, userId, intakeId: check.intakeId, checkId: check.id });
+    }
     return { check: completed, replayed: false };
   });
 }

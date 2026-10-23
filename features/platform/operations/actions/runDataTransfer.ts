@@ -142,7 +142,7 @@ export async function runDataTransfer(
       if (response.data.preparePracticeExport.replayed) {
         return { ok: true, message: 'This export key already completed. The audit digest was replayed, but confidential rows are not retained in audit metadata; use a new key for a new snapshot.' }
       }
-      return { ok: true, message: 'Bounded export prepared and its digest recorded in audit evidence.', result: response.data.preparePracticeExport }
+      return { ok: true, message: 'Export ready. It was logged in the activity log.', result: response.data.preparePracticeExport }
     }
 
     throw new Error('Unsupported data-transfer operation.')

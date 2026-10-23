@@ -17,7 +17,7 @@ import { NEUTRAL_FIRM_NAME, STOREFRONT_ACCENT_PRESETS, accentContrastOnPaper, ac
 
 const optional = <span className="font-normal text-muted-foreground/80"> · optional</span>
 
-export function BrandingSettingsClient({ setup }: { setup: BrandingSetup }) {
+export function BrandingSettingsClient({ setup, publication = 'unpublished' }: { setup: BrandingSetup; publication?: 'booking' | 'published' | 'unpublished' }) {
   const firm = setup.firm
   const initialValues = {
     name: firm?.name || '',
@@ -83,7 +83,7 @@ export function BrandingSettingsClient({ setup }: { setup: BrandingSetup }) {
           <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">Storefront preview</p>
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><StatusDot tone={firm ? 'emerald' : 'zinc'} />{firm ? 'Live firm' : 'No firm'}</span>
+              <a href="/dashboard/platform/public-site" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><StatusDot tone={!firm ? 'zinc' : publication === 'unpublished' ? 'amber' : 'emerald'} />{!firm ? 'No firm' : publication === 'unpublished' ? 'Site not published' : publication === 'booking' ? 'Published · booking open' : 'Published'}</a>
             </div>
             <div className="bg-[oklch(0.955_0.010_78)] px-5 py-6 text-[oklch(0.22_0.01_78)]">
               <div className="flex min-w-0 items-center gap-3">
@@ -95,8 +95,8 @@ export function BrandingSettingsClient({ setup }: { setup: BrandingSetup }) {
               </div>
               <div className="mt-6 h-px w-full" style={{ backgroundColor: theme['--sf-accent'] }} />
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="inline-flex h-8 items-center rounded-full px-3.5 text-xs font-medium text-white" style={{ backgroundColor: theme['--sf-accent'] }}>Request consultation</span>
-                <span className="text-xs font-medium underline underline-offset-4" style={{ color: theme['--sf-accent'] }}>Practice areas</span>
+                {publication === 'booking' ? <span className="inline-flex h-8 items-center rounded-full px-3.5 text-xs font-medium text-white" style={{ backgroundColor: theme['--sf-accent'] }}>Request a consultation</span> : null}
+                {publication === 'unpublished' ? <span className="text-xs opacity-70">Firm information is not yet published.</span> : <span className="text-xs font-medium underline underline-offset-4" style={{ color: theme['--sf-accent'] }}>Practice areas</span>}
               </div>
             </div>
           </div>
@@ -164,7 +164,7 @@ export function BrandingSettingsClient({ setup }: { setup: BrandingSetup }) {
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:-mx-6 md:px-6">
+      <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/90 py-3 pl-4 pr-20 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:-mx-6 md:pl-6 md:pr-24">
         <div className="min-w-0 flex-1 text-sm">
           {state.message ? (
             <p role="alert" className="text-destructive">{state.message}</p>

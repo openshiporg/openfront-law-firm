@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { standardFirmRoles, standardRolePermissionData } from '@/features/keystone/mutations/roleWorkflows'
 
 export type StaffInviteState = {
   message: string | null
@@ -13,6 +14,8 @@ export type StaffInviteState = {
 export type MemberAccessState = { message: string | null; success: string | null }
 
 export type TeamSetup = {
+  /** Standard role names the firm does not have yet (by name, any status). */
+  missingStandardRoles?: string[]
   roles: Array<{ id: string; name: string; status: string }>
   rolesCount: number
   offices: Array<{ id: string; name: string; code: string; status: string }>
@@ -42,9 +45,10 @@ export async function getTeamSetup(requestedPage = 1, query = '') {
   const membershipsCount = counts.data.membershipsCount
   const memberPageCount = Math.max(1, Math.ceil(membershipsCount / MEMBER_PAGE_SIZE))
   const memberPage = Math.min(Math.max(Number.isSafeInteger(requestedPage) ? requestedPage : 1, 1), memberPageCount)
-  const response = await keystoneClient<Omit<TeamSetup, 'membershipsCount' | 'memberPage' | 'memberPageCount' | 'memberQuery'>>(`
+  const response = await keystoneClient<Omit<TeamSetup, 'membershipsCount' | 'memberPage' | 'memberPageCount' | 'memberQuery' | 'missingStandardRoles'> & { allRoleNames: Array<{ name: string }> }>(`
     query TeamSetup($where: FirmMembershipWhereInput!, $skip: Int!) {
       roles(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 100) { id name status }
+      allRoleNames: roles(take: 500) { name }
       rolesCount(where: { status: { equals: active } })
       offices(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 100) { id name code status }
       officesCount(where: { status: { equals: active } })
@@ -57,7 +61,10 @@ export async function getTeamSetup(requestedPage = 1, query = '') {
     }
   `, { where, skip: (memberPage - 1) * MEMBER_PAGE_SIZE })
   if (!response.success) return response
-  return { success: true as const, data: { ...response.data, membershipsCount, memberPage, memberPageCount, memberQuery } }
+  const { allRoleNames, ...setup } = response.data
+  const names = new Set(allRoleNames.map((role) => role.name.trim().toLowerCase()))
+  const missingStandardRoles = standardFirmRoles.filter((role) => !names.has(role.name.toLowerCase())).map((role) => role.name)
+  return { success: true as const, data: { ...setup, missingStandardRoles, membershipsCount, memberPage, memberPageCount, memberQuery } }
 }
 
 // Re-sends the single-use setup link to the invited member's existing email. The
@@ -171,4 +178,27 @@ export async function inviteStaff(_previous: StaffInviteState, formData: FormDat
     success: `Invitation created for ${values.email}. Access activates only after the single-use password setup link is redeemed.`,
     values: { name: '', email: '', roleId: '', officeId: '' },
   }
+}
+
+export type StandardRolesState = { message: string | null; success: string | null }
+
+// Creates whichever standard roles (Attorney, Paralegal, Billing, Intake coordinator) the
+// active firm lacks, through the Role list (role-management access and the firm-binding
+// hook apply). Existing roles with the same name, active or archived, are left alone.
+export async function addStandardRoles(_previous: StandardRolesState, _formData: FormData): Promise<StandardRolesState> {
+  const existing = await keystoneClient<{ roles: Array<{ name: string }> }>(`
+    query FirmRoleNames { roles(take: 500) { name } }
+  `)
+  if (!existing.success) return { message: 'Roles could not be loaded. Adding roles requires role-management access.', success: null }
+  const names = new Set(existing.data.roles.map((role) => role.name.trim().toLowerCase()))
+  const missing = standardFirmRoles.filter((role) => !names.has(role.name.toLowerCase()))
+  if (!missing.length) return { message: null, success: 'All standard roles are already set up.' }
+  const created = await keystoneClient<{ createRoles: Array<{ id: string }> | null }>(`
+    mutation AddStandardRoles($data: [RoleCreateInput!]!) { createRoles(data: $data) { id } }
+  `, { data: missing.map((role) => ({ name: role.name, status: 'active', ...standardRolePermissionData(role) })) })
+  if (!created.success || !created.data.createRoles?.length) {
+    return { message: 'The roles could not be added. Adding roles requires role-management access.', success: null }
+  }
+  revalidatePath('/dashboard/platform/team')
+  return { message: null, success: `Added ${missing.map((role) => role.name).join(', ')}.` }
 }

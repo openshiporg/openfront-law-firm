@@ -7,6 +7,12 @@ import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 import { keystoneContext } from '@/features/keystone/context'
 
 export type AccountState = { error: string | null }
+
+/** Only same-site account and booking pages may be returned to after sign-in. */
+function safeReturnPath(value: unknown) {
+  const path = typeof value === 'string' ? value.trim() : ''
+  return /^\/(account|consultation)(\/[A-Za-z0-9._~-]+)*\/?$/.test(path) ? path : null
+}
 export async function customerAuthenticate(_previous: AccountState, form: FormData): Promise<AccountState> {
   const email = String(form.get('email') || '').trim().toLowerCase()
   const password = String(form.get('password') || '')
@@ -24,7 +30,8 @@ export async function customerAuthenticate(_previous: AccountState, form: FormDa
   ;(await cookies()).set('keystonejs-session', token, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 86400 * 7 })
   revalidatePath('/account')
   const service = String(form.get('service') || '')
-  redirect(service ? `/consultation?service=${encodeURIComponent(service)}` : '/account')
+  const from = safeReturnPath(form.get('from'))
+  redirect(service ? `/consultation?service=${encodeURIComponent(service)}` : from ?? '/account')
 }
 export async function customerSignOut() {
   ;(await cookies()).delete('keystonejs-session')

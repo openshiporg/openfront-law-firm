@@ -6,7 +6,7 @@ import { redeemCustomerPasswordReset, requestCustomerPasswordReset } from './act
 
 export function CustomerResetRequestForm() {
   const [state, action, pending] = useActionState(requestCustomerPasswordReset, { sent: false, error: null })
-  if (state.sent) return <div className="grid gap-5"><p role="status" className="sf-notice">If an account exists for that email, a one-time reset link is on its way.</p><div className="sf-track"><Link className="sf-pill sf-pill--raised" href="/account/signin">Back to sign in</Link></div></div>
+  if (state.sent) return <p role="status" className="sf-notice">If an account exists for that email, a one-time reset link is on its way.</p>
   return <form action={action} className="sf-form">
     <label className="sf-field-label">Email<input className="sf-field" name="email" type="email" required maxLength={320} autoComplete="email" /></label>
     {state.error && <p role="alert" className="sf-error">{state.error}</p>}

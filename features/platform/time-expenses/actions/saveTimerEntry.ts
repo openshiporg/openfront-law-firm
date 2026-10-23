@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { loadActiveHourlyRules, priceEntries } from '@/features/platform/billing/lib/loadRateRules'
 
 export type TimerSaveState = { ok: boolean; message: string; savedStartedAt: string | null }
 
@@ -43,6 +44,23 @@ export async function saveTimerEntry(_previous: TimerSaveState, formData: FormDa
     return { ok: true, message: 'This captured time was already saved as a draft entry.', savedStartedAt: startedAt.toISOString() }
   }
 
+  // Billable time is priced at capture from the active rate cards, so it reaches billing
+  // with an amount. Approved time is immutable, so pricing has to happen before approval.
+  let pricing: { rateMinor: number; amountMinor: number; currencyCode: string } | null = null
+  if (isBillable) {
+    const [matter, rules] = await Promise.all([
+      keystoneClient<{ matter: { id: string; practiceArea: { id: string } | null } | null }>(
+        'query TimerMatterRate($id: ID!) { matter(where: { id: $id }) { id practiceArea { id } } }',
+        { id: matterId },
+      ),
+      loadActiveHourlyRules(),
+    ])
+    if (matter.success && matter.data.matter && rules.success) {
+      const price = priceEntries(rules.data.rateRules, [{ id: 'timer', durationMinutes, workDate: startedAt.toISOString(), user: { id: userId }, matter: matter.data.matter }]).get('timer')
+      if (price) pricing = { rateMinor: price.rateMinor, amountMinor: price.amountMinor, currencyCode: price.rule.currencyCode }
+    }
+  }
+
   const response = await keystoneClient<{ createTimeEntry: { id: string; durationMinutes: number } | null }>(`
     mutation SaveTimerEntry($data: TimeEntryCreateInput!) {
       createTimeEntry(data: $data) { id durationMinutes }
@@ -57,11 +75,15 @@ export async function saveTimerEntry(_previous: TimerSaveState, formData: FormDa
       durationMinutes,
       description,
       isBillable,
+      ...(pricing ?? {}),
     },
   })
   if (!response.success || !response.data.createTimeEntry) {
     return { ok: false, message: response.success ? 'The time entry was not saved.' : response.error, savedStartedAt: null }
   }
   revalidatePath('/dashboard/platform/time-expenses')
-  return { ok: true, message: `Saved ${response.data.createTimeEntry.durationMinutes} minutes as a draft time entry for review.`, savedStartedAt: startedAt.toISOString() }
+  revalidatePath('/dashboard/platform/billing')
+  const minutes = response.data.createTimeEntry.durationMinutes
+  const unpriced = isBillable && !pricing ? ' No rate applies yet.' : ''
+  return { ok: true, message: `Saved ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} as a draft time entry.${unpriced}`, savedStartedAt: startedAt.toISOString() }
 }

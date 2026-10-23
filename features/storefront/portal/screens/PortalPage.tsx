@@ -68,8 +68,8 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
                 <li key={share.id}>
                   <Link href={`/portal/share/${share.id}`} className="sf-row grid-cols-[2.75rem_minmax(0,1fr)_auto]">
                     <span className="row-span-2 grid size-10 place-items-center rounded-full bg-[var(--sf-tint)] text-[var(--color-accent)]"><Icon className="size-4" aria-hidden="true" /></span>
-                    <span className="sf-row__title col-start-2"><span>{labels[share.resourceType] ?? 'Shared item'}</span></span>
-                    <span className="sf-row__meta col-start-2 truncate" style={{ paddingLeft: 0 }}>{share.matterNumber} · {share.matterTitle}</span>
+                    <span className="sf-row__title col-start-2"><span>{share.resourceTitle ? (share.resourceType === 'invoice' ? `Invoice ${share.resourceTitle}` : share.resourceTitle) : labels[share.resourceType] ?? 'Shared item'}</span></span>
+                    <span className="sf-row__meta col-start-2 truncate" style={{ paddingLeft: 0 }}>{labels[share.resourceType] ?? 'Shared item'} · {share.matterNumber} · {share.matterTitle}</span>
                     <ArrowRight className="col-start-3 row-span-2 row-start-1 size-4 text-[var(--color-muted)]" aria-hidden="true" />
                   </Link>
                 </li>

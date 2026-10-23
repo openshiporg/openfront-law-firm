@@ -149,7 +149,11 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
   if (lookup?.status === 'unavailable') return <ServiceUnavailable title="Choose an appointment" retryHref={`/consultation?service=${encodeURIComponent(selected ?? '')}`} />
   const service = lookup?.status === 'ok' ? lookup.data : null
   const notice = settings.isLocalFictional ? FIXTURE_FIRST_CONTACT_NOTICE : settings.publication.firstContactNotice
-  if (!service || !settings.bookingEnabled || !notice) return <PublicPage><div className="sf-shell sf-page"><div className="sf-narrow grid gap-6"><h1 className="sf-title">Choose an appointment</h1><div className="sf-track"><Link className="sf-pill sf-pill--raised" href="/practice-areas">Practice areas</Link></div></div></div></PublicPage>
+  if (!service || !settings.bookingEnabled || !notice) return <PublicPage><div className="sf-shell sf-page"><div className="sf-narrow grid gap-6">
+    <h1 className="sf-title">{settings.bookingEnabled && notice ? 'Choose an appointment' : 'Online booking is not available'}</h1>
+    <p role="status" className="sf-notice sf-notice--plain">{settings.bookingEnabled && notice ? (selected ? 'This appointment is not available. Choose a practice area.' : 'Choose a practice area to see open times.') : 'This firm is not taking consultation requests online. Contact the firm directly.'}</p>
+    <div className="sf-track">{settings.bookingEnabled && notice ? <Link className="sf-pill sf-pill--raised" href="/practice-areas">Practice areas</Link> : null}<Link className={settings.bookingEnabled && notice ? 'sf-pill' : 'sf-pill sf-pill--raised'} href="/contact">Contact the firm</Link></div>
+  </div></div></PublicPage>
   const history = await getCustomerConsultations()
   if (history.status === 'signed_out') redirect(`/account/signin?service=${encodeURIComponent(service.id)}`)
   if (history.status === 'unavailable') return <ServiceUnavailable title={service.name} retryHref={`/consultation?service=${encodeURIComponent(service.id)}`} />
@@ -186,7 +190,7 @@ export async function appointmentMetadata() { return firmMetadata('Appointment')
 export async function AppointmentPage({ params }: { params: Promise<{ id: string }> }) {
   const id = (await params).id
   const result = await getCustomerConsultation(id)
-  if (result.status === 'signed_out') redirect('/account/signin')
+  if (result.status === 'signed_out') redirect(`/account/signin?from=${encodeURIComponent(`/account/appointments/${encodeURIComponent(id)}`)}`)
   if (result.status === 'unavailable') return <ServiceUnavailable title="Appointment" retryHref={`/account/appointments/${encodeURIComponent(id)}`} />
   const row = result.data
   if (!row) notFound()

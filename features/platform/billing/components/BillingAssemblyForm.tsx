@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { FormSelect } from '@/components/ui/form-select'
 import { Search } from 'lucide-react'
 
@@ -18,7 +19,18 @@ import {
 import { formatMoneyLabel } from '@/features/platform/lib/money'
 
 export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) {
-  const [state, action, pending] = useActionState<InvoiceAssemblyState, FormData>(assembleInvoice, { ok: false, message: '' })
+  const router = useRouter()
+  const [state, action, pending] = useActionState<InvoiceAssemblyState, FormData>(async (previous, formData) => {
+    const result = await assembleInvoice(previous, formData)
+    if (result.ok) {
+      setSources(null)
+      const matterId = String(formData.get('matterId') ?? '')
+      if (matterId) selectMatter(matterId)
+      router.refresh()
+    }
+    return result
+  }, { ok: false, message: '' })
+  const unpricedIds = new Set(state.unpricedIds ?? [])
   const [selectedMatterId, setSelectedMatterId] = useState('')
   const [matterQuery, setMatterQuery] = useState('')
   const [found, setFound] = useState<BillingMatterOption[]>([])
@@ -63,7 +75,7 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
             <label htmlFor="billing-matter-search">Find matter</label>
             <div className="flex min-w-0 items-center gap-2">
               <input id="billing-matter-search" value={matterQuery} onChange={(event) => setMatterQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); findMatters() } }} maxLength={100} placeholder="Number or title" className={cn(fieldClass, 'text-foreground')} />
-              <Track><button type="button" className={pillClass} onClick={findMatters} disabled={loading || !matterQuery.trim()}><Search className="size-3.5" aria-hidden="true" />Find</button></Track>
+              <Track className="shrink-0 overflow-visible"><button type="button" className={pillClass} onClick={findMatters} disabled={loading || !matterQuery.trim()}><Search className="size-3.5" aria-hidden="true" />Find</button></Track>
             </div>
           </div>
         </div>
@@ -85,7 +97,7 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
               </div>
               <label htmlFor="invoiceNumber" className={labelClass}>
                 Invoice number
-                <input id="invoiceNumber" name="invoiceNumber" className={cn(fieldClass, 'font-mono')} required maxLength={120} placeholder="INV-2026-0042" />
+                <input key={setup.suggestedInvoiceNumber} id="invoiceNumber" name="invoiceNumber" className={cn(fieldClass, 'font-mono')} required maxLength={120} defaultValue={setup.suggestedInvoiceNumber} autoComplete="off" />
               </label>
             </div>
 
@@ -103,7 +115,9 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
                         id: `time:${entry.id}`,
                         title: entry.description,
                         meta: `${entry.matter.matterNumber} · ${entry.durationMinutes} min`,
-                        amount: formatMoneyLabel(entry.amountMinor, entry.currencyCode, 'unpriced'),
+                        amount: formatMoneyLabel(entry.amountMinor, entry.currencyCode, 'Unpriced'),
+                        unpriced: entry.amountMinor === null,
+                        flagged: unpricedIds.has(entry.id),
                       }))}
                     />
                     <SourceList
@@ -139,7 +153,9 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
   )
 }
 
-function SourceList({ title, count, empty, sources, bordered = false }: { title: string; count: number; empty: string; sources: Array<{ id: string; title: string; meta: string; amount: string }>; bordered?: boolean }) {
+type Source = { id: string; title: string; meta: string; amount: string; unpriced?: boolean; flagged?: boolean }
+
+function SourceList({ title, count, empty, sources, bordered = false }: { title: string; count: number; empty: string; sources: Source[]; bordered?: boolean }) {
   return (
     <fieldset className={cn('min-w-0 px-4 py-4', bordered && 'border-t border-border lg:border-t-0')}>
       <legend className="float-left flex w-full items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -148,14 +164,17 @@ function SourceList({ title, count, empty, sources, bordered = false }: { title:
       {!sources.length ? <p className="clear-both pt-3 text-sm text-muted-foreground">{empty}</p> : (
         <div className="clear-both mt-2 max-h-72 divide-y divide-border overflow-y-auto">
           {sources.map((source) => (
-            <label key={source.id} className="flex min-w-0 cursor-pointer items-start gap-3 py-2.5 text-sm">
-              <input type="checkbox" name="source" value={source.id} className="mt-0.5 size-4 shrink-0 accent-foreground" />
-              <span className="min-w-0 flex-1">
+            <div key={source.id} className={cn('flex min-w-0 items-start gap-3 py-2.5 text-sm', source.flagged && '-mx-2 rounded-lg bg-destructive/5 px-2')}>
+              <input id={`source-${source.id}`} type="checkbox" name="source" value={source.id} className="mt-0.5 size-4 shrink-0 cursor-pointer accent-foreground" />
+              <label htmlFor={`source-${source.id}`} className="min-w-0 flex-1 cursor-pointer">
                 <span className="block truncate font-medium text-foreground">{source.title}</span>
                 <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">{source.meta}</span>
+              </label>
+              <span className="shrink-0 text-right">
+                <span className={cn('block font-mono text-sm tabular-nums', source.unpriced ? 'text-amber-700 dark:text-amber-400' : 'text-foreground')}>{source.amount}</span>
+                {source.unpriced ? <a href="#billing-rates" className="block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">Set rate</a> : null}
               </span>
-              <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">{source.amount}</span>
-            </label>
+            </div>
           ))}
         </div>
       )}

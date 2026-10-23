@@ -61,7 +61,11 @@ type DrillInDefinition = {
 }
 
 const LIST_LIMIT = 20
-const label = (value: unknown, fallback = 'Not recorded') => value === null || value === undefined || value === '' ? fallback : String(value).replaceAll('_', ' ')
+const label = (value: unknown, fallback = 'Not recorded') => {
+  if (value === null || value === undefined || value === '') return fallback
+  const text = String(value).replaceAll('_', ' ')
+  return /^[a-z][a-z ]*$/.test(text) ? text.charAt(0).toUpperCase() + text.slice(1) : text
+}
 const money = (minor: unknown, currency: unknown, missing?: string) => formatMoneyLabel(minor, currency, missing)
 const matter = (record: RecordValue) => record.matter ? `${record.matter.matterNumber ?? 'Matter'} · ${record.matter.title ?? ''}` : 'Firm-level'
 const matterFields = 'matter { id matterNumber title office { timezone } }'
@@ -103,7 +107,7 @@ const drillIns: Record<string, DrillInDefinition> = {
     related: (r) => [r.intake?.id ? { label: 'Open intake pipeline', href: `/dashboard/platform/intake#pipeline-${encodeURIComponent(String(r.intake.id))}` } : null],
   },
   document: {
-    root: 'document', kind: 'Document', notice: 'Version identity, signatures, and legal holds are review data. File contents are stored outside this workspace, so versions are identified here by name, size and checksum.',
+    root: 'document', kind: 'Document', notice: 'Each version keeps its file name, size and SHA-256 checksum. Files are stored in the firm bucket.',
     query: `document(where: { id: $id }) { id title status category confidentiality updatedAt ${matterFields} currentVersion { versionNumber fileName checksumSha256 source } versionsCount versions(orderBy: [{ versionNumber: desc }, { id: asc }], take: ${LIST_LIMIT}) { id versionNumber fileName mediaType byteSize checksumSha256 source createdAt } retentionPolicy { name } }`,
     title: (r) => label(r.title, 'Untitled document'),
     facts: (r) => [['Matter', matter(r)], ['Category', label(r.category)], ['Confidentiality', label(r.confidentiality)], ['Current version', r.currentVersion ? `v${r.currentVersion.versionNumber ?? '?'} · ${r.currentVersion.fileName ?? 'unnamed file'}` : 'No current version'], ['Checksum', label(r.currentVersion?.checksumSha256, 'Not recorded')], ['Version count', label(r.versionsCount, '0')], ['Retention policy', label(r.retentionPolicy?.name, 'None')]],

@@ -5,6 +5,7 @@ import { sha256Digest } from "../lib/digests";
 import { assertLifecycleTransition } from "../lib/lifecycles";
 import { isGraphqlInt } from "../lib/int32";
 import { runSerializableTransaction } from "../lib/transactions";
+import { priceMinutes, resolveHourlyRate, type HourlyRateRule } from "../../platform/billing/lib/ratePricing";
 import {
   assertMatterAccess,
   assertMatterTeamCapability,
@@ -111,6 +112,15 @@ export async function transitionIntake(
   });
 }
 
+// Intake roles map to matter party roles; referrers are not parties to the matter.
+const intakePartyMapping: Record<string, { partyRole: string; side: string }> = {
+  prospective_client: { partyRole: "client", side: "our_client" },
+  adverse_party: { partyRole: "opposing_party", side: "adverse" },
+  related_party: { partyRole: "other", side: "unknown" },
+  witness: { partyRole: "witness", side: "neutral" },
+  other: { partyRole: "other", side: "unknown" },
+};
+
 export async function convertIntakeToMatter(
   _root: unknown,
   args: {
@@ -168,6 +178,8 @@ export async function convertIntakeToMatter(
       }
       return { matter: existing, replayed: true };
     }
+    const numberTaken = await tx.matter.findFirst({ where: { firmId, matterNumber: args.matterNumber.trim() }, select: { id: true } });
+    if (numberTaken) throw new Error("Matter number is already in use in this firm.");
     const now = new Date();
     const matter = await tx.matter.create({
       data: {
@@ -215,10 +227,42 @@ export async function convertIntakeToMatter(
         },
       }),
     ]);
+    // Intake participants were searched by the cleared checks above; they carry onto the
+    // matter as parties. The primary contact becomes the firm's client.
+    const participants = await tx.intakeParticipant.findMany({
+      where: { firmId, intakeId: intake.id, status: "active" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { contactId: true, participantRole: true },
+    });
+    const partyKeys = new Set<string>();
+    const partyIds: string[] = [];
+    const clientParticipants = participants.some((participant: any) => participant.contactId === intake.primaryContactId && participant.participantRole === "prospective_client")
+      ? participants
+      : [{ contactId: intake.primaryContactId, participantRole: "prospective_client" }, ...participants];
+    for (const participant of clientParticipants) {
+      const party = intakePartyMapping[participant.participantRole as string];
+      if (!party) continue;
+      const isPrimaryClient = participant.contactId === intake.primaryContactId && party.partyRole === "client";
+      const key = `${participant.contactId}:${party.partyRole}`;
+      if (partyKeys.has(key)) continue;
+      partyKeys.add(key);
+      const created = await tx.matterParty.create({
+        data: {
+          firmId, matterId: matter.id, contactId: participant.contactId, partyRole: party.partyRole, side: party.side,
+          status: "active", isPrimaryClient, notes: "",
+        },
+        select: { id: true },
+      });
+      partyIds.push(created.id);
+    }
+    await tx.contact.updateMany({
+      where: { id: intake.primaryContactId, firmId, status: { in: ["prospective_client", "former_client", "other"] } },
+      data: { status: "client" },
+    });
     await recordAuditEvent(tx, {
       firmId, eventType: "intake.converted_to_matter", category: "legal_workflow", actorUserId: userId,
-      matterId: matter.id, intakeId: intake.id,
-      metadata: { responsibleAttorneyId: attorney.id, conflictCheckIds: clearedCheckIds, reasonDigest: sha256Digest(reason) },
+      matterId: matter.id, intakeId: intake.id, contactId: intake.primaryContactId,
+      metadata: { responsibleAttorneyId: attorney.id, conflictCheckIds: clearedCheckIds, matterPartyIds: partyIds, reasonDigest: sha256Digest(reason) },
     });
     return { matter: openedMatter, replayed: false };
   });
@@ -321,10 +365,35 @@ export async function transitionTimeEntry(
   return transitionMatterRecord({
     context, permission: "canManageBilling", model: "timeEntry", lifecycle: "timeEntry",
     id: args.timeEntryId, toStatus: args.toStatus, reason: args.reason, humanOnly: true,
-    validate: async (_tx, _item, userId) => args.toStatus === "approved"
-      ? { approvedById: userId, approvedAt: new Date() }
+    validate: async (tx, item, userId) => args.toStatus === "approved"
+      ? { approvedById: userId, approvedAt: new Date(), ...(await priceUnpricedTime(tx, item)) }
       : args.toStatus === "draft" ? { approvedById: null, approvedAt: null } : {},
   });
+}
+
+/**
+ * Billable time approved without an amount is priced at approval from the firm's active
+ * hourly rate rules (same precedence as the Billing rates screen), because approved time
+ * is immutable afterwards. No applicable rule leaves it unpriced.
+ */
+async function priceUnpricedTime(tx: any, item: any) {
+  if (!item?.isBillable || item.amountMinor !== null && item.amountMinor !== undefined) return {};
+  const matter = await tx.matter.findFirst({ where: { id: item.matterId, firmId: item.firmId }, select: { practiceAreaId: true } });
+  const rows = await tx.rateRule.findMany({
+    where: { firmId: item.firmId, rateType: "hourly", rateCard: { status: "active" } },
+    take: 500,
+    select: { id: true, amountMinor: true, currencyCode: true, priority: true, effectiveFrom: true, effectiveTo: true, matterId: true, userId: true, practiceAreaId: true, rateCard: { select: { id: true, name: true, status: true, matterId: true, effectiveFrom: true, effectiveTo: true } } },
+  });
+  const rules: HourlyRateRule[] = rows.map((row: any) => ({
+    id: row.id, amountMinor: row.amountMinor, currencyCode: row.currencyCode, priority: row.priority,
+    effectiveFrom: row.effectiveFrom?.toISOString() ?? null, effectiveTo: row.effectiveTo?.toISOString() ?? null,
+    matter: row.matterId ? { id: row.matterId } : null, user: row.userId ? { id: row.userId } : null,
+    practiceArea: row.practiceAreaId ? { id: row.practiceAreaId } : null,
+    rateCard: row.rateCard ? { id: row.rateCard.id, name: row.rateCard.name, status: row.rateCard.status, matter: row.rateCard.matterId ? { id: row.rateCard.matterId } : null, effectiveFrom: row.rateCard.effectiveFrom?.toISOString() ?? null, effectiveTo: row.rateCard.effectiveTo?.toISOString() ?? null } : null,
+  }));
+  const rule = resolveHourlyRate(rules, { matterId: item.matterId, userId: item.userId ?? null, practiceAreaId: matter?.practiceAreaId ?? null, workDate: item.workDate ?? item.createdAt });
+  if (!rule) return {};
+  return { rateMinor: rule.amountMinor, amountMinor: priceMinutes(rule.amountMinor, Number(item.durationMinutes) || 0), currencyCode: rule.currencyCode };
 }
 
 export async function transitionExpense(

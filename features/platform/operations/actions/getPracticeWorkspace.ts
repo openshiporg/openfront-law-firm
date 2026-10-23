@@ -32,7 +32,7 @@ const intakePageQuery = `
       take: ${WORK_QUEUE_PAGE_SIZE}
       skip: $skip
     ) {
-      id intakeNumber status receivedAt
+      id intakeNumber title status receivedAt primaryContact { displayName }
     }
   }
 `
@@ -45,7 +45,7 @@ const conflictCheckPageQuery = `
       take: ${WORK_QUEUE_PAGE_SIZE}
       skip: $skip
     ) {
-      status createdAt
+      status createdAt intake { intakeNumber title primaryContact { displayName } } matter { matterNumber title }
     }
   }
 `
@@ -163,8 +163,13 @@ const deliveryPageQuery = `
 `
 
 type WorkQueuePages = { intake?: number; conflicts?: number; relationships?: number; payments?: number; invoices?: number; deadlines?: number; tasks?: number; documents?: number; signatures?: number; delivery?: number }
-type ConflictCheckRecord = { status: string | null; createdAt: string | null }
-type IntakeRecord = { id: string; intakeNumber: string; status: string; receivedAt: string | null }
+type ConflictCheckRecord = {
+  status: string | null
+  createdAt: string | null
+  intake?: { intakeNumber: string; title: string | null; primaryContact?: { displayName: string | null } | null } | null
+  matter?: { matterNumber: string; title: string | null } | null
+}
+type IntakeRecord = { id: string; intakeNumber: string; title?: string | null; status: string; receivedAt: string | null; primaryContact?: { displayName: string | null } | null }
 type MatterPartyRecord = { id: string; partyRole: string; side: string; status: string; updatedAt: string | null }
 type PaymentRecord = { id: string; paymentNumber: string; status: string; createdAt: string | null }
 type InvoiceMetadataRecord = {
@@ -230,8 +235,8 @@ function mapIntake(record: IntakeRecord, canAct: boolean): PracticeOverviewQueue
   return {
     id: record.id,
     kind: 'Intake',
-    title: record.intakeNumber,
-    subtitle: 'Prospective-client intake · open the pipeline to act',
+    title: record.title || record.intakeNumber,
+    subtitle: [record.primaryContact?.displayName ?? 'Client unavailable', record.intakeNumber].join(' · '),
     status: record.status,
     at: toIso(record.receivedAt),
     href: `/dashboard/platform/intake#pipeline-${encodeURIComponent(record.id)}`,
@@ -243,8 +248,10 @@ function mapConflictCheck(record: ConflictCheckRecord, ordinal: number): Practic
   return {
     id: `conflict-preview-${ordinal}`,
     kind: 'Conflict check',
-    title: 'Conflict check',
-    subtitle: 'Awaiting conflict review',
+    title: record.intake?.title ?? (record.matter ? `${record.matter.matterNumber} · ${record.matter.title ?? ''}` : 'Conflict check'),
+    subtitle: record.intake
+      ? [record.intake.primaryContact?.displayName ?? 'Client unavailable', record.intake.intakeNumber].join(' · ')
+      : record.matter ? 'Matter conflict check' : 'Awaiting conflict review',
     status: record.status ?? 'unknown',
     at: toIso(record.createdAt),
     href: '/dashboard/platform/intake#conflicts',
@@ -404,6 +411,20 @@ async function pagePaymentSection(section: PracticeWorkspaceSection, requestedPa
   return { section: withPageInfo({ ...section, items: response.data.payments.map((record) => mapPayment(record, canAct)) }, page.page, response.data.payments.length) }
 }
 
+// Billing queue rows are dated by due date; drafts and approved invoices have none yet,
+// so they show their creation date instead of "No date", matching the Invoices list.
+async function datedInvoiceSection(section: PracticeWorkspaceSection) {
+  const items = section.items.map((item) => ({ ...item, subtitle: item.subtitle.replace(/ · 1 lines$/, ' · 1 line') }))
+  const undated = items.filter((item) => !item.at).map((item) => item.id)
+  if (!undated.length) return { section: { ...section, items } }
+  const response = await keystoneClient<{ invoices: Array<{ id: string; createdAt: string | null }> | null }>(`
+    query BillingQueueInvoiceCreated($ids: [ID!]!, $take: Int!) { invoices(where: { id: { in: $ids } }, take: $take) { id createdAt } }
+  `, { ids: undated, take: undated.length })
+  if (!response.success || !Array.isArray(response.data.invoices)) return { section: { ...section, items } }
+  const created = new Map(response.data.invoices.map((invoice) => [invoice.id, toIso(invoice.createdAt)]))
+  return { section: { ...section, items: items.map((item) => (item.at ? item : { ...item, at: created.get(item.id) ?? null })) } }
+}
+
 async function loadInvoiceMetadataRegister(requestedPage: number) {
   const countResponse = await keystoneClient<{ invoicesCount: number | null }>(invoiceMetadataCountQuery)
   if (!countResponse.success || typeof countResponse.data.invoicesCount !== 'number') {
@@ -524,6 +545,7 @@ export async function getPracticeWorkspace(
       if (category === 'intake' && section.key === 'conflicts') return pageConflictCheckSection(section, workPages.conflicts ?? 1)
       if (category === 'contacts' && section.key === 'relationships') return pageMatterPartySection(section, workPages.relationships ?? 1)
       if (category === 'billing' && section.key === 'payments') return pagePaymentSection(section, workPages.payments ?? 1)
+      if (category === 'billing' && section.key === 'invoices') return datedInvoiceSection(section)
       if (category === 'work' && section.key === 'deadlines') return pageDeadlineSection(section, workPages.deadlines ?? 1)
       if (category === 'work' && section.key === 'tasks') return pageTaskSection(section, workPages.tasks ?? 1)
       if (category === 'communications' && section.key === 'delivery') return pageDeliverySection(section, workPages.delivery ?? 1)

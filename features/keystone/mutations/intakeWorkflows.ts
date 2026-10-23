@@ -3,9 +3,93 @@ import { randomUUID } from 'node:crypto'
 
 import type { Context } from '.keystone/types'
 
-import { permissions } from '../access'
+import { isInteractiveHumanSession, permissions } from '../access'
+import { blockingConflictCheckStatuses } from '../lib/conflict-status'
+import { sha256Digest } from '../lib/digests'
+import { assertLifecycleTransition } from '../lib/lifecycles'
 import { runSerializableTransaction } from '../lib/transactions'
 import { recordAuditEvent, requirePermission } from './workflow-helpers'
+
+const MAX_ADVERSE_PARTIES = 25
+const organizationSuffix = /\b(inc|incorporated|llc|l\.l\.c|llp|lp|ltd|limited|corp|corporation|company|co|plc|pllc|pc|gmbh|ag|sa|bv|nv|bank|trust|group|holdings|partners|association|foundation|university|hospital|authority|department|agency|county|city)\.?$/i
+
+export function normalizeConflictTerm(value: string) {
+  return value.toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+}
+
+/** Known adverse parties arrive as free text. Each line, semicolon or comma separated
+ * entry is one name; duplicates and the client's own name are dropped. */
+export function parseAdversePartyNames(summary: string | null, exclude: string[] = []) {
+  if (!summary) return []
+  const seen = new Set(exclude.map(normalizeConflictTerm).filter(Boolean))
+  const names: string[] = []
+  for (const raw of summary.split(/[\r\n;,]+/)) {
+    const name = raw.replace(/^[\s\-*•\d.)]+/, '').replace(/\s+/g, ' ').trim()
+    const normalized = normalizeConflictTerm(name)
+    if (!normalized || seen.has(normalized)) continue
+    if (name.length > 200) throw new Error('Each known adverse party must be 200 characters or fewer.')
+    seen.add(normalized)
+    names.push(name)
+  }
+  if (names.length > MAX_ADVERSE_PARTIES) throw new Error(`List at most ${MAX_ADVERSE_PARTIES} known adverse parties.`)
+  return names
+}
+
+function adversePartyContact(name: string) {
+  if (organizationSuffix.test(name)) return { contactType: 'organization' as const, firstName: '', lastName: '', organizationName: name }
+  const parts = name.split(' ')
+  const lastName = parts.length > 1 ? parts.pop() as string : ''
+  return { contactType: 'person' as const, firstName: parts.join(' '), lastName, organizationName: '' }
+}
+
+const intakeClearancePath: Record<string, string[]> = {
+  new: ['screening', 'conflict_review', 'decision'],
+  screening: ['conflict_review', 'decision'],
+  conflict_review: ['decision'],
+  consultation: ['decision'],
+}
+
+/** Runs inside finalizeConflictCheck's transaction once a check is cleared. When the
+ * intake has a cleared check and no blocking check left, and the reviewer may manage
+ * intake, the intake walks its lifecycle to the decision stage. Conversion stays an
+ * explicit, reasoned command. A conflict_found result never reaches this. */
+export async function advanceIntakeAfterConflictClearance(
+  tx: any,
+  context: Context,
+  input: { firmId: string; userId: string; intakeId: string; checkId: string },
+) {
+  const session = context.session as any
+  if (!isInteractiveHumanSession(session) || !permissions.canManageIntake({ session })) return null
+  try {
+    await assertCurrentCommandActor(tx, context, 'canManageIntake')
+  } catch {
+    return null
+  }
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`intake:${input.firmId}:${input.intakeId}`}))`
+  const intake = await tx.intake.findFirst({ where: { id: input.intakeId, firmId: input.firmId }, select: { id: true, status: true } })
+  const path = intake ? intakeClearancePath[intake.status] : undefined
+  if (!intake || !path) return null
+  const [cleared, blocking] = await Promise.all([
+    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: 'cleared' } }),
+    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: { in: [...blockingConflictCheckStatuses] } } }),
+  ])
+  if (!cleared || blocking) return null
+  let fromStatus = intake.status as string
+  for (const toStatus of path) {
+    assertLifecycleTransition('intake', fromStatus, toStatus)
+    await recordAuditEvent(tx, {
+      firmId: input.firmId,
+      eventType: `intake.${toStatus}`,
+      category: 'legal_workflow',
+      actorUserId: input.userId,
+      intakeId: intake.id,
+      metadata: { fromStatus, toStatus, cause: 'conflict_check_cleared', conflictCheckId: input.checkId, reasonDigest: sha256Digest('Conflict check cleared.') },
+    })
+    fromStatus = toStatus
+  }
+  await tx.intake.update({ where: { id: intake.id }, data: { status: 'decision' } })
+  return { intakeId: intake.id, fromStatus: intake.status as string, toStatus: 'decision' }
+}
 
 function text(value: unknown, label: string, maximum: number, required = true) {
   const result = typeof value === 'string' ? value.trim() : ''
@@ -27,6 +111,7 @@ export async function startClientIntake(
     summary?: string | null
     adversePartySummary?: string | null
     officeId?: string | null
+    practiceAreaId?: string | null
     assignedToId?: string | null
   },
   context: Context,
@@ -46,6 +131,9 @@ export async function startClientIntake(
   const summary = text(args.summary, 'Intake summary', 4000, false)
   const adversePartySummary = text(args.adversePartySummary, 'Adverse-party summary', 2000, false)
   const source = args.source?.trim() || 'other'
+  const contactName = args.contactType === 'organization' ? organizationName : [firstName, lastName].filter(Boolean).join(' ')
+  if (!contactName) throw new Error('A conflict-search name is required.')
+  parseAdversePartyNames(adversePartySummary, [contactName])
   if (!['website', 'referral', 'phone', 'walk_in', 'import', 'other'].includes(source)) throw new Error('Unsupported intake source.')
   const prisma = context.prisma as any
 
@@ -56,6 +144,10 @@ export async function startClientIntake(
     if (args.officeId) {
       const office = await tx.office.findFirst({ where: { id: args.officeId, firmId, status: 'active' }, select: { id: true } })
       if (!office) throw new Error('The selected office is unavailable in this firm.')
+    }
+    if (args.practiceAreaId) {
+      const area = await tx.practiceArea.findFirst({ where: { id: args.practiceAreaId, firmId, status: 'active' }, select: { id: true } })
+      if (!area) throw new Error('The selected practice area is unavailable in this firm.')
     }
     if (args.assignedToId) {
       const membership = await tx.firmMembership.findFirst({
@@ -88,6 +180,7 @@ export async function startClientIntake(
         source,
         primaryContactId: contact.id,
         officeId: args.officeId || null,
+        practiceAreaId: args.practiceAreaId || null,
         openedById: userId,
         assignedToId: args.assignedToId || userId,
         receivedAt: new Date(),
@@ -99,6 +192,19 @@ export async function startClientIntake(
     await tx.intakeParticipant.create({
       data: { firmId, intakeId: intake.id, contactId: contact.id, participantRole: 'prospective_client', status: 'active' },
     })
+    const adverseNames = parseAdversePartyNames(adversePartySummary, [contactName ?? ''])
+    const adverseContacts = []
+    for (const name of adverseNames) {
+      const identity = adversePartyContact(name)
+      const adverse = await tx.contact.create({
+        data: { firmId, ...identity, status: 'opposing', primaryEmail: '', primaryPhone: '', conflictSearchAliases: [] },
+        select: { id: true },
+      })
+      await tx.intakeParticipant.create({
+        data: { firmId, intakeId: intake.id, contactId: adverse.id, participantRole: 'adverse_party', status: 'active' },
+      })
+      adverseContacts.push({ id: adverse.id, name, termType: identity.contactType })
+    }
     const conflictCheck = await tx.conflictCheck.create({
       data: {
         firmId,
@@ -111,19 +217,30 @@ export async function startClientIntake(
       },
       select: { id: true, checkNumber: true, status: true },
     })
-    const contactName = args.contactType === 'organization' ? organizationName : [firstName, lastName].filter(Boolean).join(' ')
-    if (!contactName) throw new Error('A conflict-search name is required.')
     await tx.conflictSearchTerm.create({
       data: {
         firmId,
         checkId: conflictCheck.id,
         term: contactName,
-        normalizedTerm: contactName.toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}]+/gu, ' ').trim(),
+        normalizedTerm: normalizeConflictTerm(contactName),
         termType: args.contactType === 'organization' ? 'organization' : 'person',
         sourceContactId: contact.id,
         includeAliases: true,
       },
     })
+    for (const adverse of adverseContacts) {
+      await tx.conflictSearchTerm.create({
+        data: {
+          firmId,
+          checkId: conflictCheck.id,
+          term: adverse.name,
+          normalizedTerm: normalizeConflictTerm(adverse.name),
+          termType: adverse.termType,
+          sourceContactId: adverse.id,
+          includeAliases: true,
+        },
+      })
+    }
     await recordAuditEvent(tx, {
       firmId,
       actorUserId: userId,
@@ -132,7 +249,7 @@ export async function startClientIntake(
       category: 'legal_workflow',
       intakeId: intake.id,
       contactId: contact.id,
-      metadata: { conflictCheckId: conflictCheck.id, source },
+      metadata: { conflictCheckId: conflictCheck.id, source, adversePartyContactIds: adverseContacts.map((adverse) => adverse.id) },
     })
     return { intake, contact, conflictCheck }
   })

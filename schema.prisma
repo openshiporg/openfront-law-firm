@@ -250,6 +250,7 @@ model Firm {
   from_AgentAction_firm              AgentAction[]              @relation("AgentAction_firm")
   from_AgentActionEvent_firm         AgentActionEvent[]         @relation("AgentActionEvent_firm")
   from_PublicSitePolicy_firm         PublicSitePolicy[]         @relation("PublicSitePolicy_firm")
+  from_AttorneyProfile_firm          AttorneyProfile[]          @relation("AttorneyProfile_firm")
 }
 
 model Office {
@@ -536,6 +537,8 @@ model Intake {
   primaryContactId                String                @map("primaryContact")
   office                          Office?               @relation("Intake_office", fields: [officeId], references: [id])
   officeId                        String?               @map("office")
+  practiceArea                    PracticeArea?         @relation("Intake_practiceArea", fields: [practiceAreaId], references: [id])
+  practiceAreaId                  String?               @map("practiceArea")
   openedBy                        User?                 @relation("Intake_openedBy", fields: [openedById], references: [id])
   openedById                      String?               @map("openedBy")
   assignedTo                      User?                 @relation("Intake_assignedTo", fields: [assignedToId], references: [id])
@@ -565,6 +568,7 @@ model Intake {
   @@index([intakeNumber])
   @@index([primaryContactId])
   @@index([officeId])
+  @@index([practiceAreaId])
   @@index([openedById])
   @@index([assignedToId])
 }
@@ -781,22 +785,24 @@ model ConflictDisposition {
 }
 
 model PracticeArea {
-  id                                String                  @id @default(cuid())
-  firm                              Firm                    @relation("PracticeArea_firm", fields: [firmId], references: [id])
-  firmId                            String                  @map("firm")
-  name                              String                  @default("")
-  code                              String                  @default("")
-  status                            PracticeAreaStatusType? @default(active)
-  description                       String                  @default("")
-  isPublic                          Boolean                 @default(false)
-  publicSlug                        String?
-  consultationFeeMinor              Int                     @default(0)
-  consultationMinutes               Int                     @default(30)
-  matters                           Matter[]                @relation("Matter_practiceArea")
-  createdAt                         DateTime                @default(now())
-  updatedAt                         DateTime                @default(now()) @updatedAt
-  from_RateRule_practiceArea        RateRule[]              @relation("RateRule_practiceArea")
-  from_RetentionPolicy_practiceArea RetentionPolicy[]       @relation("RetentionPolicy_practiceArea")
+  id                                 String                  @id @default(cuid())
+  firm                               Firm                    @relation("PracticeArea_firm", fields: [firmId], references: [id])
+  firmId                             String                  @map("firm")
+  name                               String                  @default("")
+  code                               String                  @default("")
+  status                             PracticeAreaStatusType? @default(active)
+  description                        String                  @default("")
+  isPublic                           Boolean                 @default(false)
+  publicSlug                         String?
+  consultationFeeMinor               Int                     @default(0)
+  consultationMinutes                Int                     @default(30)
+  matters                            Matter[]                @relation("Matter_practiceArea")
+  createdAt                          DateTime                @default(now())
+  updatedAt                          DateTime                @default(now()) @updatedAt
+  from_Intake_practiceArea           Intake[]                @relation("Intake_practiceArea")
+  from_RateRule_practiceArea         RateRule[]              @relation("RateRule_practiceArea")
+  from_RetentionPolicy_practiceArea  RetentionPolicy[]       @relation("RetentionPolicy_practiceArea")
+  from_AttorneyProfile_practiceAreas AttorneyProfile[]       @relation("AttorneyProfile_practiceAreas")
 
   @@unique([firmId, code])
   @@unique([firmId, publicSlug])
@@ -2777,6 +2783,28 @@ model PublicSitePolicy {
 
   @@unique([firmId])
   @@index([firmId])
+}
+
+model AttorneyProfile {
+  id            String         @id @default(cuid())
+  firm          Firm           @relation("AttorneyProfile_firm", fields: [firmId], references: [id])
+  firmId        String         @map("firm")
+  name          String         @default("")
+  slug          String         @default("")
+  title         String         @default("")
+  focus         String         @default("")
+  biography     String         @default("")
+  admissions    String         @default("")
+  email         String         @default("")
+  practiceAreas PracticeArea[] @relation("AttorneyProfile_practiceAreas")
+  isPublic      Boolean        @default(false)
+  sortOrder     Int?           @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
+
+  @@unique([firmId, slug])
+  @@index([firmId])
+  @@index([slug])
 }
 
 enum UserStatusType {

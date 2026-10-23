@@ -26,6 +26,7 @@ import {
 } from "./dataWorkflows";
 import {
   allocatePayment,
+  recordManualPayment,
   recordRefundProviderOutcome,
   requestRefund,
   reversePaymentAllocation,
@@ -1034,6 +1035,16 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           providerPaymentId: String
           failureReason: String
         ): PaymentTransitionResult!
+        recordManualPayment(
+          idempotencyKey: String!
+          payerId: ID!
+          invoiceId: ID
+          amountMinor: Int!
+          currencyCode: String!
+          method: String!
+          receivedAt: DateTime!
+          reference: String
+        ): PaymentTransitionResult!
         allocatePayment(
           paymentId: ID!
           invoiceId: ID!
@@ -1254,6 +1265,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           summary: String
           adversePartySummary: String
           officeId: ID
+          practiceAreaId: ID
           assignedToId: ID
         ): ClientIntakeStartResult!
 
@@ -1442,6 +1454,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         transitionInvoice,
         transitionPayment,
         allocatePayment,
+        recordManualPayment,
         reversePaymentAllocation,
         requestRefund,
         reviewRefund,

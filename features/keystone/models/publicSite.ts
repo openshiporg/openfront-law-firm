@@ -1,9 +1,10 @@
 import { list } from "@keystone-6/core";
-import { checkbox, integer, select, text, timestamp } from "@keystone-6/core/fields";
+import { checkbox, integer, relationship, select, text, timestamp } from "@keystone-6/core/fields";
 
 import { isInteractiveHuman, permissions, rules, type AccessArgs } from "../access";
 import { denyAll, firmOwnedHooks } from "../tenancy";
 import { firmRelationship, uniqueConstraints } from "./fields";
+import { normalizePublicSlug } from "./matters";
 import { trackingFields } from "./trackingFields";
 
 /**
@@ -111,6 +112,58 @@ export const PublicSitePolicy = list({
     aboutStatement: text({ ui: { displayMode: "textarea", description: "Firm-approved About text for the public site." } }),
     publishedAt: timestamp({ access: systemManaged, ui: hiddenOnCreate }),
     publishedByUserId: text({ access: systemManaged, ui: hiddenOnCreate }),
+    ...trackingFields,
+  },
+});
+
+const profileHooks = firmOwnedHooks();
+
+function profileSlug(resolvedData: any, item: any) {
+  if (typeof resolvedData.slug === "string") resolvedData.slug = normalizePublicSlug(resolvedData.slug);
+  if (!(resolvedData.slug ?? item?.slug)) resolvedData.slug = normalizePublicSlug(resolvedData.name ?? item?.name);
+  return resolvedData;
+}
+
+/**
+ * Firm-approved public attorney profile. Nothing is shown on /attorneys until a
+ * human firm manager writes the profile and marks it public; credentials and
+ * admissions are the firm's own text.
+ */
+export const AttorneyProfile = list({
+  db: uniqueConstraints(["firmId", "slug"]),
+  access: {
+    operation: { query: permissions.canManageFirm, create: humanFirmManager, update: humanFirmManager, delete: humanFirmManager },
+    filter: { query: rules.activeFirmOwned, update: rules.activeFirmOwned, delete: rules.activeFirmOwned },
+  },
+  hooks: {
+    ...profileHooks,
+    resolveInput: {
+      create: (args: any) => profileSlug(profileHooks.resolveInput.create(args), null),
+      update: ({ resolvedData, item }: any) => profileSlug(resolvedData, item),
+    },
+    validate: {
+      create: async (args: any) => {
+        await profileHooks.validate.create(args);
+        if (!args.resolvedData?.slug) args.addValidationError("A web address is required.");
+      },
+      update: async (args: any) => {
+        await profileHooks.validate.update(args);
+      },
+    },
+  },
+  ui: { listView: { initialColumns: ["name", "title", "isPublic", "sortOrder"] } },
+  fields: {
+    firm: firmRelationship(),
+    name: text({ validation: { isRequired: true, length: { max: 200 } } }),
+    slug: text({ isIndexed: true, validation: { length: { max: 80 } }, ui: { description: "Public URL handle, e.g. jane-doe. Derived from the name when left empty." } }),
+    title: text({ validation: { length: { max: 120 } }, ui: { description: "e.g. Partner, Associate, Of counsel" } }),
+    focus: text({ validation: { length: { max: 200 } } }),
+    biography: text({ ui: { displayMode: "textarea" }, validation: { length: { max: 8000 } } }),
+    admissions: text({ ui: { displayMode: "textarea", description: "Bar admissions as the firm verified them, one per line." }, validation: { length: { max: 2000 } } }),
+    email: text({ validation: { length: { max: 320 } } }),
+    practiceAreas: relationship({ ref: "PracticeArea", many: true }),
+    isPublic: checkbox({ defaultValue: false }),
+    sortOrder: integer({ defaultValue: 0 }),
     ...trackingFields,
   },
 });

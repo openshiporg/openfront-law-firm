@@ -12,24 +12,10 @@ export type PublicPracticeArea = {
   details: readonly string[]
 }
 
-export type PublicAttorney = {
-  slug: string
-  name: string
-  role: string
-  focus: string
-  summary: string
-  practiceSlugs: readonly string[]
-}
-
 export const practiceAreas: readonly PublicPracticeArea[] = []
-export const attorneys: readonly PublicAttorney[] = []
 
 export function practiceArea(slug: string) {
   return practiceAreas.find((item) => item.slug === slug)
-}
-
-export function attorney(slug: string) {
-  return attorneys.find((item) => item.slug === slug)
 }
 
 export function initialsOf(name: string) {

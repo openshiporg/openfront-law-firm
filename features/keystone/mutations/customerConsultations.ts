@@ -138,7 +138,7 @@ const SLOT_STEP_MINUTES = 30
 const CANDIDATE_STEP_MS = 15 * 60_000
 const MAX_OFFERED_SLOTS = 300
 // Fictional offline fixtures only. This is NOT a live office calendar.
-const CONSULTATION_HOURS = { open: 9 * 60, close: 17 * 60, weekdays: new Set([1, 2, 3, 4, 5]) }
+export const CONSULTATION_HOURS = { open: 9 * 60, close: 17 * 60, weekdays: new Set([1, 2, 3, 4, 5]) }
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function validTimezone(value: unknown, fallback = 'UTC') {
@@ -184,10 +184,16 @@ async function eligibleHosts(tx: any, firm: any): Promise<Host[]> {
   }
   throw new Error('Consultation capacity could not be fully checked. Contact the firm.')
 }
-function requireConfiguredConsultationCalendar(mode: AdmittedFirm['mode']) {
-  // No reviewed live hours/closures/calendar participation is implemented yet.
-  // Fail NEW admission closed rather than presenting fixture hours as capacity.
-  if (mode !== 'fixture') throw new Error('Online consultation scheduling is unavailable until the firm configures a reviewed calendar. Contact the firm.')
+/**
+ * Consultation hours are the published weekday office hours (CONSULTATION_HOURS in each
+ * host's office time zone). A live firm adopts them by publishing its policy with booking
+ * enabled, which the Public site screen states next to the booking switch; publicFirm
+ * already requires that publication. Anything else stays closed to new bookings.
+ */
+function requireConfiguredConsultationCalendar(admitted: AdmittedFirm) {
+  if (admitted.mode === 'fixture') return
+  if (admitted.mode === 'live' && admitted.policy?.status === 'published' && admitted.policy.publicBookingEnabled) return
+  throw new Error('Online consultation scheduling is unavailable. Contact the firm.')
 }
 function busyWhere(firmId: string, hostId: string, start: Date, end: Date) {
   return { firmId, hostId, status: { in: ['requested', 'scheduled'] }, startsAt: { lt: end }, endsAt: { gt: start } }
@@ -199,7 +205,7 @@ export async function consultationAvailability(_root: unknown, args: { serviceId
     const admitted = await publicFirm(tx, 'booking')
     if (!admitted) throw new Error('Consultation booking is unavailable.')
     const { firm } = admitted
-    requireConfiguredConsultationCalendar(admitted.mode)
+    requireConfiguredConsultationCalendar(admitted)
     const service = await tx.practiceArea.findFirst({ where: { id: args.serviceId, firmId: firm.id, status: 'active', isPublic: true } })
     if (!service) throw new Error('Service is unavailable.')
     const timezone = validTimezone(firm.defaultTimezone)
@@ -274,7 +280,7 @@ export async function bookClientConsultation(
     const admitted = await publicFirm(tx, 'booking')
     if (!admitted || admitted.firm.id !== firm.id) throw new Error('Consultation booking is unavailable.')
     const { mode } = admitted
-    requireConfiguredConsultationCalendar(mode) // exact accepted replay above remains available
+    requireConfiguredConsultationCalendar(admitted) // exact accepted replay above remains available
     const acknowledgment = currentAcknowledgment(admitted)
     if (args.acknowledgmentVersion !== acknowledgment.version) throw new Error('The first-contact notice has changed. Review it and submit again.')
     const service = await tx.practiceArea.findFirst({ where: { id: args.serviceId, firmId: firm.id, status: 'active', isPublic: true } })

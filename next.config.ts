@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   allowedDevOrigins: ['law-firm.local'],
   serverExternalPackages: ['graphql'],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
   images: {
     remotePatterns: [
       {

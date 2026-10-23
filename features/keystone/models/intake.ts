@@ -80,6 +80,7 @@ export const Intake = list({
       graphql: { omit: { update: true } },
     }),
     office: relationship({ ref: "Office" }),
+    practiceArea: relationship({ ref: "PracticeArea" }),
     openedBy: relationship({ ref: "User" }),
     assignedTo: relationship({ ref: "User" }),
     receivedAt: timestamp({ access: controlledIntakeIdentityAccess, graphql: { omit: { update: true } }, defaultValue: { kind: "now" }, validation: { isRequired: true } }),

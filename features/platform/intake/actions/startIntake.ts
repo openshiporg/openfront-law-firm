@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 
 export type IntakeSetup = {
   offices: Array<{ id: string; name: string; code: string }>
@@ -11,13 +12,27 @@ export type IntakeSetup = {
   membershipsCount: number
   practiceAreas: Array<{ id: string; name: string }>
   practiceAreasCount: number
-  decisionIntakes: Array<{ id: string; intakeNumber: string; title: string; primaryContact: { displayName: string } }>
+  decisionIntakes: Array<{ id: string; intakeNumber: string; title: string; primaryContact: { displayName: string }; practiceArea?: { id: string } | null }>
   decisionIntakesCount: number
   decisionPage: number
   decisionPageCount: number
+  suggestedMatterNumber: string
 }
 
-export type IntakeStartState = { ok: boolean; message: string }
+export type IntakeStartState = { ok: boolean; message: string; matterId?: string; matterNumber?: string }
+
+/** Next number in the firm's YYYY-NNN sequence (keeping any prefix such as "QA-"),
+ * read from the most recent visible matter numbers. A suggestion only: the field stays
+ * editable and the conversion command enforces uniqueness. */
+function nextMatterNumber(numbers: string[], year: string) {
+  const pattern = /^(.*?)(\d{4})-(\d+)$/
+  const parsed = numbers.map((value) => pattern.exec(value.trim())).filter((match): match is RegExpExecArray => Boolean(match))
+  const prefix = parsed[0]?.[1] ?? ''
+  const current = parsed.filter((match) => match[1] === prefix && match[2] === year)
+  const width = Math.max(3, ...current.map((match) => match[3].length))
+  const highest = Math.max(0, ...current.map((match) => Number(match[3])))
+  return `${prefix}${year}-${String(highest + 1).padStart(width, '0')}`
+}
 
 const DECISION_PAGE_SIZE = 10
 
@@ -30,7 +45,7 @@ export async function getIntakeSetup(requestedDecisionPage = 1) {
   const decisionIntakesCount = counts.data.decisionIntakesCount
   const decisionPageCount = Math.max(1, Math.ceil(decisionIntakesCount / DECISION_PAGE_SIZE))
   const decisionPage = Math.min(Math.max(Number.isSafeInteger(requestedDecisionPage) ? requestedDecisionPage : 1, 1), decisionPageCount)
-  const response = await keystoneClient<Omit<IntakeSetup, 'decisionIntakesCount' | 'decisionPage' | 'decisionPageCount'>>(`
+  const [response, timeZone] = await Promise.all([keystoneClient<Omit<IntakeSetup, 'decisionIntakesCount' | 'decisionPage' | 'decisionPageCount' | 'suggestedMatterNumber'> & { recentMatters: Array<{ matterNumber: string }> }>(`
     query IntakeSetup($decisionSkip: Int!) {
       offices(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 100) { id name code }
       officesCount(where: { status: { equals: active } })
@@ -41,12 +56,16 @@ export async function getIntakeSetup(requestedDecisionPage = 1) {
       practiceAreas(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 100) { id name }
       practiceAreasCount(where: { status: { equals: active } })
       decisionIntakes: intakes(where: { status: { equals: decision } }, orderBy: [{ receivedAt: asc }, { id: asc }], take: 10, skip: $decisionSkip) {
-        id intakeNumber title primaryContact { displayName }
+        id intakeNumber title primaryContact { displayName } practiceArea { id }
       }
+      recentMatters: matters(orderBy: [{ createdAt: desc }, { id: desc }], take: 50) { matterNumber }
     }
-  `, { decisionSkip: (decisionPage - 1) * DECISION_PAGE_SIZE })
+  `, { decisionSkip: (decisionPage - 1) * DECISION_PAGE_SIZE }), getFirmTimeZone()])
   if (!response.success) return response
-  return { success: true as const, data: { ...response.data, decisionIntakesCount, decisionPage, decisionPageCount } }
+  const year = new Intl.DateTimeFormat('en', { timeZone, year: 'numeric' }).format(new Date())
+  const { recentMatters, ...data } = response.data
+  const suggestedMatterNumber = nextMatterNumber(recentMatters.map((matter) => matter.matterNumber), year)
+  return { success: true as const, data: { ...data, decisionIntakesCount, decisionPage, decisionPageCount, suggestedMatterNumber } }
 }
 
 export async function convertIntake(_previous: IntakeStartState, formData: FormData): Promise<IntakeStartState> {
@@ -62,6 +81,9 @@ export async function convertIntake(_previous: IntakeStartState, formData: FormD
   if (!values.intakeId || !values.matterNumber || !values.title || !values.responsibleAttorneyId || values.reason.length < 10) {
     return { ok: false, message: 'Intake, matter number, title, responsible attorney, and a 10-character reason are required.' }
   }
+  if (values.matterNumber.length > 100) return { ok: false, message: 'Matter number must be 100 characters or fewer.' }
+  const taken = await keystoneClient<{ mattersCount: number }>(`query MatterNumberTaken($number: String!) { mattersCount(where: { matterNumber: { equals: $number } }) }`, { number: values.matterNumber })
+  if (taken.success && taken.data.mattersCount > 0) return { ok: false, message: `Matter number ${values.matterNumber} is already in use.` }
   const response = await keystoneClient<{ convertIntakeToMatter: { matter: { id: string; matterNumber: string; status: string }; replayed: boolean } }>(`
     mutation ConvertIntake(
       $intakeId: ID!
@@ -87,7 +109,8 @@ export async function convertIntake(_previous: IntakeStartState, formData: FormD
   revalidatePath('/dashboard/platform/intake')
   revalidatePath('/dashboard/platform/matters')
   revalidatePath('/dashboard')
-  return { ok: true, message: `${response.data.convertIntakeToMatter.matter.matterNumber} created through the atomic conversion workflow.` }
+  const matter = response.data.convertIntakeToMatter.matter
+  return { ok: true, message: `Matter ${matter.matterNumber} opened`, matterId: matter.id, matterNumber: matter.matterNumber }
 }
 
 export async function startIntake(_previous: IntakeStartState, formData: FormData): Promise<IntakeStartState> {
@@ -103,6 +126,7 @@ export async function startIntake(_previous: IntakeStartState, formData: FormDat
     summary: String(formData.get('summary') ?? ''),
     adversePartySummary: String(formData.get('adversePartySummary') ?? ''),
     officeId: String(formData.get('officeId') ?? '') || null,
+    practiceAreaId: String(formData.get('practiceAreaId') ?? '') || null,
     assignedToId: String(formData.get('assignedToId') ?? '') || null,
   }
   const response = await keystoneClient<{ startClientIntake: { intake: { id: string; intakeNumber: string }; conflictCheck: { id: string; checkNumber: string } } }>(`
@@ -118,6 +142,7 @@ export async function startIntake(_previous: IntakeStartState, formData: FormDat
       $summary: String
       $adversePartySummary: String
       $officeId: ID
+      $practiceAreaId: ID
       $assignedToId: ID
     ) {
       startClientIntake(
@@ -132,6 +157,7 @@ export async function startIntake(_previous: IntakeStartState, formData: FormDat
         summary: $summary
         adversePartySummary: $adversePartySummary
         officeId: $officeId
+        practiceAreaId: $practiceAreaId
         assignedToId: $assignedToId
       ) { intake { id intakeNumber } conflictCheck { id checkNumber } }
     }

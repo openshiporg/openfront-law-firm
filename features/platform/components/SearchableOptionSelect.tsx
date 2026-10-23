@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Search } from 'lucide-react'
 
 import { FormSelect } from '@/components/ui/form-select'
@@ -58,9 +58,24 @@ export function SearchableOptionSelect({
       if (!result.success) return setMessage(result.error)
       setFound(previous => [...new Map([...previous, ...result.data].map(option => [option.value, option])).values()])
       setNextPage(result.nextPage)
-      setMessage(result.data.length ? `Page ${result.page}: ${result.data.length} authorized matches added. ${result.nextPage ? 'More matches are available.' : 'End of matching results.'}` : 'No authorized match on this page.')
+      setMessage(result.data.length ? `${result.data.length} matches${result.nextPage ? ' · more available' : ''}` : 'No match')
     })
   }
+
+  // Pickers with no preloaded options list the first page of authorized records, so a
+  // firm with a handful of matters never has to search before choosing one.
+  const preloaded = useRef(false)
+  useEffect(() => {
+    if (preloaded.current || options.length) return
+    preloaded.current = true
+    const revision = ++searchRevision.current
+    startSearch(async () => {
+      const result = await searchPracticeOptions(kind, '', 1)
+      if (revision !== searchRevision.current || !result.success) return
+      setFound(previous => [...new Map([...previous, ...result.data].map(option => [option.value, option])).values()])
+      setNextPage(result.nextPage)
+    })
+  }, [kind, options.length])
 
   return (
     <div className="grid min-w-0 gap-1.5">
@@ -90,7 +105,7 @@ export function SearchableOptionSelect({
             placeholder={total === undefined ? 'Search' : `Search all ${total.toLocaleString()}`}
             className={cn(fieldClass, 'rounded-full')}
           />
-          <div className={trackClass}>
+          <div className={cn(trackClass, 'shrink-0 overflow-visible')}>
             <button type="button" className={trackItemClass(true)} onClick={() => search()} disabled={searching}>
               <Search className="size-3.5" aria-hidden="true" />Find
             </button>

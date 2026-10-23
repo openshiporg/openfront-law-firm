@@ -9,7 +9,7 @@ export default function OnboardingDialog({ isOpen, onClose }: { isOpen: boolean;
           <DialogTitle className="text-base font-semibold">Firm setup</DialogTitle>
           <DialogDescription className="text-xs">Workspace settings</DialogDescription>
         </DialogHeader>
-        <FirmSetupForm />
+        <FirmSetupForm inDialog />
       </DialogContent>
     </Dialog>
   )

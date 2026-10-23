@@ -52,7 +52,7 @@ export async function createDeskRecord(_previous: DeskCreateState, formData: For
 
     if (kind === 'task') {
       const response = await keystoneClient<{ createLegalTask: { id: string } | null }>(`mutation CreateDeskTask($data: LegalTaskCreateInput!) { createLegalTask(data: $data) { id } }`, {
-        data: { matter, title: text(formData, 'title', { max: 300, label: 'Title' }), priority: choice(formData, 'priority', priorities, 'priority'), ...(formData.get('dueAt') ? { dueAt: instant(formData, 'dueAt', 'Due time') } : {}) },
+        data: { matter, title: text(formData, 'title', { max: 300, label: 'Title' }), priority: choice(formData, 'priority', priorities, 'priority'), ...(formData.get('dueAt') ? { dueAt: instant(formData, 'dueAt', 'Due time') } : {}), ...(String(formData.get('assignedToId') ?? '').trim() ? { assignedTo: { connect: { id: String(formData.get('assignedToId')).trim().slice(0, 200) } } } : {}) },
       })
       if (!response.success || !response.data.createLegalTask) throw new Error(response.success ? 'The task was not created.' : response.error)
       revalidatePath('/dashboard/platform/work')
@@ -96,6 +96,41 @@ export async function createDeskRecord(_previous: DeskCreateState, formData: For
         return { ok: false, message: `The conversation was created, but its draft message was not: ${message.success ? 'no record returned' : message.error}`, href: `/dashboard/platform/communications/thread/${encodeURIComponent(threadId)}` }
       }
       return { ok: true, message: 'Draft message created. Add recipients and queue it through the controlled delivery workflow.', href: `/dashboard/platform/communications/message/${encodeURIComponent(message.data.createCommunicationMessage.id)}` }
+    }
+
+    if (kind === 'time') {
+      const hours = Number(String(formData.get('hours') ?? '').trim() || '0')
+      const minutes = Number(String(formData.get('minutes') ?? '').trim() || '0')
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || minutes < 0) throw new Error('Enter the time spent.')
+      const durationMinutes = Math.round(hours * 60 + minutes)
+      if (durationMinutes < 1 || durationMinutes > 24 * 60) throw new Error('Time spent must be between 1 minute and 24 hours.')
+      const viewer = await keystoneClient<{ authenticatedItem: { id: string } | null }>('query TimeViewer { authenticatedItem { ... on User { id } } }')
+      if (!viewer.success || !viewer.data.authenticatedItem?.id) throw new Error('Sign in again to record time.')
+      const response = await keystoneClient<{ createTimeEntry: { id: string } | null }>(`mutation CreateDeskTime($data: TimeEntryCreateInput!) { createTimeEntry(data: $data) { id } }`, {
+        data: {
+          matter,
+          user: { connect: { id: viewer.data.authenticatedItem.id } },
+          workDate: instant(formData, 'workDate', 'Date worked'),
+          durationMinutes,
+          description: text(formData, 'description', { min: 3, max: 2000, label: 'Work description' }),
+          isBillable: formData.get('isBillable') === 'on',
+        },
+      })
+      if (!response.success || !response.data.createTimeEntry) throw new Error(response.success ? 'The time entry was not created.' : 'The time entry was not created. Billing permission on this matter is required.')
+      revalidatePath('/dashboard/platform/time-expenses')
+      return { ok: true, message: `Draft time entry created (${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'}).`, href: `/dashboard/platform/time-expenses/time-entry/${encodeURIComponent(response.data.createTimeEntry.id)}` }
+    }
+
+    if (kind === 'party') {
+      const contactId = text(formData, 'contactId', { max: 200, label: 'Contact' })
+      const partyRole = text(formData, 'partyRole', { max: 60, label: 'Role' })
+      const side = String(formData.get('side') ?? '').trim() || 'unknown'
+      const response = await keystoneClient<{ addMatterParty: { id: string } }>(`mutation AddDeskParty($matterId: ID!, $contactId: ID!, $partyRole: String!, $side: String, $notes: String) { addMatterParty(matterId: $matterId, contactId: $contactId, partyRole: $partyRole, side: $side, notes: $notes) { id } }`, {
+        matterId, contactId, partyRole, side, notes: String(formData.get('notes') ?? '').trim().slice(0, 2000) || null,
+      })
+      if (!response.success) throw new Error('The party was not added. The contact may already have that role, or matter edit access is required.')
+      revalidatePath(`/dashboard/platform/matters/${matterId}`)
+      return { ok: true, message: 'Party added. A conflict re-review was requested for this party.' }
     }
 
     if (kind === 'expense') {

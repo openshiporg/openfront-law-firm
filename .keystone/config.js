@@ -102,8 +102,11 @@ function activeFirmId(session) {
 function isSignedIn({ session }) {
   return Boolean(session?.itemId);
 }
-function isInteractiveHumanSession(session) {
+function isHumanIdentitySession(session) {
   return Boolean(session?.itemId) && (!session?.authenticationType || session.authenticationType === "human") && !session?.credentialId && !session?.oauthClientId && !session?.agentPrincipalId && !session?.agentExecution;
+}
+function isInteractiveHumanSession(session) {
+  return isHumanIdentitySession(session) && session.data.status === "active";
 }
 function isInteractiveHuman({ session }) {
   return isInteractiveHumanSession(session);
@@ -121,18 +124,18 @@ function hasPermission({ session }, permission) {
   );
   if (!firmId) {
     if (isMachine) return false;
-    return bootstrapPermissions.has(permission) && (session.data.role?.status ?? "active") === "active" && Boolean(session.data.role?.[permission]);
+    return session.data.role?.firm === null && bootstrapPermissions.has(permission) && (session.data.role?.status ?? "active") === "active" && Boolean(session.data.role?.[permission]);
   }
   if (!["onboarding", "active"].includes(session.data.activeFirm?.status ?? "active")) return false;
   const memberships = session.data.firmMemberships ?? [];
   const activeMembership = memberships.find(
     (membership) => membership.status === "active" && membership.firm?.id === firmId
   );
-  if (activeMembership && (activeMembership.role?.status ?? "active") === "active") {
-    return isMachine ? machineHasPermission(session, permission) : Boolean(activeMembership.role?.[permission]);
+  if (activeMembership?.role?.firm?.id === firmId && activeMembership.role.status === "active") {
+    return activeMembership.role[permission] === true && (!isMachine || machineHasPermission(session, permission));
   }
   if (isMachine) return false;
-  const isUnboundBootstrap = session.data.role?.firm === null && memberships.every(
+  const isUnboundBootstrap = session.data.activeFirm?.status === "onboarding" && bootstrapPermissions.has(permission) && session.data.role?.firm === null && memberships.every(
     (membership) => membership.status === "invited" && membership.firm?.id === firmId
   );
   return isUnboundBootstrap && (session.data.role?.status ?? "active") === "active" && Boolean(session.data.role?.[permission]);
@@ -478,6 +481,28 @@ var import_fields3 = require("@keystone-6/core/fields");
 // features/keystone/tenancy.ts
 var import_node_crypto = require("node:crypto");
 var import_client = require("@prisma/client");
+
+// features/keystone/lib/matter-access.ts
+function accessibleMatterStorageWhere(firmId, userId) {
+  return {
+    firmId,
+    AND: [
+      {
+        OR: [
+          { confidentiality: { not: "restricted" } },
+          {
+            AND: [
+              { authorizedUsers: { some: { id: userId } } },
+              { teamMembers: { some: { firmId, userId, status: "active", canAccessRestricted: true } } }
+            ]
+          }
+        ]
+      },
+      { blockedUsers: { none: { id: userId } } },
+      { ethicalWalls: { none: { status: "active", members: { some: { userId, status: "active", decision: "blocked" } } } } }
+    ]
+  };
+}
 
 // features/keystone/lib/lifecycles.ts
 var lifecycles = {
@@ -907,39 +932,7 @@ async function validateMatterAccess({
   const matter = await prisma.matter.findFirst({
     where: {
       id: matterId,
-      firmId,
-      AND: [
-        {
-          OR: [
-            { confidentiality: { not: "restricted" } },
-            {
-              teamMembers: {
-                some: {
-                  userId,
-                  status: "active",
-                  canAccessRestricted: true
-                }
-              }
-            }
-          ]
-        },
-        {
-          NOT: {
-            ethicalWalls: {
-              some: {
-                status: "active",
-                members: {
-                  some: {
-                    userId,
-                    status: "active",
-                    decision: "blocked"
-                  }
-                }
-              }
-            }
-          }
-        }
-      ]
+      ...accessibleMatterStorageWhere(firmId, userId)
     },
     select: { id: true }
   });
@@ -1295,7 +1288,7 @@ var DashboardAdmission = import_core.graphql.object()({
   }
 });
 function viewerDashboardAdmission(session, userId) {
-  if (!isInteractiveHumanSession(session) || session.itemId !== userId) return null;
+  if (!isHumanIdentitySession(session) || session.itemId !== userId) return null;
   return {
     canAccessDashboard: permissions.canAccessDashboard({ session }),
     canManageOnboarding: permissions.canManageOnboarding({ session })
@@ -1446,7 +1439,9 @@ var User = (0, import_core.list)({
     }),
     activeFirm: (0, import_fields3.relationship)({
       ref: "Firm.activeUsers",
-      access: { create: permissions.canManageFirm, update: permissions.canManageFirm }
+      // Selection changes affect current administrator viability. Generated
+      // nested/bulk/self writes cannot bypass the controlled setup/join path.
+      access: { create: permissions.canManageFirm, update: import_access3.denyAll }
     }),
     firmMemberships: readOnlyRelationship("FirmMembership.user", true),
     consultations: readOnlyRelationship("Consultation.account", true),
@@ -2462,6 +2457,7 @@ var Intake = (0, import_core6.list)({
       graphql: { omit: { update: true } }
     }),
     office: (0, import_fields13.relationship)({ ref: "Office" }),
+    practiceArea: (0, import_fields13.relationship)({ ref: "PracticeArea" }),
     openedBy: (0, import_fields13.relationship)({ ref: "User" }),
     assignedTo: (0, import_fields13.relationship)({ ref: "User" }),
     receivedAt: (0, import_fields13.timestamp)({ access: controlledIntakeIdentityAccess, graphql: { omit: { update: true } }, defaultValue: { kind: "now" }, validation: { isRequired: true } }),
@@ -5220,6 +5216,342 @@ var Refund = (0, import_core14.list)({
 var import_core15 = require("@keystone-6/core");
 var import_fields31 = require("@keystone-6/core/fields");
 
+// features/keystone/lib/agent-controls.ts
+var import_node_crypto4 = require("node:crypto");
+var highRiskAgentActions = /* @__PURE__ */ new Set([
+  "privileged.read",
+  "communication.send",
+  "document.publish",
+  "signature.send",
+  "matter.transition",
+  "conflict.resolve",
+  "invoice.issue",
+  "billing.write",
+  "payment.capture",
+  "payment.refund",
+  "trust.post",
+  "retention.dispose",
+  "access.change"
+]);
+var denied = (reason, requiresApproval = false) => ({ allowed: false, requiresApproval, reason });
+function isExpired(value, now) {
+  if (!value) return false;
+  const timestamp21 = Date.parse(value);
+  return !Number.isFinite(timestamp21) || timestamp21 <= now.getTime();
+}
+function authorizeAgentAction(input) {
+  const { grant } = input;
+  if (grant.firmId !== input.activeFirmId) {
+    return denied("Agent grant does not belong to the active firm.");
+  }
+  if (grant.status !== "active") return denied("Agent grant is not active.");
+  if (isExpired(grant.expiresAt, input.now)) return denied("Agent grant has expired.");
+  if (input.matterId && grant.matterId !== input.matterId) {
+    return denied("Agent grant does not cover the requested matter.");
+  }
+  if (!grant.capabilities.includes(input.actionType)) {
+    return denied("Agent grant does not include the requested capability.");
+  }
+  const requiresApproval = highRiskAgentActions.has(input.actionType);
+  if (!requiresApproval) return { allowed: true, requiresApproval: false, reason: null };
+  const { approval } = input;
+  if (!approval) {
+    return denied("A current human approval is required for this action.", true);
+  }
+  if (approval.status !== "approved") return denied("Agent action approval is not approved.", true);
+  if (approval.firmId !== input.activeFirmId) {
+    return denied("Agent action approval does not belong to the active firm.", true);
+  }
+  if ((approval.matterId ?? null) !== (input.matterId ?? null)) {
+    return denied("Agent action approval does not cover the requested matter.", true);
+  }
+  if (approval.actionType !== input.actionType) {
+    return denied("Agent action approval does not match the requested action.", true);
+  }
+  if (approval.requestDigest !== input.requestDigest) {
+    return denied("Agent action approval digest does not match the request digest.", true);
+  }
+  if (isExpired(approval.expiresAt, input.now)) {
+    return denied("Agent action approval has expired.", true);
+  }
+  if (!approval.approverUserId || !approval.approverCanApproveAgentActions) {
+    return denied("A human approver with agent-approval authority is required.", true);
+  }
+  if (!approval.approverHasDomainPermission) {
+    return denied("The human approver lacks the required domain permission.", true);
+  }
+  return { allowed: true, requiresApproval: true, reason: null };
+}
+function computeAgentApprovalDigest(input) {
+  return (0, import_node_crypto4.createHash)("sha256").update(JSON.stringify({
+    actionId: input.actionId,
+    actionType: input.actionType,
+    matterId: input.matterId,
+    requestDigest: input.requestDigest,
+    approvalExpiresAt: input.approvalExpiresAt.toISOString()
+  })).digest("hex");
+}
+var AGENT_EXECUTION_LEASE_MS = 15 * 60 * 1e3;
+var replaySafeAgentActions = /* @__PURE__ */ new Set([
+  "task.draft",
+  "matter.transition",
+  "payment.capture",
+  "payment.refund",
+  "trust.post",
+  "signature.send"
+]);
+function agentExecutionLeaseExpired(startedAt, now) {
+  return !startedAt || now.getTime() - startedAt.getTime() >= AGENT_EXECUTION_LEASE_MS;
+}
+
+// features/keystone/lib/machine-auth.ts
+var import_node_crypto5 = require("node:crypto");
+var tokenTags = {
+  api_key: "olfk",
+  oauth_access: "olfoa",
+  oauth_refresh: "olfor",
+  oauth_code: "olfoc",
+  oauth_client: "olfcs",
+  agent: "olfa",
+  portal_invite: "olfpi",
+  portal_session: "olfps"
+};
+var tagKinds = new Map(Object.entries(tokenTags).map(([kind, tag]) => [tag, kind]));
+var tokenPattern = /^([a-z]+)_([a-f0-9]{16})_([A-Za-z0-9_-]{43})$/;
+var availableMachineScopes = Object.freeze(Object.keys(machineScopePermissionMap));
+function credentialPepper(override) {
+  const value = override ?? process.env.MACHINE_CREDENTIAL_PEPPER ?? process.env.SESSION_SECRET;
+  if (!value || Buffer.byteLength(value, "utf8") < 32) {
+    throw new Error("MACHINE_CREDENTIAL_PEPPER or SESSION_SECRET must be at least 32 bytes.");
+  }
+  return value;
+}
+function credentialDigest(kind, token, pepper) {
+  return (0, import_node_crypto5.createHmac)("sha256", credentialPepper(pepper)).update(kind).update("\0").update(token).digest("hex");
+}
+function issueCredential(kind, pepper) {
+  const prefix = (0, import_node_crypto5.randomBytes)(8).toString("hex");
+  const token = `${tokenTags[kind]}_${prefix}_${(0, import_node_crypto5.randomBytes)(32).toString("base64url")}`;
+  return {
+    token,
+    prefix,
+    digest: credentialDigest(kind, token, pepper)
+  };
+}
+function parseCredential(value) {
+  if (!value || value.length > 128) return null;
+  const match = value.match(tokenPattern);
+  if (!match) return null;
+  const kind = tagKinds.get(match[1]);
+  if (!kind) return null;
+  return { kind, prefix: match[2], token: value };
+}
+function normalizeMachineScopes(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
+    throw new Error("At least one and at most twenty machine scopes are required.");
+  }
+  const scopes = [...new Set(value.map((scope) => String(scope).trim()).filter(Boolean))];
+  if (!scopes.length || scopes.some((scope) => !availableMachineScopes.includes(scope))) {
+    throw new Error("Machine scopes contain an unsupported value.");
+  }
+  return scopes;
+}
+function normalizedScopeSet(value) {
+  if (!Array.isArray(value)) return /* @__PURE__ */ new Set();
+  try {
+    return new Set(normalizeMachineScopes(value));
+  } catch {
+    return /* @__PURE__ */ new Set();
+  }
+}
+function effectiveOAuthScopes(session, input) {
+  const firmId = session?.data.activeFirm?.id;
+  if (!session?.itemId || session.data.status !== "active" || !firmId || !["onboarding", "active"].includes(session.data.activeFirm?.status ?? "")) return [];
+  const membership = session.data.firmMemberships?.find(
+    (candidate) => candidate.status === "active" && candidate.firm?.id === firmId && candidate.role?.status === "active" && candidate.role.firm?.id === firmId
+  );
+  const role = membership?.role;
+  if (!role) return [];
+  const roleScopes = new Set(availableMachineScopes.filter(
+    (scope) => machineScopePermissionMap[scope].every((permission) => role[permission] === true)
+  ));
+  const clientScopes = normalizedScopeSet(input.clientAllowedScopes);
+  const consentScopes = normalizedScopeSet(input.consentScopes);
+  const tokenScopes = normalizedScopeSet(input.tokenScopes);
+  return availableMachineScopes.filter(
+    (scope) => roleScopes.has(scope) && clientScopes.has(scope) && consentScopes.has(scope) && tokenScopes.has(scope)
+  );
+}
+function normalizeAgentCapabilities(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
+    throw new Error("At least one and at most twenty agent capabilities are required.");
+  }
+  const capabilities = [...new Set(value.map((capability) => String(capability).trim()).filter(Boolean))];
+  if (!capabilities.every((capability) => /^[a-z]+(?:[._-][a-z]+)+$/.test(capability))) {
+    throw new Error("Agent capabilities contain an unsupported value.");
+  }
+  return capabilities;
+}
+function normalizeRedirectUri(value) {
+  const uri = new URL(value);
+  const loopbackHttp = uri.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(uri.hostname);
+  if (uri.protocol !== "https:" && !loopbackHttp || uri.username || uri.password || uri.hash) {
+    throw new Error("Redirect URIs require HTTPS or loopback HTTP and cannot contain credentials or fragments.");
+  }
+  return uri.href;
+}
+function normalizeRedirectUris(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
+    throw new Error("OAuth clients require between one and twenty redirect URIs.");
+  }
+  return [...new Set(value.map((uri) => normalizeRedirectUri(String(uri))))];
+}
+var roleSelect = {
+  id: true,
+  name: true,
+  status: true,
+  firmId: true,
+  ...Object.fromEntries(permissionKeys.map((permission) => [permission, true]))
+};
+var userSelect = {
+  id: true,
+  name: true,
+  status: true,
+  activeFirm: { select: { id: true, name: true, displayName: true, shortName: true, brandTagline: true, brandColor: true, supportEmail: true, status: true } },
+  bootstrapRole: { select: roleSelect },
+  firmMemberships: {
+    select: {
+      id: true,
+      status: true,
+      firm: { select: { id: true } },
+      role: { select: roleSelect }
+    }
+  }
+};
+function sessionRole(role) {
+  if (!role) return null;
+  const { firmId, ...fields } = role;
+  return { ...fields, firm: firmId ? { id: firmId } : null };
+}
+function machineSession({
+  user,
+  authenticationType,
+  scopes,
+  credentialId,
+  oauthClientId,
+  agentPrincipalId,
+  agentCapabilities
+}) {
+  const firmId = user?.activeFirm?.id;
+  if (!user?.id || user.status !== "active" || !firmId) return null;
+  const memberships = (user.firmMemberships ?? []).map((membership) => ({
+    id: membership.id,
+    status: membership.status,
+    firm: membership.firm,
+    role: sessionRole(membership.role)
+  }));
+  const activeMembership = memberships.find(
+    (membership) => membership.status === "active" && membership.firm?.id === firmId && membership.role?.status === "active" && membership.role?.firm?.id === firmId
+  );
+  if (!activeMembership || !["onboarding", "active"].includes(user.activeFirm.status)) return null;
+  return {
+    itemId: user.id,
+    listKey: "User",
+    authenticationType,
+    machineScopes: scopes,
+    ...credentialId ? { credentialId } : {},
+    oauthClientId,
+    agentPrincipalId,
+    agentCapabilities,
+    data: {
+      name: user.name,
+      status: user.status,
+      activeFirm: user.activeFirm,
+      role: sessionRole(user.bootstrapRole),
+      firmMemberships: memberships
+    }
+  };
+}
+async function loadActiveHumanSession(prisma, userId, expectedFirmId) {
+  prisma = prismaWithoutGraphQLErrorConversion(prisma);
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: userSelect });
+  if (user?.activeFirm?.id !== expectedFirmId) return null;
+  return machineSession({
+    user,
+    authenticationType: "human",
+    scopes: [],
+    credentialId: ""
+  });
+}
+
+// features/keystone/mutations/command-authority.ts
+async function lockCurrentFirmMember(tx, userId, firmId) {
+  await tx.$executeRaw`SELECT u.id FROM "User" u
+    JOIN "FirmMembership" m ON m."user" = u.id AND m.firm = ${firmId}
+    JOIN "Role" r ON r.id = m.role AND r.firm = m.firm
+    JOIN "Firm" f ON f.id = m.firm
+    WHERE u.id = ${userId} AND u."activeFirm" = f.id
+    ORDER BY r.id, m.id FOR SHARE OF u, m, r, f`;
+  return loadActiveHumanSession(tx, userId, firmId);
+}
+async function assertCurrentCommandActor(tx, context, permission) {
+  const session = context.session;
+  const firmId = activeFirmId(session);
+  if (!session?.itemId || !firmId) throw new Error("Current command authority is required.");
+  const current = await lockCurrentFirmMember(tx, session.itemId, firmId);
+  if (!current || current.data.activeFirm?.status !== "active") throw new Error("Current command authority is required.");
+  const type = session.authenticationType || "human";
+  if (type === "human") {
+    if (!permissions[permission]({ session: current })) throw new Error("Current command authority is required.");
+    const execution = session.agentExecution;
+    if (session.agentPrincipalId) {
+      if (!execution?.actionId || !execution?.credentialSession || typeof execution.claimStartedAt !== "string" || !Number.isFinite(Date.parse(execution.claimStartedAt))) throw new Error("Agent execution claim binding is required.");
+      await tx.$executeRaw`SELECT a.id FROM "AgentAction" a JOIN "AgentGrant" g ON g.id = a.grant JOIN "AgentPrincipal" p ON p.id = a."agentPrincipal" WHERE a.id = ${execution.actionId} FOR SHARE OF a,g,p`;
+      const action = await tx.agentAction.findFirst({ where: { id: execution.actionId, firmId, agentPrincipalId: session.agentPrincipalId, status: "executing", startedAt: new Date(execution.claimStartedAt), grant: { status: "active" }, agentPrincipal: { status: "active" } }, include: { grant: true } });
+      if (!action || action.approvedById && action.approvedById !== session.itemId || action.grant.startsAt && action.grant.startsAt > /* @__PURE__ */ new Date() || action.grant.expiresAt && action.grant.expiresAt <= /* @__PURE__ */ new Date() || !Array.isArray(action.grant.capabilities) || !action.grant.capabilities.includes(action.actionType)) throw new Error("Current agent execution authority is required.");
+      if (highRiskAgentActions.has(action.actionType)) {
+        const expiresAt = action.approvalExpiresAt;
+        if (!action.approvedById || !expiresAt || expiresAt <= /* @__PURE__ */ new Date() || action.approvalDigest !== computeAgentApprovalDigest({
+          actionId: action.id,
+          actionType: action.actionType,
+          matterId: action.matterId,
+          requestDigest: action.requestDigest,
+          approvalExpiresAt: expiresAt
+        }) || !permissions.canApproveAgentActions({ session: current })) throw new Error("Current agent approval authority is required.");
+      }
+      await assertCurrentAgentCredential(tx, context.withSession(execution.credentialSession), action.actionType);
+    }
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  if (type === "api_key") {
+    await tx.$executeRaw`SELECT id FROM "ApiKey" WHERE id = ${session.credentialId || ""} FOR SHARE`;
+    const key = await tx.apiKey.findFirst({ where: { id: session.credentialId, firmId, ownerId: session.itemId, status: "active" } });
+    if (!key || key.expiresAt && key.expiresAt <= now) throw new Error("Current credential authority is required.");
+    const scoped = { ...current, authenticationType: type, machineScopes: normalizeMachineScopes(key.scopes) };
+    if (!permissions[permission]({ session: scoped })) throw new Error("Current credential authority is required.");
+    return;
+  }
+  if (type === "oauth") {
+    await tx.$executeRaw`SELECT t.id FROM "OAuthToken" t JOIN "OAuthClient" c ON c.id = t.client JOIN "OAuthConsent" s ON s.id = t.consent WHERE t.id = ${session.credentialId || ""} FOR SHARE OF t,c,s`;
+    const token = await tx.oAuthToken.findFirst({ where: { id: session.credentialId, firmId, userId: session.itemId, status: "active", tokenType: "access_token", expiresAt: { gt: now }, client: { status: "active", firmId }, consent: { status: "active" } }, include: { client: true, consent: true } });
+    if (!token) throw new Error("Current credential authority is required.");
+    const scopes = effectiveOAuthScopes(current, { clientAllowedScopes: token.client.allowedScopes, consentScopes: token.consent.scopes, tokenScopes: token.scopes });
+    if (!permissions[permission]({ session: { ...current, authenticationType: type, machineScopes: scopes } })) throw new Error("Current credential authority is required.");
+    return;
+  }
+  throw new Error("Direct command authority is unavailable for this credential type.");
+}
+async function assertCurrentAgentCredential(tx, context, capability) {
+  const session = context.session;
+  const firmId = activeFirmId(session);
+  if (!session?.itemId || !firmId || session.authenticationType !== "agent" || !session.credentialId || !session.agentPrincipalId) throw new Error("Current agent credential is required.");
+  await tx.$executeRaw`SELECT c.id FROM "AgentCredential" c JOIN "AgentPrincipal" p ON p.id = c."agentPrincipal" WHERE c.id = ${session.credentialId} FOR SHARE OF c,p`;
+  const current = await lockCurrentFirmMember(tx, session.itemId, firmId);
+  const credential = await tx.agentCredential.findFirst({ where: { id: session.credentialId, firmId, status: "active", agentPrincipalId: session.agentPrincipalId, agentPrincipal: { status: "active", firmId, ownerId: session.itemId } } });
+  if (!current || current.data.activeFirm?.status !== "active" || !credential || credential.expiresAt && credential.expiresAt <= /* @__PURE__ */ new Date() || !normalizeAgentCapabilities(credential.scopes).includes(capability)) throw new Error("Current agent credential is required.");
+}
+
 // features/keystone/lib/portal-policy.ts
 var PORTAL_POLICY_STATUSES = ["open", "on_hold", "closing"];
 var PORTAL_POLICY_REVIEW_STATUSES = ["proposed", "pending_conflict", ...PORTAL_POLICY_STATUSES, "closed", "declined"];
@@ -5234,6 +5566,7 @@ function normalizePortalPolicy(mode, statuses) {
   return { mode, statuses: normalized, admission: mode === "read_intersection" && conservativeStatuses ? "admitted" : "review_required" };
 }
 async function assertCurrentPortalActor(tx, firmId, userId, required) {
+  await lockCurrentFirmMember(tx, userId, firmId);
   const actor = await tx.user.findFirst({
     where: { id: userId, status: "active", activeFirmId: firmId, firmMemberships: { some: {
       firmId,
@@ -6518,6 +6851,50 @@ var PublicSitePolicy = (0, import_core19.list)({
     ...trackingFields
   }
 });
+var profileHooks = firmOwnedHooks();
+function profileSlug(resolvedData, item) {
+  if (typeof resolvedData.slug === "string") resolvedData.slug = normalizePublicSlug(resolvedData.slug);
+  if (!(resolvedData.slug ?? item?.slug)) resolvedData.slug = normalizePublicSlug(resolvedData.name ?? item?.name);
+  return resolvedData;
+}
+var AttorneyProfile = (0, import_core19.list)({
+  db: uniqueConstraints(["firmId", "slug"]),
+  access: {
+    operation: { query: permissions.canManageFirm, create: humanFirmManager, update: humanFirmManager, delete: humanFirmManager },
+    filter: { query: rules.activeFirmOwned, update: rules.activeFirmOwned, delete: rules.activeFirmOwned }
+  },
+  hooks: {
+    ...profileHooks,
+    resolveInput: {
+      create: (args) => profileSlug(profileHooks.resolveInput.create(args), null),
+      update: ({ resolvedData, item }) => profileSlug(resolvedData, item)
+    },
+    validate: {
+      create: async (args) => {
+        await profileHooks.validate.create(args);
+        if (!args.resolvedData?.slug) args.addValidationError("A web address is required.");
+      },
+      update: async (args) => {
+        await profileHooks.validate.update(args);
+      }
+    }
+  },
+  ui: { listView: { initialColumns: ["name", "title", "isPublic", "sortOrder"] } },
+  fields: {
+    firm: firmRelationship(),
+    name: (0, import_fields39.text)({ validation: { isRequired: true, length: { max: 200 } } }),
+    slug: (0, import_fields39.text)({ isIndexed: true, validation: { length: { max: 80 } }, ui: { description: "Public URL handle, e.g. jane-doe. Derived from the name when left empty." } }),
+    title: (0, import_fields39.text)({ validation: { length: { max: 120 } }, ui: { description: "e.g. Partner, Associate, Of counsel" } }),
+    focus: (0, import_fields39.text)({ validation: { length: { max: 200 } } }),
+    biography: (0, import_fields39.text)({ ui: { displayMode: "textarea" }, validation: { length: { max: 8e3 } } }),
+    admissions: (0, import_fields39.text)({ ui: { displayMode: "textarea", description: "Bar admissions as the firm verified them, one per line." }, validation: { length: { max: 2e3 } } }),
+    email: (0, import_fields39.text)({ validation: { length: { max: 320 } } }),
+    practiceAreas: (0, import_fields39.relationship)({ ref: "PracticeArea", many: true }),
+    isPublic: (0, import_fields39.checkbox)({ defaultValue: false }),
+    sortOrder: (0, import_fields39.integer)({ defaultValue: 0 }),
+    ...trackingFields
+  }
+});
 
 // features/keystone/models/agents.ts
 var import_core20 = require("@keystone-6/core");
@@ -6942,7 +7319,8 @@ var modelDefinitions = {
   AgentGrant,
   AgentAction,
   AgentActionEvent,
-  PublicSitePolicy
+  PublicSitePolicy,
+  AttorneyProfile
 };
 var models = Object.fromEntries(
   Object.entries(modelDefinitions).map(([key, model]) => [
@@ -6957,345 +7335,12 @@ var models = Object.fromEntries(
 // features/keystone/mutations/index.ts
 var import_schema = require("@graphql-tools/schema");
 
-// features/keystone/lib/agent-controls.ts
-var import_node_crypto4 = require("node:crypto");
-var highRiskAgentActions = /* @__PURE__ */ new Set([
-  "privileged.read",
-  "communication.send",
-  "document.publish",
-  "signature.send",
-  "matter.transition",
-  "conflict.resolve",
-  "invoice.issue",
-  "billing.write",
-  "payment.capture",
-  "payment.refund",
-  "trust.post",
-  "retention.dispose",
-  "access.change"
-]);
-var denied = (reason, requiresApproval = false) => ({ allowed: false, requiresApproval, reason });
-function isExpired(value, now) {
-  if (!value) return false;
-  const timestamp21 = Date.parse(value);
-  return !Number.isFinite(timestamp21) || timestamp21 <= now.getTime();
-}
-function authorizeAgentAction(input) {
-  const { grant } = input;
-  if (grant.firmId !== input.activeFirmId) {
-    return denied("Agent grant does not belong to the active firm.");
-  }
-  if (grant.status !== "active") return denied("Agent grant is not active.");
-  if (isExpired(grant.expiresAt, input.now)) return denied("Agent grant has expired.");
-  if (input.matterId && grant.matterId !== input.matterId) {
-    return denied("Agent grant does not cover the requested matter.");
-  }
-  if (!grant.capabilities.includes(input.actionType)) {
-    return denied("Agent grant does not include the requested capability.");
-  }
-  const requiresApproval = highRiskAgentActions.has(input.actionType);
-  if (!requiresApproval) return { allowed: true, requiresApproval: false, reason: null };
-  const { approval } = input;
-  if (!approval) {
-    return denied("A current human approval is required for this action.", true);
-  }
-  if (approval.status !== "approved") return denied("Agent action approval is not approved.", true);
-  if (approval.firmId !== input.activeFirmId) {
-    return denied("Agent action approval does not belong to the active firm.", true);
-  }
-  if ((approval.matterId ?? null) !== (input.matterId ?? null)) {
-    return denied("Agent action approval does not cover the requested matter.", true);
-  }
-  if (approval.actionType !== input.actionType) {
-    return denied("Agent action approval does not match the requested action.", true);
-  }
-  if (approval.requestDigest !== input.requestDigest) {
-    return denied("Agent action approval digest does not match the request digest.", true);
-  }
-  if (isExpired(approval.expiresAt, input.now)) {
-    return denied("Agent action approval has expired.", true);
-  }
-  if (!approval.approverUserId || !approval.approverCanApproveAgentActions) {
-    return denied("A human approver with agent-approval authority is required.", true);
-  }
-  if (!approval.approverHasDomainPermission) {
-    return denied("The human approver lacks the required domain permission.", true);
-  }
-  return { allowed: true, requiresApproval: true, reason: null };
-}
-function computeAgentApprovalDigest(input) {
-  return (0, import_node_crypto4.createHash)("sha256").update(JSON.stringify({
-    actionId: input.actionId,
-    actionType: input.actionType,
-    matterId: input.matterId,
-    requestDigest: input.requestDigest,
-    approvalExpiresAt: input.approvalExpiresAt.toISOString()
-  })).digest("hex");
-}
-var AGENT_EXECUTION_LEASE_MS = 15 * 60 * 1e3;
-var replaySafeAgentActions = /* @__PURE__ */ new Set([
-  "task.draft",
-  "matter.transition",
-  "payment.capture",
-  "payment.refund",
-  "trust.post",
-  "signature.send"
-]);
-function agentExecutionLeaseExpired(startedAt, now) {
-  return !startedAt || now.getTime() - startedAt.getTime() >= AGENT_EXECUTION_LEASE_MS;
-}
-
-// features/keystone/lib/machine-auth.ts
-var import_node_crypto5 = require("node:crypto");
-var tokenTags = {
-  api_key: "olfk",
-  oauth_access: "olfoa",
-  oauth_refresh: "olfor",
-  oauth_code: "olfoc",
-  oauth_client: "olfcs",
-  agent: "olfa",
-  portal_invite: "olfpi",
-  portal_session: "olfps"
-};
-var tagKinds = new Map(Object.entries(tokenTags).map(([kind, tag]) => [tag, kind]));
-var tokenPattern = /^([a-z]+)_([a-f0-9]{16})_([A-Za-z0-9_-]{43})$/;
-var availableMachineScopes = Object.freeze(Object.keys(machineScopePermissionMap));
-function credentialPepper(override) {
-  const value = override ?? process.env.MACHINE_CREDENTIAL_PEPPER ?? process.env.SESSION_SECRET;
-  if (!value || Buffer.byteLength(value, "utf8") < 32) {
-    throw new Error("MACHINE_CREDENTIAL_PEPPER or SESSION_SECRET must be at least 32 bytes.");
-  }
-  return value;
-}
-function credentialDigest(kind, token, pepper) {
-  return (0, import_node_crypto5.createHmac)("sha256", credentialPepper(pepper)).update(kind).update("\0").update(token).digest("hex");
-}
-function issueCredential(kind, pepper) {
-  const prefix = (0, import_node_crypto5.randomBytes)(8).toString("hex");
-  const token = `${tokenTags[kind]}_${prefix}_${(0, import_node_crypto5.randomBytes)(32).toString("base64url")}`;
-  return {
-    token,
-    prefix,
-    digest: credentialDigest(kind, token, pepper)
-  };
-}
-function parseCredential(value) {
-  if (!value || value.length > 128) return null;
-  const match = value.match(tokenPattern);
-  if (!match) return null;
-  const kind = tagKinds.get(match[1]);
-  if (!kind) return null;
-  return { kind, prefix: match[2], token: value };
-}
-function normalizeMachineScopes(value) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
-    throw new Error("At least one and at most twenty machine scopes are required.");
-  }
-  const scopes = [...new Set(value.map((scope) => String(scope).trim()).filter(Boolean))];
-  if (!scopes.length || scopes.some((scope) => !availableMachineScopes.includes(scope))) {
-    throw new Error("Machine scopes contain an unsupported value.");
-  }
-  return scopes;
-}
-function normalizedScopeSet(value) {
-  if (!Array.isArray(value)) return /* @__PURE__ */ new Set();
-  try {
-    return new Set(normalizeMachineScopes(value));
-  } catch {
-    return /* @__PURE__ */ new Set();
-  }
-}
-function effectiveOAuthScopes(session, input) {
-  const firmId = session?.data.activeFirm?.id;
-  if (!session?.itemId || session.data.status !== "active" || !firmId || !["onboarding", "active"].includes(session.data.activeFirm?.status ?? "")) return [];
-  const membership = session.data.firmMemberships?.find(
-    (candidate) => candidate.status === "active" && candidate.firm?.id === firmId && candidate.role?.status === "active"
-  );
-  const role = membership?.role;
-  if (!role) return [];
-  const roleScopes = new Set(availableMachineScopes.filter(
-    (scope) => machineScopePermissionMap[scope].every((permission) => role[permission] === true)
-  ));
-  const clientScopes = normalizedScopeSet(input.clientAllowedScopes);
-  const consentScopes = normalizedScopeSet(input.consentScopes);
-  const tokenScopes = normalizedScopeSet(input.tokenScopes);
-  return availableMachineScopes.filter(
-    (scope) => roleScopes.has(scope) && clientScopes.has(scope) && consentScopes.has(scope) && tokenScopes.has(scope)
-  );
-}
-function normalizeAgentCapabilities(value) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
-    throw new Error("At least one and at most twenty agent capabilities are required.");
-  }
-  const capabilities = [...new Set(value.map((capability) => String(capability).trim()).filter(Boolean))];
-  if (!capabilities.every((capability) => /^[a-z]+(?:[._-][a-z]+)+$/.test(capability))) {
-    throw new Error("Agent capabilities contain an unsupported value.");
-  }
-  return capabilities;
-}
-function normalizeRedirectUri(value) {
-  const uri = new URL(value);
-  const loopbackHttp = uri.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(uri.hostname);
-  if (uri.protocol !== "https:" && !loopbackHttp || uri.username || uri.password || uri.hash) {
-    throw new Error("Redirect URIs require HTTPS or loopback HTTP and cannot contain credentials or fragments.");
-  }
-  return uri.href;
-}
-function normalizeRedirectUris(value) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 20) {
-    throw new Error("OAuth clients require between one and twenty redirect URIs.");
-  }
-  return [...new Set(value.map((uri) => normalizeRedirectUri(String(uri))))];
-}
-var roleSelect = {
-  id: true,
-  name: true,
-  status: true,
-  firmId: true,
-  ...Object.fromEntries(permissionKeys.map((permission) => [permission, true]))
-};
-var userSelect = {
-  id: true,
-  name: true,
-  status: true,
-  activeFirm: { select: { id: true, name: true, displayName: true, shortName: true, brandTagline: true, brandColor: true, supportEmail: true, status: true } },
-  bootstrapRole: { select: roleSelect },
-  firmMemberships: {
-    select: {
-      id: true,
-      status: true,
-      firm: { select: { id: true } },
-      role: { select: roleSelect }
-    }
-  }
-};
-function sessionRole(role) {
-  if (!role) return null;
-  const { firmId, ...fields } = role;
-  return { ...fields, firm: firmId ? { id: firmId } : null };
-}
-function machineSession({
-  user,
-  authenticationType,
-  scopes,
-  credentialId,
-  oauthClientId,
-  agentPrincipalId,
-  agentCapabilities
-}) {
-  const firmId = user?.activeFirm?.id;
-  if (!user?.id || user.status !== "active" || !firmId) return null;
-  const memberships = (user.firmMemberships ?? []).map((membership) => ({
-    id: membership.id,
-    status: membership.status,
-    firm: membership.firm,
-    role: sessionRole(membership.role)
-  }));
-  const activeMembership = memberships.find(
-    (membership) => membership.status === "active" && membership.firm?.id === firmId && membership.role?.status === "active"
-  );
-  if (!activeMembership || !["onboarding", "active"].includes(user.activeFirm.status)) return null;
-  return {
-    itemId: user.id,
-    listKey: "User",
-    authenticationType,
-    machineScopes: scopes,
-    ...credentialId ? { credentialId } : {},
-    oauthClientId,
-    agentPrincipalId,
-    agentCapabilities,
-    data: {
-      name: user.name,
-      status: user.status,
-      activeFirm: user.activeFirm,
-      role: sessionRole(user.bootstrapRole),
-      firmMemberships: memberships
-    }
-  };
-}
-async function loadActiveHumanSession(prisma, userId, expectedFirmId) {
-  prisma = prismaWithoutGraphQLErrorConversion(prisma);
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: userSelect });
-  if (user?.activeFirm?.id !== expectedFirmId) return null;
-  return machineSession({
-    user,
-    authenticationType: "human",
-    scopes: [],
-    credentialId: ""
-  });
-}
-
-// features/keystone/mutations/command-authority.ts
-async function assertCurrentCommandActor(tx, context, permission) {
-  const session = context.session;
-  const firmId = activeFirmId(session);
-  if (!session?.itemId || !firmId) throw new Error("Current command authority is required.");
-  await tx.$executeRaw`SELECT u.id FROM "User" u
-    JOIN "FirmMembership" m ON m."user" = u.id AND m.firm = ${firmId}
-    JOIN "Role" r ON r.id = m.role JOIN "Firm" f ON f.id = m.firm
-    WHERE u.id = ${session.itemId} AND u."activeFirm" = f.id
-    ORDER BY r.id, m.id FOR SHARE OF u, m, r, f`;
-  const current = await loadActiveHumanSession(tx, session.itemId, firmId);
-  if (!current || current.data.activeFirm?.status !== "active") throw new Error("Current command authority is required.");
-  const type = session.authenticationType || "human";
-  if (type === "human") {
-    if (!permissions[permission]({ session: current })) throw new Error("Current command authority is required.");
-    const execution = session.agentExecution;
-    if (session.agentPrincipalId) {
-      if (!execution?.actionId || !execution?.credentialSession) throw new Error("Agent execution binding is required.");
-      await tx.$executeRaw`SELECT a.id FROM "AgentAction" a JOIN "AgentGrant" g ON g.id = a.grant JOIN "AgentPrincipal" p ON p.id = a."agentPrincipal" WHERE a.id = ${execution.actionId} FOR SHARE OF a,g,p`;
-      const action = await tx.agentAction.findFirst({ where: { id: execution.actionId, firmId, agentPrincipalId: session.agentPrincipalId, status: "executing", grant: { status: "active" }, agentPrincipal: { status: "active" } }, include: { grant: true } });
-      if (!action || action.approvedById && action.approvedById !== session.itemId || action.grant.startsAt && action.grant.startsAt > /* @__PURE__ */ new Date() || action.grant.expiresAt && action.grant.expiresAt <= /* @__PURE__ */ new Date() || !Array.isArray(action.grant.capabilities) || !action.grant.capabilities.includes(action.actionType)) throw new Error("Current agent execution authority is required.");
-      if (highRiskAgentActions.has(action.actionType)) {
-        const expiresAt = action.approvalExpiresAt;
-        if (!action.approvedById || !expiresAt || expiresAt <= /* @__PURE__ */ new Date() || action.approvalDigest !== computeAgentApprovalDigest({
-          actionId: action.id,
-          actionType: action.actionType,
-          matterId: action.matterId,
-          requestDigest: action.requestDigest,
-          approvalExpiresAt: expiresAt
-        }) || !permissions.canApproveAgentActions({ session: current })) throw new Error("Current agent approval authority is required.");
-      }
-      await assertCurrentAgentCredential(tx, context.withSession(execution.credentialSession), action.actionType);
-    }
-    return;
-  }
-  const now = /* @__PURE__ */ new Date();
-  if (type === "api_key") {
-    await tx.$executeRaw`SELECT id FROM "ApiKey" WHERE id = ${session.credentialId || ""} FOR SHARE`;
-    const key = await tx.apiKey.findFirst({ where: { id: session.credentialId, firmId, ownerId: session.itemId, status: "active" } });
-    if (!key || key.expiresAt && key.expiresAt <= now) throw new Error("Current credential authority is required.");
-    const scoped = { ...current, authenticationType: type, machineScopes: normalizeMachineScopes(key.scopes) };
-    if (!permissions[permission]({ session: scoped })) throw new Error("Current credential authority is required.");
-    return;
-  }
-  if (type === "oauth") {
-    await tx.$executeRaw`SELECT t.id FROM "OAuthToken" t JOIN "OAuthClient" c ON c.id = t.client JOIN "OAuthConsent" s ON s.id = t.consent WHERE t.id = ${session.credentialId || ""} FOR SHARE OF t,c,s`;
-    const token = await tx.oAuthToken.findFirst({ where: { id: session.credentialId, firmId, userId: session.itemId, status: "active", tokenType: "access_token", expiresAt: { gt: now }, client: { status: "active", firmId }, consent: { status: "active" } }, include: { client: true, consent: true } });
-    if (!token) throw new Error("Current credential authority is required.");
-    const scopes = effectiveOAuthScopes(current, { clientAllowedScopes: token.client.allowedScopes, consentScopes: token.consent.scopes, tokenScopes: token.scopes });
-    if (!permissions[permission]({ session: { ...current, authenticationType: type, machineScopes: scopes } })) throw new Error("Current credential authority is required.");
-    return;
-  }
-  throw new Error("Direct command authority is unavailable for this credential type.");
-}
-async function assertCurrentAgentCredential(tx, context, capability) {
-  const session = context.session;
-  const firmId = activeFirmId(session);
-  if (!session?.itemId || !firmId || session.authenticationType !== "agent" || !session.credentialId || !session.agentPrincipalId) throw new Error("Current agent credential is required.");
-  await tx.$executeRaw`SELECT c.id FROM "AgentCredential" c JOIN "AgentPrincipal" p ON p.id = c."agentPrincipal" WHERE c.id = ${session.credentialId} FOR SHARE OF c,p`;
-  await tx.$executeRaw`SELECT u.id FROM "User" u JOIN "FirmMembership" m ON m."user" = u.id AND m.firm = ${firmId} JOIN "Role" r ON r.id = m.role JOIN "Firm" f ON f.id = m.firm WHERE u.id = ${session.itemId} AND u."activeFirm" = f.id ORDER BY r.id, m.id FOR SHARE OF u,m,r,f`;
-  const current = await loadActiveHumanSession(tx, session.itemId, firmId);
-  const credential = await tx.agentCredential.findFirst({ where: { id: session.credentialId, firmId, status: "active", agentPrincipalId: session.agentPrincipalId, agentPrincipal: { status: "active", firmId, ownerId: session.itemId } } });
-  if (!current || current.data.activeFirm?.status !== "active" || !credential || credential.expiresAt && credential.expiresAt <= /* @__PURE__ */ new Date() || !normalizeAgentCapabilities(credential.scopes).includes(capability)) throw new Error("Current agent credential is required.");
-}
-
 // features/keystone/mutations/workflow-helpers.ts
 var import_node_crypto6 = require("node:crypto");
 function requirePermission(context, permission, options = {}) {
   const session = context.session;
   const firmId = activeFirmId(session);
-  if (!session?.itemId || !firmId || options.humanOnly && session.authenticationType && session.authenticationType !== "human" || !permissions[permission]({ session })) {
+  if (!session?.itemId || !firmId || options.humanOnly && !isInteractiveHumanSession(session) || !permissions[permission]({ session })) {
     throw new Error(`Permission ${permission} is required in an active firm.`);
   }
   return { session, firmId, userId: session.itemId };
@@ -7324,31 +7369,7 @@ async function assertMatterAccess(prisma, firmId, matterId, userId) {
   const matter = await prisma.matter.findFirst({
     where: {
       id: matterId,
-      firmId,
-      AND: [
-        {
-          OR: [
-            { confidentiality: { not: "restricted" } },
-            {
-              teamMembers: {
-                some: { userId, status: "active", canAccessRestricted: true }
-              }
-            }
-          ]
-        },
-        {
-          NOT: {
-            ethicalWalls: {
-              some: {
-                status: "active",
-                members: {
-                  some: { userId, status: "active", decision: "blocked" }
-                }
-              }
-            }
-          }
-        }
-      ]
+      ...accessibleMatterStorageWhere(firmId, userId)
     },
     select: { id: true }
   });
@@ -7433,6 +7454,8 @@ async function setMatterTeamAccess(_root, args, context) {
   return runSerializableTransaction(prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManageMatters");
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`matter-team:${firmId}:${args.matterId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ethical-wall-matter:${firmId}:${args.matterId}`}))`;
+    await tx.$executeRaw`SELECT id FROM "Matter" WHERE id = ${args.matterId} AND firm = ${firmId} FOR SHARE`;
     const matter = await tx.matter.findFirst({ where: { id: args.matterId, firmId }, select: { id: true, confidentiality: true } });
     if (!matter) throw new Error("Matter was not found in the active firm.");
     await assertMatterAccess(tx, firmId, matter.id, actorUserId);
@@ -7452,18 +7475,25 @@ async function setMatterTeamAccess(_root, args, context) {
     const willGrantRestrictedAccess = args.status === "active" && Boolean(args.canAccessRestricted);
     const currentlyGrantsRestrictedAccess = existing?.status === "active" && existing.canAccessRestricted;
     if (matter.confidentiality === "restricted" && currentlyGrantsRestrictedAccess && !willGrantRestrictedAccess) {
-      const otherAuthorizedMembers = await tx.matterTeamMember.count({
-        where: {
-          firmId,
-          matterId: matter.id,
-          status: "active",
-          canAccessRestricted: true,
-          userId: { not: target.id }
+      let viable = false;
+      let after;
+      for (let page = 0; page < 32 && !viable; page++) {
+        const candidates = await tx.matterTeamMember.findMany({
+          where: { firmId, matterId: matter.id, status: "active", canAccessRestricted: true, userId: { not: target.id }, ...after ? { id: { gt: after } } : {} },
+          select: { id: true, userId: true },
+          orderBy: { id: "asc" },
+          take: 32
+        });
+        for (const candidate of candidates) {
+          const current = await lockCurrentFirmMember(tx, candidate.userId, firmId);
+          if (!current || !permissions.canReadMatters({ session: current }) || !permissions.canManageMatters({ session: current })) continue;
+          viable = Boolean(await tx.matter.findFirst({ where: { id: matter.id, ...accessibleMatterStorageWhere(firmId, candidate.userId) }, select: { id: true } }));
+          if (viable) break;
         }
-      });
-      if (!otherAuthorizedMembers) {
-        throw new Error("A restricted matter must retain at least one active restricted-access team member.");
+        if (candidates.length < 32) break;
+        after = candidates[candidates.length - 1].id;
       }
+      if (!viable) throw new Error("A restricted matter must retain a current authorized access steward. Request a reviewed recovery if none is available.");
     }
     const data = {
       firmId,
@@ -8645,9 +8675,301 @@ async function recordRefundProviderOutcome(_root, args, context) {
     return { refund: updated, replayed: false };
   });
 }
+var manualPaymentMethods = /* @__PURE__ */ new Set(["check", "ach", "wire", "cash", "card", "other"]);
+async function recordManualPayment(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManagePayments", { humanOnly: true });
+  const key = idempotencyKey(args.idempotencyKey);
+  if (!manualPaymentMethods.has(args.method)) throw new Error("Unsupported payment method.");
+  if (!isGraphqlInt(args.amountMinor) || args.amountMinor <= 0) {
+    throw new Error("Payment amount must be a positive database-range integer minor-unit value.");
+  }
+  const currencyCode = String(args.currencyCode ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currencyCode)) throw new Error("Use a three-letter uppercase currency code.");
+  const receivedAt = timestamp20(args.receivedAt, "Payment received date");
+  if (!receivedAt) throw new Error("Payment received date is required.");
+  const now = /* @__PURE__ */ new Date();
+  if (receivedAt.getTime() > now.getTime() + 36 * 36e5) throw new Error("Payment received date cannot be in the future.");
+  const reference = optionalBoundedText(args.reference, "Payment reference", 200) ?? "";
+  const invoiceId = args.invoiceId?.trim() || null;
+  const providerCode = `manual:${args.method}`;
+  const prisma = context.prisma;
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManagePayments");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`manual-payment:${firmId}:${key}`}))`;
+    const replay = await tx.payment.findFirst({ where: { firmId, idempotencyKey: key } });
+    if (replay) {
+      if (replay.payerId !== args.payerId || (replay.invoiceId ?? null) !== invoiceId || replay.amountMinor !== args.amountMinor || replay.currencyCode !== currencyCode || replay.providerCode !== providerCode || (replay.providerPaymentId ?? "") !== reference) {
+        throw new Error("Payment idempotency key was reused with a different payload.");
+      }
+      if (replay.matterId) {
+        await assertMatterAccess(tx, firmId, replay.matterId, userId);
+        await assertMatterTeamCapability(tx, firmId, replay.matterId, userId, "canBill");
+      }
+      return { payment: replay, replayed: true };
+    }
+    const payer = await tx.contact.findFirst({ where: { id: args.payerId, firmId }, select: { id: true } });
+    if (!payer) throw new Error("Payer was not found in the active firm.");
+    let matterId = null;
+    if (invoiceId) {
+      const invoice = await tx.invoice.findFirst({
+        where: { id: invoiceId, firmId },
+        select: { id: true, matterId: true, status: true, currencyCode: true }
+      });
+      if (!invoice) throw new Error("Invoice was not found in the active firm.");
+      await assertMatterAccess(tx, firmId, invoice.matterId, userId);
+      await assertMatterTeamCapability(tx, firmId, invoice.matterId, userId, "canBill");
+      if (!(/* @__PURE__ */ new Set(["issued", "partially_paid", "overdue"])).has(invoice.status)) {
+        throw new Error("A payment can be recorded against an open issued invoice only.");
+      }
+      if (invoice.currencyCode !== currencyCode) throw new Error("Payment and invoice currencies must match.");
+      matterId = invoice.matterId;
+    }
+    const payment = await tx.payment.create({
+      data: {
+        firmId,
+        matterId,
+        invoiceId,
+        payerId: payer.id,
+        paymentNumber: `PAY-${(0, import_node_crypto8.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+        idempotencyKey: key,
+        paymentType: "operating",
+        status: "captured",
+        amountMinor: args.amountMinor,
+        refundedMinor: 0,
+        currencyCode,
+        providerCode,
+        providerPaymentId: reference,
+        capturedAt: receivedAt,
+        receivedById: userId
+      }
+    });
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "payment.recorded",
+      category: "financial",
+      actorUserId: userId,
+      matterId,
+      invoiceId,
+      paymentId: payment.id,
+      metadata: { method: args.method, amountMinor: args.amountMinor, currencyCode, receivedAt: receivedAt.toISOString() }
+    });
+    return { payment, replayed: false };
+  });
+}
 
 // features/keystone/lib/conflict-status.ts
 var blockingConflictCheckStatuses = ["requested", "running", "review_required", "conflict_found", "failed"];
+
+// features/keystone/mutations/intakeWorkflows.ts
+var import_node_crypto9 = require("node:crypto");
+var MAX_ADVERSE_PARTIES = 25;
+var organizationSuffix = /\b(inc|incorporated|llc|l\.l\.c|llp|lp|ltd|limited|corp|corporation|company|co|plc|pllc|pc|gmbh|ag|sa|bv|nv|bank|trust|group|holdings|partners|association|foundation|university|hospital|authority|department|agency|county|city)\.?$/i;
+function normalizeConflictTerm(value) {
+  return value.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+function parseAdversePartyNames(summary, exclude = []) {
+  if (!summary) return [];
+  const seen = new Set(exclude.map(normalizeConflictTerm).filter(Boolean));
+  const names = [];
+  for (const raw of summary.split(/[\r\n;,]+/)) {
+    const name = raw.replace(/^[\s\-*•\d.)]+/, "").replace(/\s+/g, " ").trim();
+    const normalized = normalizeConflictTerm(name);
+    if (!normalized || seen.has(normalized)) continue;
+    if (name.length > 200) throw new Error("Each known adverse party must be 200 characters or fewer.");
+    seen.add(normalized);
+    names.push(name);
+  }
+  if (names.length > MAX_ADVERSE_PARTIES) throw new Error(`List at most ${MAX_ADVERSE_PARTIES} known adverse parties.`);
+  return names;
+}
+function adversePartyContact(name) {
+  if (organizationSuffix.test(name)) return { contactType: "organization", firstName: "", lastName: "", organizationName: name };
+  const parts = name.split(" ");
+  const lastName = parts.length > 1 ? parts.pop() : "";
+  return { contactType: "person", firstName: parts.join(" "), lastName, organizationName: "" };
+}
+var intakeClearancePath = {
+  new: ["screening", "conflict_review", "decision"],
+  screening: ["conflict_review", "decision"],
+  conflict_review: ["decision"],
+  consultation: ["decision"]
+};
+async function advanceIntakeAfterConflictClearance(tx, context, input) {
+  const session = context.session;
+  if (!isInteractiveHumanSession(session) || !permissions.canManageIntake({ session })) return null;
+  try {
+    await assertCurrentCommandActor(tx, context, "canManageIntake");
+  } catch {
+    return null;
+  }
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`intake:${input.firmId}:${input.intakeId}`}))`;
+  const intake = await tx.intake.findFirst({ where: { id: input.intakeId, firmId: input.firmId }, select: { id: true, status: true } });
+  const path = intake ? intakeClearancePath[intake.status] : void 0;
+  if (!intake || !path) return null;
+  const [cleared, blocking] = await Promise.all([
+    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: "cleared" } }),
+    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: { in: [...blockingConflictCheckStatuses] } } })
+  ]);
+  if (!cleared || blocking) return null;
+  let fromStatus = intake.status;
+  for (const toStatus of path) {
+    assertLifecycleTransition("intake", fromStatus, toStatus);
+    await recordAuditEvent(tx, {
+      firmId: input.firmId,
+      eventType: `intake.${toStatus}`,
+      category: "legal_workflow",
+      actorUserId: input.userId,
+      intakeId: intake.id,
+      metadata: { fromStatus, toStatus, cause: "conflict_check_cleared", conflictCheckId: input.checkId, reasonDigest: sha256Digest("Conflict check cleared.") }
+    });
+    fromStatus = toStatus;
+  }
+  await tx.intake.update({ where: { id: intake.id }, data: { status: "decision" } });
+  return { intakeId: intake.id, fromStatus: intake.status, toStatus: "decision" };
+}
+function text22(value, label, maximum, required = true) {
+  const result = typeof value === "string" ? value.trim() : "";
+  if (required && !result || result.length > maximum) throw new Error(`${label} ${required ? "is required and " : ""}must be ${maximum} characters or fewer.`);
+  return result || null;
+}
+async function startClientIntake(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManageIntake", { humanOnly: true });
+  if (!permissions.canManagePeople({ session: context.session }) || !permissions.canRunConflictChecks({ session: context.session })) {
+    throw new Error("Starting an intake requires people-management and conflict-check permission.");
+  }
+  if (!["person", "organization"].includes(args.contactType)) throw new Error("Contact type must be person or organization.");
+  const firstName = text22(args.firstName, "First name", 120, args.contactType === "person");
+  const lastName = text22(args.lastName, "Last name", 120, args.contactType === "person");
+  const organizationName = text22(args.organizationName, "Organization name", 200, args.contactType === "organization");
+  const email = text22(args.email, "Email", 320, false)?.toLowerCase() ?? null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Email must be valid.");
+  const phone = text22(args.phone, "Phone", 80, false);
+  const title = text22(args.title, "Intake title", 240);
+  const summary = text22(args.summary, "Intake summary", 4e3, false);
+  const adversePartySummary = text22(args.adversePartySummary, "Adverse-party summary", 2e3, false);
+  const source = args.source?.trim() || "other";
+  const contactName2 = args.contactType === "organization" ? organizationName : [firstName, lastName].filter(Boolean).join(" ");
+  if (!contactName2) throw new Error("A conflict-search name is required.");
+  parseAdversePartyNames(adversePartySummary, [contactName2]);
+  if (!["website", "referral", "phone", "walk_in", "import", "other"].includes(source)) throw new Error("Unsupported intake source.");
+  const prisma = context.prisma;
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManageIntake");
+    await assertCurrentCommandActor(tx, context, "canManagePeople");
+    await assertCurrentCommandActor(tx, context, "canRunConflictChecks");
+    if (args.officeId) {
+      const office = await tx.office.findFirst({ where: { id: args.officeId, firmId, status: "active" }, select: { id: true } });
+      if (!office) throw new Error("The selected office is unavailable in this firm.");
+    }
+    if (args.practiceAreaId) {
+      const area = await tx.practiceArea.findFirst({ where: { id: args.practiceAreaId, firmId, status: "active" }, select: { id: true } });
+      if (!area) throw new Error("The selected practice area is unavailable in this firm.");
+    }
+    if (args.assignedToId) {
+      const membership = await tx.firmMembership.findFirst({
+        where: { firmId, userId: args.assignedToId, status: "active" },
+        select: { id: true }
+      });
+      if (!membership) throw new Error("The selected assignee is not an active firm member.");
+    }
+    const suffix = (0, import_node_crypto9.randomUUID)().replaceAll("-", "").slice(0, 12).toUpperCase();
+    const contact = await tx.contact.create({
+      data: {
+        firmId,
+        contactType: args.contactType,
+        status: "prospective_client",
+        firstName: firstName ?? "",
+        lastName: lastName ?? "",
+        organizationName: organizationName ?? "",
+        primaryEmail: email ?? "",
+        primaryPhone: phone ?? "",
+        conflictSearchAliases: []
+      },
+      select: { id: true }
+    });
+    const intake = await tx.intake.create({
+      data: {
+        firmId,
+        intakeNumber: `INT-${suffix}`,
+        title,
+        status: "new",
+        source,
+        primaryContactId: contact.id,
+        officeId: args.officeId || null,
+        practiceAreaId: args.practiceAreaId || null,
+        openedById: userId,
+        assignedToId: args.assignedToId || userId,
+        receivedAt: /* @__PURE__ */ new Date(),
+        summary: summary ?? "",
+        adversePartySummary: adversePartySummary ?? ""
+      },
+      select: { id: true, intakeNumber: true, status: true }
+    });
+    await tx.intakeParticipant.create({
+      data: { firmId, intakeId: intake.id, contactId: contact.id, participantRole: "prospective_client", status: "active" }
+    });
+    const adverseNames = parseAdversePartyNames(adversePartySummary, [contactName2 ?? ""]);
+    const adverseContacts = [];
+    for (const name of adverseNames) {
+      const identity = adversePartyContact(name);
+      const adverse = await tx.contact.create({
+        data: { firmId, ...identity, status: "opposing", primaryEmail: "", primaryPhone: "", conflictSearchAliases: [] },
+        select: { id: true }
+      });
+      await tx.intakeParticipant.create({
+        data: { firmId, intakeId: intake.id, contactId: adverse.id, participantRole: "adverse_party", status: "active" }
+      });
+      adverseContacts.push({ id: adverse.id, name, termType: identity.contactType });
+    }
+    const conflictCheck = await tx.conflictCheck.create({
+      data: {
+        firmId,
+        checkNumber: `CHK-${suffix}`,
+        status: "requested",
+        intakeId: intake.id,
+        requestedById: userId,
+        searchScope: "contacts_and_matters",
+        searchVersion: "v1"
+      },
+      select: { id: true, checkNumber: true, status: true }
+    });
+    await tx.conflictSearchTerm.create({
+      data: {
+        firmId,
+        checkId: conflictCheck.id,
+        term: contactName2,
+        normalizedTerm: normalizeConflictTerm(contactName2),
+        termType: args.contactType === "organization" ? "organization" : "person",
+        sourceContactId: contact.id,
+        includeAliases: true
+      }
+    });
+    for (const adverse of adverseContacts) {
+      await tx.conflictSearchTerm.create({
+        data: {
+          firmId,
+          checkId: conflictCheck.id,
+          term: adverse.name,
+          normalizedTerm: normalizeConflictTerm(adverse.name),
+          termType: adverse.termType,
+          sourceContactId: adverse.id,
+          includeAliases: true
+        }
+      });
+    }
+    await recordAuditEvent(tx, {
+      firmId,
+      actorUserId: userId,
+      actorType: "user",
+      eventType: "intake.started",
+      category: "legal_workflow",
+      intakeId: intake.id,
+      contactId: contact.id,
+      metadata: { conflictCheckId: conflictCheck.id, source, adversePartyContactIds: adverseContacts.map((adverse) => adverse.id) }
+    });
+    return { intake, contact, conflictCheck };
+  });
+}
 
 // features/keystone/mutations/legalWorkflows.ts
 var conflictTermTypes = /* @__PURE__ */ new Set(["person", "organization", "alias", "matter", "other"]);
@@ -9004,6 +9326,9 @@ async function finalizeConflictCheck(_root, args, context) {
       intakeId: check.intakeId,
       metadata: { checkId: check.id, outcome: args.outcome }
     });
+    if (args.outcome === "cleared" && check.intakeId) {
+      await advanceIntakeAfterConflictClearance(tx, context, { firmId, userId, intakeId: check.intakeId, checkId: check.id });
+    }
     return { check: completed, replayed: false };
   });
 }
@@ -9145,7 +9470,7 @@ async function transitionMatter(_root, args, context) {
 }
 
 // features/keystone/mutations/postTrustTransaction.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 
 // features/keystone/lib/trust-ledger.ts
 var currencyPattern = /^[A-Z]{3}$/;
@@ -9559,7 +9884,7 @@ async function postTrustTransaction(_root, { data }, context) {
     const transaction = await tx.trustTransaction.create({
       data: {
         firmId,
-        transactionNumber: `TRUST-${(0, import_node_crypto9.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+        transactionNumber: `TRUST-${(0, import_node_crypto10.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
         idempotencyKey: storedIdempotencyKey,
         postingDigest,
         trustAccountId: account2.id,
@@ -9622,8 +9947,364 @@ async function postTrustTransaction(_root, { data }, context) {
   });
 }
 
+// features/keystone/mutations/communicationWorkflows.ts
+var COMMUNICATION_DELIVERY_SNAPSHOT_VERSION = 1;
+var MAX_RECIPIENTS = 50;
+var participantRoles = /* @__PURE__ */ new Set(["staff", "client", "external_counsel", "third_party"]);
+var singleEmailAddress = /^[^\s@<>,;()"]+@[^\s@<>,;()"]+\.[^\s@<>,;()"]+$/;
+function isSingleEmailAddress(value) {
+  return Boolean(value && value.length <= 254 && singleEmailAddress.test(value));
+}
+function communicationEnvelopeDigest(message) {
+  return sha256Digest({ subject: message.subject ?? "", body: message.body ?? "" });
+}
+function communicationQueueDigest(message, deliveries) {
+  return sha256Digest({
+    messageId: message.id,
+    firmId: message.firmId,
+    matterId: message.matterId ?? null,
+    threadId: message.threadId,
+    envelopeDigest: communicationEnvelopeDigest(message),
+    deliveries: deliveries.map((delivery) => ({
+      id: delivery.id,
+      channel: delivery.channel,
+      provider: delivery.provider,
+      integrationConnectionId: delivery.integrationConnectionId ?? null,
+      recipientAddress: delivery.recipientAddress,
+      participantId: delivery.providerMetadata?.participantId ?? null,
+      envelopeDigest: delivery.providerMetadata?.envelopeDigest ?? null,
+      snapshotVersion: delivery.providerMetadata?.snapshotVersion ?? null,
+      attachments: delivery.providerMetadata?.attachments ?? []
+    })).sort((a, b) => a.id.localeCompare(b.id))
+  });
+}
+async function lockThread(tx, firmId, threadId) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`communication-thread:${firmId}:${threadId}`}))`;
+}
+async function resolveParticipantIdentity(tx, firmId, thread, args) {
+  const identities = [args.userId, args.contactId, args.portalAccountId].filter(Boolean);
+  if (identities.length !== 1) throw new Error("Choose exactly one staff member, contact or portal account.");
+  if (args.contactMethodId && !args.contactId) throw new Error("A contact method can be chosen only for a contact participant.");
+  if (args.userId) {
+    if (args.participantRole !== "staff") throw new Error("Firm users can join a thread only as staff.");
+    const membership = await tx.firmMembership.findFirst({
+      where: { firmId, userId: args.userId, status: "active", user: { status: "active" }, role: { firmId, status: "active", canReadCommunications: true, ...thread.matterId ? { canReadMatters: true } : {} } },
+      select: { user: { select: { email: true } } }
+    });
+    if (!membership) throw new Error("Staff participant must be an active member of the active firm.");
+    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, args.userId);
+    return { userId: args.userId, displayAddress: membership.user?.email ?? "" };
+  }
+  if (args.participantRole === "staff") throw new Error("Staff participants must be firm users.");
+  if (args.portalAccountId) {
+    if (args.participantRole !== "client") throw new Error("Portal accounts can join a thread only as clients.");
+    const account2 = await tx.portalAccount.findFirst({
+      where: { id: args.portalAccountId, firmId, status: "active" },
+      select: { id: true, email: true, contactId: true, contact: { select: { firmId: true, status: true } } }
+    });
+    if (!account2 || account2.contact?.firmId !== firmId || account2.contact.status === "archived" || !thread.matterId) throw new Error("Portal participant must be a current account/contact on this matter.");
+    const identity = { firmId, portalAccountId: account2.id, contactId: account2.contactId };
+    let after;
+    let admitted = false;
+    for (let page = 0; page < 32 && !admitted; page++) {
+      const shares = await tx.portalShare.findMany({
+        where: { ...portalShareCandidateWhere(identity, /* @__PURE__ */ new Date()), matterId: thread.matterId, resourceType: "communication_thread", communicationThreadId: thread.id, ...after ? { id: { gt: after } } : {} },
+        select: portalShareHeaderSelect,
+        orderBy: { id: "asc" },
+        take: 32
+      });
+      for (const candidate of shares) {
+        const share = boundPortalShare(candidate, identity);
+        if (share && await portalShareIsCurrent(tx, share)) {
+          admitted = true;
+          break;
+        }
+      }
+      if (shares.length < 32) break;
+      after = shares[shares.length - 1].id;
+    }
+    if (!admitted) throw new Error("Portal recipient needs a current message-capable share of this exact thread.");
+    return { portalAccountId: account2.id, contactId: account2.contactId ?? null, displayAddress: account2.email ?? "" };
+  }
+  const contact = await tx.contact.findFirst({
+    where: { id: args.contactId, firmId, status: { not: "archived" } },
+    select: { id: true, primaryEmail: true }
+  });
+  if (!contact) throw new Error("Contact participant must be an active contact in the active firm.");
+  if (args.contactMethodId) {
+    const method2 = await tx.contactMethod.findFirst({
+      where: { id: args.contactMethodId, firmId, contactId: contact.id, methodType: "email", canContact: true },
+      select: { value: true }
+    });
+    if (!method2) throw new Error("Contact method must be a contactable email address of this contact.");
+    return { contactId: contact.id, displayAddress: method2.value };
+  }
+  const method = await tx.contactMethod.findFirst({
+    where: { firmId, contactId: contact.id, methodType: "email", value: args.address ?? contact.primaryEmail, canContact: true },
+    select: { value: true }
+  });
+  if (!method) throw new Error("Choose a currently contactable email method before preparing this recipient.");
+  return { contactId: contact.id, displayAddress: method.value };
+}
+async function assertCurrentCommunicationRecipient(tx, message, participantId, expectedAddress) {
+  await tx.$executeRaw`SELECT id FROM "Firm" WHERE id = ${message.firmId} FOR SHARE`;
+  await tx.$executeRaw`SELECT id FROM "CommunicationThread" WHERE id = ${message.threadId} AND firm = ${message.firmId} FOR SHARE`;
+  await tx.$executeRaw`SELECT id FROM "CommunicationParticipant" WHERE id = ${participantId} AND firm = ${message.firmId} FOR SHARE`;
+  if (message.matterId) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`matter-team:${message.firmId}:${message.matterId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ethical-wall-matter:${message.firmId}:${message.matterId}`}))`;
+    await tx.$executeRaw`SELECT id FROM "Matter" WHERE id = ${message.matterId} AND firm = ${message.firmId} FOR SHARE`;
+  }
+  const thread = await tx.communicationThread.findFirst({
+    where: { id: message.threadId, firmId: message.firmId, matterId: message.matterId, status: "open", firm: { status: "active" } },
+    select: { id: true, matterId: true }
+  });
+  const participant = await tx.communicationParticipant.findFirst({
+    where: { id: participantId, firmId: message.firmId, threadId: message.threadId, matterId: message.matterId, status: "active" }
+  });
+  if (!thread || !participant) throw new Error("Recipient or thread is no longer available.");
+  if (participant.userId) {
+    await tx.$executeRaw`SELECT u.id FROM "User" u JOIN "FirmMembership" m ON m."user" = u.id JOIN "Role" r ON r.id = m.role AND r.firm = m.firm WHERE u.id = ${participant.userId} AND m.firm = ${message.firmId} FOR SHARE OF u,m,r`;
+  }
+  if (participant.portalAccountId) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-policy:${message.firmId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-account:${message.firmId}:${participant.portalAccountId}`}))`;
+    await tx.$executeRaw`SELECT id FROM "PortalAccount" WHERE id = ${participant.portalAccountId} AND firm = ${message.firmId} FOR SHARE`;
+  }
+  if (participant.contactId) {
+    await tx.$executeRaw`SELECT id FROM "Contact" WHERE id = ${participant.contactId} AND firm = ${message.firmId} FOR SHARE`;
+    await tx.$executeRaw`SELECT id FROM "ContactMethod" WHERE contact = ${participant.contactId} AND firm = ${message.firmId} ORDER BY id FOR SHARE`;
+  }
+  const current = await resolveParticipantIdentity(tx, message.firmId, thread, {
+    participantRole: participant.participantRole,
+    userId: participant.userId,
+    portalAccountId: participant.portalAccountId,
+    contactId: participant.portalAccountId ? void 0 : participant.contactId,
+    address: expectedAddress ?? participant.displayAddress
+  });
+  const address = expectedAddress ?? participant.displayAddress;
+  if (!isSingleEmailAddress(current.displayAddress) || current.displayAddress !== address) throw new Error("Recipient address or contactability changed; prepare a new reviewed envelope.");
+  return participant;
+}
+async function addCommunicationParticipant(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
+  if (!participantRoles.has(args.participantRole)) throw new Error("Participant role is not available through this command.");
+  const prisma = context.prisma;
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManageCommunications");
+    await lockThread(tx, firmId, args.threadId);
+    const thread = await tx.communicationThread.findFirst({
+      where: { id: args.threadId, firmId },
+      select: { id: true, status: true, matterId: true }
+    });
+    if (!thread) throw new Error("Communication thread was not found in the active firm.");
+    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, userId);
+    if (thread.status !== "open") throw new Error("Participants can be added only to open threads.");
+    const identity = await resolveParticipantIdentity(tx, firmId, thread, args);
+    const existing = await tx.communicationParticipant.findFirst({
+      where: {
+        firmId,
+        threadId: thread.id,
+        status: "active",
+        userId: identity.userId ?? null,
+        contactId: identity.contactId ?? null,
+        portalAccountId: identity.portalAccountId ?? null
+      }
+    });
+    if (existing) {
+      if (existing.participantRole !== args.participantRole) {
+        throw new Error("This identity already participates in the thread with a different role.");
+      }
+      await assertCurrentCommunicationRecipient(tx, { firmId, threadId: thread.id, matterId: thread.matterId }, existing.id, existing.displayAddress);
+      return { participant: existing, replayed: true };
+    }
+    const participant = await tx.communicationParticipant.create({
+      data: {
+        firmId,
+        matterId: thread.matterId ?? null,
+        threadId: thread.id,
+        userId: identity.userId ?? null,
+        contactId: identity.contactId ?? null,
+        portalAccountId: identity.portalAccountId ?? null,
+        participantRole: args.participantRole,
+        status: "active",
+        displayAddress: identity.displayAddress,
+        addedAt: /* @__PURE__ */ new Date()
+      }
+    });
+    await assertCurrentCommunicationRecipient(tx, { firmId, threadId: thread.id, matterId: thread.matterId }, participant.id, participant.displayAddress);
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "communication.participant_added",
+      category: "legal_workflow",
+      ...workflowActor(context, userId),
+      matterId: thread.matterId ?? null,
+      contactId: identity.contactId ?? null,
+      metadata: {
+        threadId: thread.id,
+        participantId: participant.id,
+        participantRole: args.participantRole,
+        identityDigest: sha256Digest({ ...identity, participantRole: args.participantRole })
+      }
+    });
+    return { participant, replayed: false };
+  });
+}
+async function removeCommunicationParticipant(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
+  const reason = boundedReason(args.reason, "Participant removal reason", 5, 2e3);
+  const prisma = context.prisma;
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManageCommunications");
+    const identity = await tx.communicationParticipant.findFirst({
+      where: { id: args.participantId, firmId },
+      select: { threadId: true }
+    });
+    if (!identity) throw new Error("Communication participant was not found in the active firm.");
+    await lockThread(tx, firmId, identity.threadId);
+    const participant = await tx.communicationParticipant.findFirst({ where: { id: args.participantId, firmId } });
+    if (!participant) throw new Error("Communication participant was not found in the active firm.");
+    if (participant.matterId) await assertMatterAccess(tx, firmId, participant.matterId, userId);
+    if (participant.status === "removed") return { participant, replayed: true };
+    const removed = await tx.communicationParticipant.update({
+      where: { id: participant.id },
+      data: { status: "removed", removedAt: /* @__PURE__ */ new Date() }
+    });
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "communication.participant_removed",
+      category: "legal_workflow",
+      ...workflowActor(context, userId),
+      matterId: participant.matterId ?? null,
+      contactId: participant.contactId ?? null,
+      metadata: { threadId: participant.threadId, participantId: participant.id, reasonDigest: sha256Digest(reason) }
+    });
+    return { participant: removed, replayed: false };
+  });
+}
+async function prepareCommunicationDeliveries(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
+  const reason = boundedReason(args.reason, "Delivery preparation reason", 5, 2e3);
+  const participantIds = [...new Set((args.participantIds ?? []).map((id2) => id2?.trim()).filter(Boolean))].sort();
+  if (!participantIds.length || participantIds.length > MAX_RECIPIENTS) {
+    throw new Error(`Choose between 1 and ${MAX_RECIPIENTS} thread participants.`);
+  }
+  const prisma = context.prisma;
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManageCommunications");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`message:${firmId}:${args.messageId}`}))`;
+    const message = await tx.communicationMessage.findFirst({
+      where: { id: args.messageId, firmId },
+      include: {
+        attachments: {
+          select: { id: true, firmId: true, checksumSha256: true, byteSize: true, document: { select: { matterId: true, status: true } } }
+        },
+        deliveries: { select: { id: true, status: true, providerMetadata: true } }
+      }
+    });
+    if (!message) throw new Error("Communication message was not found in the active firm.");
+    if (message.matterId) await assertMatterAccess(tx, firmId, message.matterId, userId);
+    if (message.status !== "draft") throw new Error("Deliveries can be prepared only for draft messages.");
+    if (message.direction !== "outbound") throw new Error("Only outbound messages have deliveries.");
+    if (message.channel !== "email") {
+      throw new Error("Only email delivery preparation is available; portal and SMS delivery adapters are not configured.");
+    }
+    if (message.deliveries.some((delivery) => delivery.status !== "pending")) {
+      throw new Error("A message with delivery outcomes cannot be re-prepared.");
+    }
+    await lockThread(tx, firmId, message.threadId);
+    const participants = await tx.communicationParticipant.findMany({
+      where: { id: { in: participantIds }, firmId, threadId: message.threadId, status: "active" },
+      select: { id: true, userId: true, contactId: true, portalAccountId: true, displayAddress: true },
+      orderBy: { id: "asc" }
+    });
+    if (participants.length !== participantIds.length) {
+      throw new Error("Every recipient must be an active participant of this message's thread.");
+    }
+    for (const participant of participants) {
+      if (!isSingleEmailAddress(participant.displayAddress)) {
+        throw new Error("Every email recipient needs one valid email address on the thread participant.");
+      }
+      await assertCurrentCommunicationRecipient(tx, message, participant.id, participant.displayAddress);
+    }
+    const attachments = message.attachments.map((attachment) => {
+      if (attachment.firmId !== firmId || attachment.document?.status === "disposed" || message.matterId && attachment.document?.matterId !== message.matterId) {
+        throw new Error("Attachments must be current versions from this firm and matter.");
+      }
+      return { versionId: attachment.id, checksumSha256: attachment.checksumSha256, byteSize: attachment.byteSize };
+    }).sort((left, right) => left.versionId.localeCompare(right.versionId));
+    let connection = null;
+    if (args.integrationConnectionId) {
+      connection = await tx.integrationConnection.findFirst({
+        where: { id: args.integrationConnectionId, firmId, status: "active", category: "email" },
+        select: { id: true, provider: true }
+      });
+      if (!connection) throw new Error("Delivery connection must be an active email integration in the active firm.");
+    }
+    const provider = connection?.provider ?? "smtp";
+    const envelopeDigest = communicationEnvelopeDigest(message);
+    const snapshots = participants.map((participant) => ({
+      snapshotVersion: COMMUNICATION_DELIVERY_SNAPSHOT_VERSION,
+      participantId: participant.id,
+      envelopeDigest,
+      attachments,
+      destination: { channel: "email", provider, connectionId: connection?.id ?? null }
+    }));
+    const preparationDigest = sha256Digest({
+      messageId: message.id,
+      snapshots,
+      recipients: participants.map((participant) => participant.displayAddress)
+    });
+    if (message.deliveries.length === snapshots.length && message.deliveries.every((delivery) => delivery.providerMetadata?.preparationDigest === preparationDigest)) {
+      return { message, deliveries: message.deliveries, replayed: true };
+    }
+    const replaced = message.deliveries.length;
+    if (replaced) await tx.communicationDelivery.deleteMany({ where: { firmId, messageId: message.id, status: "pending" } });
+    const deliveries = [];
+    for (const [index, participant] of participants.entries()) {
+      deliveries.push(await tx.communicationDelivery.create({
+        data: {
+          firmId,
+          matterId: message.matterId ?? null,
+          messageId: message.id,
+          integrationConnectionId: connection?.id ?? null,
+          channel: "email",
+          status: "pending",
+          recipientContactId: participant.contactId ?? null,
+          recipientAddress: participant.displayAddress,
+          provider,
+          attemptCount: 0,
+          providerMetadata: { ...snapshots[index], preparationDigest }
+        }
+      }));
+    }
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "communication.deliveries_prepared",
+      category: "integration",
+      ...workflowActor(context, userId),
+      matterId: message.matterId ?? null,
+      metadata: {
+        messageId: message.id,
+        deliveryCount: deliveries.length,
+        replacedPendingCount: replaced,
+        preparationDigest,
+        reasonDigest: sha256Digest(reason)
+      }
+    });
+    return { message, deliveries, replayed: false };
+  });
+}
+
+// features/keystone/webhooks/wire-contract.ts
+var import_node_http = require("node:http");
+function assertWebhookWireIdentity(eventId2, eventType) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{7,299}$/.test(eventId2)) throw new Error("Webhook event ID must be an 8\u2013300 character ASCII identifier.");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,299}$/.test(eventType)) throw new Error("Webhook event type must be an ASCII identifier.");
+}
+
 // features/keystone/lib/secret-envelope.ts
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 function envelopeKey(override) {
   const encoded = override ?? process.env.INTEGRATION_CREDENTIAL_KEY;
   if (!encoded) throw new Error("INTEGRATION_CREDENTIAL_KEY is required.");
@@ -9636,15 +10317,15 @@ function encryptSecret(value, keyOverride) {
     throw new Error("Integration credential must be between 1 and 32768 bytes.");
   }
   const key = envelopeKey(keyOverride);
-  const iv = (0, import_node_crypto10.randomBytes)(12);
-  const cipher = (0, import_node_crypto10.createCipheriv)("aes-256-gcm", key, iv);
+  const iv = (0, import_node_crypto11.randomBytes)(12);
+  const cipher = (0, import_node_crypto11.createCipheriv)("aes-256-gcm", key, iv);
   cipher.setAAD(Buffer.from("openfront-law-firm:integration:v1"));
   const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `v1.${iv.toString("base64url")}.${encrypted.toString("base64url")}.${tag.toString("base64url")}`;
 }
 function secretDigest(value, keyOverride) {
-  return (0, import_node_crypto10.createHmac)("sha256", envelopeKey(keyOverride)).update(value).digest("hex");
+  return (0, import_node_crypto11.createHmac)("sha256", envelopeKey(keyOverride)).update(value).digest("hex");
 }
 
 // features/keystone/mutations/providerWorkflows.ts
@@ -9765,6 +10446,7 @@ async function enqueueWebhookDelivery(_root, args, context) {
   const deliveryEventId = eventId(args.eventId);
   const eventType = optionalBoundedText(args.eventType, "Webhook event type", 300);
   if (!eventType) throw new Error("Webhook event type is required.");
+  assertWebhookWireIdentity(deliveryEventId, eventType);
   const prisma = context.prisma;
   return runSerializableTransaction(prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManageIntegrations");
@@ -9803,7 +10485,7 @@ async function enqueueWebhookDelivery(_root, args, context) {
       category: "integration",
       ...workflowActor(context, userId),
       matterId: args.matterId ?? null,
-      metadata: { deliveryId: delivery.id, connectionId: connection.id, subscriptionId: subscription.id, requestDigest: sha256Digest({ eventId: deliveryEventId, eventType, payload: args.payload ?? null, destinationUrl: subscription.endpointUrl }) }
+      metadata: { deliveryId: delivery.id, connectionId: connection.id, subscriptionId: subscription.id, authenticationType: context.session?.authenticationType ?? "human", credentialId: context.session?.credentialId ?? null, requestDigest: sha256Digest({ eventId: deliveryEventId, eventType, payload: args.payload ?? null, destinationUrl: subscription.endpointUrl }) }
     });
     return delivery;
   });
@@ -9821,6 +10503,9 @@ async function queueCommunicationMessage(_root, args, context) {
     });
     if (!message) throw new Error("Communication message was not found in the active firm.");
     if (message.matterId) await assertMatterAccess(tx, firmId, message.matterId, userId);
+    for (const delivery of message.deliveries) {
+      await assertCurrentCommunicationRecipient(tx, message, delivery.providerMetadata?.participantId ?? "", delivery.recipientAddress);
+    }
     if (message.status === "queued") return { message, replayed: true };
     assertLifecycleTransition("communicationMessage", message.status, "queued");
     if (!message.deliveries.length || message.deliveries.some((delivery) => delivery.status !== "pending")) {
@@ -9836,7 +10521,7 @@ async function queueCommunicationMessage(_root, args, context) {
       category: "integration",
       actorUserId: userId,
       matterId: message.matterId,
-      metadata: { messageId: message.id, deliveryCount: message.deliveries.length, reasonDigest: sha256Digest(reason) }
+      metadata: { messageId: message.id, deliveryCount: message.deliveries.length, reasonDigest: sha256Digest(reason), authenticationType: "human", intentVersion: 1, requestDigest: communicationQueueDigest(message, message.deliveries) }
     });
     return { message: queued, replayed: false };
   });
@@ -10561,7 +11246,7 @@ async function recordAgentActionSucceeded(tx, action, summary, agentPrincipalId)
   const now = /* @__PURE__ */ new Date();
   const resultDigest = sha256Digest(summary);
   const updated = await tx.agentAction.updateMany({
-    where: { id: action.id, status: "executing" },
+    where: { id: action.id, status: "executing", startedAt: action.startedAt },
     data: { status: "succeeded", completedAt: now, resultDigest, resultEnvelope: summary }
   });
   if (updated.count !== 1) throw new Error("Agent action is no longer executing.");
@@ -10604,7 +11289,7 @@ async function dispatchAction(action, approvedContext) {
       await assertCurrentCommandActor(tx, approvedContext, "canManageTasks");
       await assertMatterAccess(tx, action.firmId, action.matterId, session.itemId);
       await tx.$executeRaw`SELECT id FROM "AgentAction" WHERE id = ${action.id} FOR UPDATE`;
-      const current = await tx.agentAction.findFirst({ where: { id: action.id, status: "executing" }, select: { id: true } });
+      const current = await tx.agentAction.findFirst({ where: { id: action.id, status: "executing", startedAt: action.startedAt }, select: { id: true } });
       if (!current) throw new Error("Agent action is no longer executing.");
       const task = await tx.legalTask.create({
         data: {
@@ -10835,13 +11520,13 @@ async function executeAgentAction(_root, args, context) {
         metadata: { requestDigest: action.requestDigest }
       }
     });
-    return { action: { ...action, status: "executing" }, replayed: false, reviewerSession };
+    return { action: { ...action, status: "executing", startedAt: now }, replayed: false, reviewerSession };
   });
   if (claimed.replayed) return { action: claimed.action, replayed: true };
   const approvedContext = context.withSession({
     ...claimed.reviewerSession,
     agentPrincipalId: session.agentPrincipalId,
-    agentExecution: { actionId: claimed.action.id, credentialSession: session }
+    agentExecution: { actionId: claimed.action.id, claimStartedAt: claimed.action.startedAt.toISOString(), credentialSession: session }
   });
   let result;
   try {
@@ -10851,7 +11536,7 @@ async function executeAgentAction(_root, args, context) {
     await runSerializableTransaction(prisma, async (tx) => {
       const now = /* @__PURE__ */ new Date();
       const failed = await tx.agentAction.updateMany({
-        where: { id: claimed.action.id, status: "executing" },
+        where: { id: claimed.action.id, status: "executing", startedAt: claimed.action.startedAt },
         data: {
           status: "failed",
           completedAt: now,
@@ -11014,11 +11699,11 @@ async function updateAgentGrantAuthority(_root, args, context) {
 }
 
 // features/keystone/mutations/credentials.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 function requireHumanSession(context, permission) {
   const session = context.session;
   const firmId = activeFirmId(session);
-  if (!session?.itemId || !firmId || session.authenticationType && session.authenticationType !== "human" || !permissions[permission]({ session })) {
+  if (!session?.itemId || !firmId || !isInteractiveHumanSession(session) || !permissions[permission]({ session })) {
     throw new Error("A human administrator with credential authority is required.");
   }
   return { session, firmId };
@@ -11044,21 +11729,11 @@ function futureExpiration(value, maxDays) {
   }
   return expiresAt;
 }
-async function activeFirmUser(prisma, firmId, userId) {
-  return prisma.user.findFirst({
-    where: {
-      id: userId,
-      status: "active",
-      firmMemberships: { some: { firmId, status: "active", role: { status: "active" } } }
-    },
-    select: { id: true }
-  });
-}
 async function audit(tx, data) {
   await tx.auditEvent.create({
     data: {
       firmId: data.firmId,
-      eventId: (0, import_node_crypto11.randomUUID)(),
+      eventId: (0, import_node_crypto12.randomUUID)(),
       eventType: data.eventType,
       category: "authentication",
       outcome: "succeeded",
@@ -11079,8 +11754,11 @@ async function issueApiKey(_root, args, context) {
   const prisma = context.prisma;
   return runSerializableTransaction(prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManageMachineCredentials");
-    if (!await activeFirmUser(tx, firmId, ownerId)) {
-      throw new Error("API-key owner must be an active member of the selected firm.");
+    const owner = await lockCurrentFirmMember(tx, ownerId, firmId);
+    if (!owner || owner.data.activeFirm?.status !== "active" || scopes.some(
+      (scope) => machineScopePermissionMap[scope].some((permission) => !permissions[permission]({ session: owner }))
+    )) {
+      throw new Error("API-key scopes must be within the current same-firm owner role.");
     }
     const key = await tx.apiKey.create({
       data: {
@@ -11138,7 +11816,7 @@ async function issueOAuthClient(_root, args, context) {
   const scopes = normalizeMachineScopes(args.scopes);
   const description = args.description?.trim() || null;
   if (description && description.length > 2e3) throw new Error("OAuth client description is too long.");
-  const clientId = `olfc_${(0, import_node_crypto11.randomUUID)().replaceAll("-", "")}`;
+  const clientId = `olfc_${(0, import_node_crypto12.randomUUID)().replaceAll("-", "")}`;
   const secret = issueCredential("oauth_client");
   const prisma = context.prisma;
   return runSerializableTransaction(prisma, async (tx) => {
@@ -11279,28 +11957,6 @@ async function revokeAgentCredential(_root, args, context) {
     });
     return { credential: revoked, replayed: false };
   });
-}
-
-// features/keystone/lib/matter-access.ts
-function accessibleMatterStorageWhere(firmId, userId) {
-  return {
-    firmId,
-    AND: [
-      {
-        OR: [
-          { confidentiality: { not: "restricted" } },
-          {
-            AND: [
-              { authorizedUsers: { some: { id: userId } } },
-              { teamMembers: { some: { firmId, userId, status: "active", canAccessRestricted: true } } }
-            ]
-          }
-        ]
-      },
-      { blockedUsers: { none: { id: userId } } },
-      { ethicalWalls: { none: { status: "active", members: { some: { userId, status: "active", decision: "blocked" } } } } }
-    ]
-  };
 }
 
 // features/keystone/mutations/dataWorkflows.ts
@@ -11826,6 +12482,178 @@ async function viewerCanSeedSyntheticDemo(_root, _args, context) {
   }
 }
 
+// features/keystone/mutations/roleWorkflows.ts
+var standardFirmRoles = [
+  {
+    name: "Attorney",
+    permissions: [
+      "canAccessDashboard",
+      "canReadPeople",
+      "canReadIntake",
+      "canManageIntake",
+      "canRunConflictChecks",
+      "canResolveConflicts",
+      "canReadMatters",
+      "canManageMatters",
+      "canReadCalendar",
+      "canManageCalendar",
+      "canReadTasks",
+      "canManageTasks",
+      "canReadCommunications",
+      "canManageCommunications",
+      "canReadDocuments",
+      "canManageDocuments",
+      "canReadBilling",
+      "canManageBilling",
+      "canReadTrust",
+      "canReadPayments",
+      "canReadPortal",
+      "canManagePortal"
+    ]
+  },
+  {
+    name: "Paralegal",
+    permissions: [
+      "canAccessDashboard",
+      "canReadPeople",
+      "canReadIntake",
+      "canManageIntake",
+      "canRunConflictChecks",
+      "canReadMatters",
+      "canReadCalendar",
+      "canManageCalendar",
+      "canReadTasks",
+      "canManageTasks",
+      "canReadCommunications",
+      "canManageCommunications",
+      "canReadDocuments",
+      "canManageDocuments",
+      "canReadBilling",
+      "canManageBilling",
+      "canReadPortal"
+    ]
+  },
+  {
+    name: "Billing",
+    permissions: [
+      "canAccessDashboard",
+      "canReadPeople",
+      "canReadMatters",
+      "canReadBilling",
+      "canManageBilling",
+      "canReadTrust",
+      "canManageTrust",
+      "canReadPayments",
+      "canManagePayments",
+      "canReadPortal"
+    ]
+  },
+  {
+    name: "Intake coordinator",
+    permissions: [
+      "canAccessDashboard",
+      "canReadPeople",
+      "canReadIntake",
+      "canManageIntake",
+      "canRunConflictChecks",
+      "canReadCalendar",
+      "canManageCalendar",
+      "canReadTasks",
+      "canManageTasks",
+      "canReadCommunications",
+      "canManageCommunications"
+    ]
+  }
+];
+function standardRolePermissionData(role) {
+  const granted = new Set(role.permissions);
+  return Object.fromEntries(permissionKeys.map((permission) => [permission, granted.has(permission)]));
+}
+var administrativePermissions = ["canAccessDashboard", "canManagePeople", "canManageRoles", "canManageFirm"];
+function grantedPermissions(value) {
+  if (!Array.isArray(value) || value.length > permissionKeys.length) throw new Error("Granted permissions must be a list of role permissions.");
+  const granted = /* @__PURE__ */ new Set();
+  for (const entry of value) {
+    if (typeof entry !== "string" || !permissionKeys.includes(entry)) throw new Error("Granted permissions contain an unknown permission.");
+    granted.add(entry);
+  }
+  return granted;
+}
+function isAdministrative(role) {
+  return role.status === "active" && administrativePermissions.every((permission) => role[permission] === true);
+}
+async function updateFirmRoleAuthority(_root, args, context) {
+  const session = context.session;
+  if (!isInteractiveHumanSession(session) || !permissions.canManageRoles({ session })) {
+    throw new Error("Changing role authority requires an interactive role-management session.");
+  }
+  const firmId = activeFirmId(session);
+  if (!firmId) throw new Error("An active firm session is required.");
+  const roleId = typeof args.roleId === "string" ? args.roleId.trim() : "";
+  if (!roleId) throw new Error("Role is required.");
+  const reason = typeof args.reason === "string" ? args.reason.trim() : "";
+  if (reason.length < 3 || reason.length > 2e3) throw new Error("Reason must be between 3 and 2000 characters.");
+  const nextStatus = args.status?.trim() || null;
+  if (nextStatus && !["active", "archived"].includes(nextStatus)) throw new Error("Role status must be active or archived.");
+  const granted = grantedPermissions(args.grantedPermissions);
+  return runSerializableTransaction(context.prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManageRoles");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`firm-administrator:${firmId}`}))`;
+    await tx.$executeRaw`SELECT id FROM "Role" WHERE id = ${roleId} AND firm = ${firmId} FOR UPDATE`;
+    const role = await tx.role.findFirst({ where: { id: roleId, firmId } });
+    if (!role) throw new Error("Role is unavailable in the active firm.");
+    const next = {
+      status: nextStatus ?? role.status,
+      ...Object.fromEntries(permissionKeys.map((permission) => [permission, granted.has(permission)]))
+    };
+    const changedPermissions = permissionKeys.filter((permission) => Boolean(role[permission]) !== next[permission]);
+    if (!changedPermissions.length && next.status === role.status) throw new Error("The requested role authority is unchanged.");
+    const actorMembership = await tx.firmMembership.findFirst({
+      where: { firmId, userId: session.itemId, status: "active" },
+      select: { roleId: true }
+    });
+    if (actorMembership?.roleId === roleId && (next.status !== "active" || !next.canManageRoles || !next.canManagePeople)) {
+      throw new Error("Administrators cannot remove their own role or people management through their own role.");
+    }
+    if (isAdministrative(role) && !isAdministrative(next)) {
+      const remaining = await tx.firmMembership.count({
+        where: {
+          firmId,
+          status: "active",
+          roleId: { not: roleId },
+          role: { firmId, status: "active", canAccessDashboard: true, canManagePeople: true, canManageRoles: true, canManageFirm: true },
+          user: { status: "active", activeFirmId: firmId },
+          firm: { status: "active" }
+        }
+      });
+      if (remaining === 0) throw new Error("The firm must retain another active administrator before this role change.");
+    }
+    const updated = await tx.role.update({
+      where: { id: roleId },
+      data: next,
+      select: { id: true, name: true, status: true }
+    });
+    const affectedMemberships = await tx.firmMembership.count({ where: { firmId, roleId, status: { in: ["active", "invited", "suspended"] } } });
+    await recordAuditEvent(tx, {
+      firmId,
+      actorUserId: session.itemId,
+      actorType: "user",
+      eventType: "staff.role_authority_changed",
+      category: "authorization",
+      metadata: {
+        roleId,
+        previousStatus: role.status,
+        nextStatus: updated.status,
+        changedPermissions,
+        grantedPermissions: permissionKeys.filter((permission) => next[permission]),
+        affectedMemberships,
+        reasonDigest: sha256Digest(reason)
+      }
+    });
+    return { roleId: updated.id, name: updated.name, status: updated.status, changedPermissions, affectedMemberships };
+  });
+}
+
 // features/keystone/mutations/onboarding.ts
 function bounded2(value, label, max) {
   const text23 = value?.trim();
@@ -11877,8 +12705,8 @@ function currency(value) {
 }
 async function completeFirmOnboarding(_root, args, context) {
   const session = context.session;
-  if (!isInteractiveHumanSession(session) || session.data.status !== "active" || !session.data.role?.canManageOnboarding) {
-    throw new Error("An active human bootstrap administrator is required for onboarding.");
+  if (!isInteractiveHumanSession(session) || session.data.status !== "active") {
+    throw new Error("An active human administrator is required for onboarding.");
   }
   const firmName = bounded2(args.firmName, "Firm name", 200);
   const firmSlug = slug(args.firmSlug);
@@ -11910,6 +12738,7 @@ async function completeFirmOnboarding(_root, args, context) {
       (membership2) => membership2.status === "active" && membership2.firmId === user.activeFirmId
     );
     if (user.activeFirm && activeMembership) {
+      await assertCurrentCommandActor(tx, context, "canManageOnboarding");
       if (user.activeFirm.status !== "active" || activeMembership.role?.status !== "active" || activeMembership.role?.firmId !== user.activeFirm.id || !activeMembership.role?.canManageOnboarding) throw new Error("Current onboarding authority is required.");
       if (args.seedSyntheticDemo === true) {
         await assertCurrentCommandActor(tx, context, "canManageOnboarding");
@@ -11950,6 +12779,7 @@ async function completeFirmOnboarding(_root, args, context) {
     }
     const duplicate = await tx.firm.findUnique({ where: { slug: firmSlug } });
     if (duplicate) throw new Error("Firm slug is already in use.");
+    if (args.seedSyntheticDemo === true) await requireOwnedOfflineDatabase(tx);
     const firm = await tx.firm.create({
       data: {
         name: firmName,
@@ -11983,6 +12813,14 @@ async function completeFirmOnboarding(_root, args, context) {
         status: "active",
         ...Object.fromEntries(permissionKeys.map((permission) => [permission, true]))
       }
+    });
+    await tx.role.createMany({
+      data: standardFirmRoles.map((standard) => ({
+        firmId: firm.id,
+        name: standard.name,
+        status: "active",
+        ...standardRolePermissionData(standard)
+      }))
     });
     const now = /* @__PURE__ */ new Date();
     const membership = await tx.firmMembership.create({
@@ -12046,120 +12884,6 @@ async function completeFirmOnboarding(_root, args, context) {
   });
 }
 
-// features/keystone/mutations/intakeWorkflows.ts
-var import_node_crypto12 = require("node:crypto");
-function text22(value, label, maximum, required = true) {
-  const result = typeof value === "string" ? value.trim() : "";
-  if (required && !result || result.length > maximum) throw new Error(`${label} ${required ? "is required and " : ""}must be ${maximum} characters or fewer.`);
-  return result || null;
-}
-async function startClientIntake(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageIntake", { humanOnly: true });
-  if (!permissions.canManagePeople({ session: context.session }) || !permissions.canRunConflictChecks({ session: context.session })) {
-    throw new Error("Starting an intake requires people-management and conflict-check permission.");
-  }
-  if (!["person", "organization"].includes(args.contactType)) throw new Error("Contact type must be person or organization.");
-  const firstName = text22(args.firstName, "First name", 120, args.contactType === "person");
-  const lastName = text22(args.lastName, "Last name", 120, args.contactType === "person");
-  const organizationName = text22(args.organizationName, "Organization name", 200, args.contactType === "organization");
-  const email = text22(args.email, "Email", 320, false)?.toLowerCase() ?? null;
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Email must be valid.");
-  const phone = text22(args.phone, "Phone", 80, false);
-  const title = text22(args.title, "Intake title", 240);
-  const summary = text22(args.summary, "Intake summary", 4e3, false);
-  const adversePartySummary = text22(args.adversePartySummary, "Adverse-party summary", 2e3, false);
-  const source = args.source?.trim() || "other";
-  if (!["website", "referral", "phone", "walk_in", "import", "other"].includes(source)) throw new Error("Unsupported intake source.");
-  const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageIntake");
-    await assertCurrentCommandActor(tx, context, "canManagePeople");
-    await assertCurrentCommandActor(tx, context, "canRunConflictChecks");
-    if (args.officeId) {
-      const office = await tx.office.findFirst({ where: { id: args.officeId, firmId, status: "active" }, select: { id: true } });
-      if (!office) throw new Error("The selected office is unavailable in this firm.");
-    }
-    if (args.assignedToId) {
-      const membership = await tx.firmMembership.findFirst({
-        where: { firmId, userId: args.assignedToId, status: "active" },
-        select: { id: true }
-      });
-      if (!membership) throw new Error("The selected assignee is not an active firm member.");
-    }
-    const suffix = (0, import_node_crypto12.randomUUID)().replaceAll("-", "").slice(0, 12).toUpperCase();
-    const contact = await tx.contact.create({
-      data: {
-        firmId,
-        contactType: args.contactType,
-        status: "prospective_client",
-        firstName: firstName ?? "",
-        lastName: lastName ?? "",
-        organizationName: organizationName ?? "",
-        primaryEmail: email ?? "",
-        primaryPhone: phone ?? "",
-        conflictSearchAliases: []
-      },
-      select: { id: true }
-    });
-    const intake = await tx.intake.create({
-      data: {
-        firmId,
-        intakeNumber: `INT-${suffix}`,
-        title,
-        status: "new",
-        source,
-        primaryContactId: contact.id,
-        officeId: args.officeId || null,
-        openedById: userId,
-        assignedToId: args.assignedToId || userId,
-        receivedAt: /* @__PURE__ */ new Date(),
-        summary: summary ?? "",
-        adversePartySummary: adversePartySummary ?? ""
-      },
-      select: { id: true, intakeNumber: true, status: true }
-    });
-    await tx.intakeParticipant.create({
-      data: { firmId, intakeId: intake.id, contactId: contact.id, participantRole: "prospective_client", status: "active" }
-    });
-    const conflictCheck = await tx.conflictCheck.create({
-      data: {
-        firmId,
-        checkNumber: `CHK-${suffix}`,
-        status: "requested",
-        intakeId: intake.id,
-        requestedById: userId,
-        searchScope: "contacts_and_matters",
-        searchVersion: "v1"
-      },
-      select: { id: true, checkNumber: true, status: true }
-    });
-    const contactName2 = args.contactType === "organization" ? organizationName : [firstName, lastName].filter(Boolean).join(" ");
-    if (!contactName2) throw new Error("A conflict-search name is required.");
-    await tx.conflictSearchTerm.create({
-      data: {
-        firmId,
-        checkId: conflictCheck.id,
-        term: contactName2,
-        normalizedTerm: contactName2.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim(),
-        termType: args.contactType === "organization" ? "organization" : "person",
-        sourceContactId: contact.id,
-        includeAliases: true
-      }
-    });
-    await recordAuditEvent(tx, {
-      firmId,
-      actorUserId: userId,
-      actorType: "user",
-      eventType: "intake.started",
-      category: "legal_workflow",
-      intakeId: intake.id,
-      contactId: contact.id,
-      metadata: { conflictCheckId: conflictCheck.id, source }
-    });
-    return { intake, contact, conflictCheck };
-  });
-}
-
 // features/keystone/mutations/staffWorkflows.ts
 var import_node_crypto13 = require("node:crypto");
 function requireString(value, label, maximum) {
@@ -12207,62 +12931,51 @@ async function inviteFirmMember(_root, args, context) {
   ]);
   if (!role) throw new Error("The selected active role is unavailable in this firm.");
   if (officeId && !office) throw new Error("The selected active office is unavailable in this firm.");
-  if (existing && !isUnclaimedInvitationIdentity(existing)) {
+  if (existing) {
     throw new Error("A user with this email already exists. Use account recovery or an administrator-assisted membership review.");
   }
-  let createdUserId = null;
-  try {
-    const created = existing ?? await context.sudo().db.User.createOne({
-      data: { name, email, password: `Of!${(0, import_node_crypto13.randomBytes)(30).toString("base64url")}9a`, status: "invited" }
-    });
-    if (!existing) createdUserId = created.id;
-    const membership = await runSerializableTransaction(prisma, async (tx) => {
-      await assertCurrentCommandActor(tx, context, "canManagePeople");
-      await assertCurrentCommandActor(tx, context, "canManageRoles");
-      await tx.$executeRaw`SELECT id FROM "Role" WHERE id = ${roleId} AND firm = ${firmId} FOR SHARE`;
-      const currentRole = await tx.role.findFirst({ where: { id: roleId, firmId, status: "active" }, select: { id: true } });
-      if (!currentRole) throw new Error("The selected active role is unavailable in this firm.");
-      if (officeId) {
-        await tx.$executeRaw`SELECT id FROM "Office" WHERE id = ${officeId} AND firm = ${firmId} FOR SHARE`;
-        const currentOffice = await tx.office.findFirst({ where: { id: officeId, firmId, status: "active" }, select: { id: true } });
-        if (!currentOffice) throw new Error("The selected active office is unavailable in this firm.");
-      }
-      await tx.$executeRaw`SELECT id FROM "User" WHERE id = ${created.id} FOR UPDATE`;
-      const identity = await tx.user.findUnique({ where: { id: created.id }, select: invitationIdentitySelect });
-      if (!identity || !isUnclaimedInvitationIdentity(identity)) throw new Error("This user already has a firm membership.");
-      await tx.user.update({ where: { id: created.id }, data: { activeFirmId: firmId, ...existing ? { name } : {} } });
-      const result = await tx.firmMembership.create({
-        data: {
-          firmId,
-          userId: created.id,
-          roleId,
-          primaryOfficeId: officeId,
-          status: "invited"
-        },
-        select: { id: true, status: true }
-      });
-      await recordAuditEvent(tx, {
-        firmId,
-        actorUserId,
-        actorType: "user",
-        eventType: "staff.invitation_issued",
-        category: "authorization",
-        metadata: {
-          membershipId: result.id,
-          invitationDigest: sha256Digest({ email, roleId, officeId, invitedUserId: created.id })
-        }
-      });
-      return result;
-    });
-    return { membership, userId: created.id, email };
-  } catch (error) {
-    if (createdUserId) {
-      await prisma.user.deleteMany({
-        where: { id: createdUserId, firmMemberships: { none: {} } }
-      }).catch(() => void 0);
+  const created = await context.sudo().db.User.createOne({
+    data: { name, email, password: `Of!${(0, import_node_crypto13.randomBytes)(30).toString("base64url")}9a`, status: "invited" }
+  });
+  const membership = await runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManagePeople");
+    await assertCurrentCommandActor(tx, context, "canManageRoles");
+    await tx.$executeRaw`SELECT id FROM "Role" WHERE id = ${roleId} AND firm = ${firmId} FOR SHARE`;
+    const currentRole = await tx.role.findFirst({ where: { id: roleId, firmId, status: "active" }, select: { id: true } });
+    if (!currentRole) throw new Error("The selected active role is unavailable in this firm.");
+    if (officeId) {
+      await tx.$executeRaw`SELECT id FROM "Office" WHERE id = ${officeId} AND firm = ${firmId} FOR SHARE`;
+      const currentOffice = await tx.office.findFirst({ where: { id: officeId, firmId, status: "active" }, select: { id: true } });
+      if (!currentOffice) throw new Error("The selected active office is unavailable in this firm.");
     }
-    throw error;
-  }
+    await tx.$executeRaw`SELECT id FROM "User" WHERE id = ${created.id} FOR UPDATE`;
+    const identity = await tx.user.findUnique({ where: { id: created.id }, select: invitationIdentitySelect });
+    if (!identity || !isUnclaimedInvitationIdentity(identity)) throw new Error("This user already has a firm membership.");
+    await tx.user.update({ where: { id: created.id }, data: { activeFirmId: firmId } });
+    const result = await tx.firmMembership.create({
+      data: {
+        firmId,
+        userId: created.id,
+        roleId,
+        primaryOfficeId: officeId,
+        status: "invited"
+      },
+      select: { id: true, status: true }
+    });
+    await recordAuditEvent(tx, {
+      firmId,
+      actorUserId,
+      actorType: "user",
+      eventType: "staff.invitation_issued",
+      category: "authorization",
+      metadata: {
+        membershipId: result.id,
+        invitationDigest: sha256Digest({ email, roleId, officeId, invitedUserId: created.id })
+      }
+    });
+    return result;
+  });
+  return { membership, userId: created.id, email };
 }
 async function changeFirmMemberAccess(_root, args, context) {
   if (!permissions.canManagePeople({ session: context.session })) {
@@ -12298,7 +13011,7 @@ async function changeFirmMemberAccess(_root, args, context) {
         roleId: true,
         primaryOfficeId: true,
         startedAt: true,
-        role: { select: { canManagePeople: true, canManageRoles: true, canManageFirm: true } }
+        role: { select: { canAccessDashboard: true, canManagePeople: true, canManageRoles: true, canManageFirm: true } }
       }
     });
     if (!membership) throw new Error("Firm membership is unavailable in the active firm.");
@@ -12311,7 +13024,7 @@ async function changeFirmMemberAccess(_root, args, context) {
     }
     const role = roleId ? await tx.role.findFirst({
       where: { id: roleId, firmId, status: "active" },
-      select: { id: true, canManagePeople: true, canManageRoles: true, canManageFirm: true }
+      select: { id: true, canAccessDashboard: true, canManagePeople: true, canManageRoles: true, canManageFirm: true }
     }) : null;
     if (roleId && !role) throw new Error("The selected active role is unavailable in this firm.");
     if (officeProvided && officeId) {
@@ -12326,8 +13039,8 @@ async function changeFirmMemberAccess(_root, args, context) {
     }
     const nextStatus = toStatus ?? membership.status;
     const nextRole = role ?? membership.role;
-    const currentlyAdministrative = membership.status === "active" && membership.role.canManagePeople && membership.role.canManageRoles && membership.role.canManageFirm;
-    const remainsAdministrative = nextStatus === "active" && nextRole.canManagePeople && nextRole.canManageRoles && nextRole.canManageFirm;
+    const currentlyAdministrative = membership.status === "active" && membership.role.canAccessDashboard && membership.role.canManagePeople && membership.role.canManageRoles && membership.role.canManageFirm;
+    const remainsAdministrative = nextStatus === "active" && nextRole.canAccessDashboard && nextRole.canManagePeople && nextRole.canManageRoles && nextRole.canManageFirm;
     if (currentlyAdministrative && !remainsAdministrative) {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`firm-administrator:${firmId}`}))`;
       const otherAdministrators = await tx.firmMembership.count({
@@ -12335,7 +13048,9 @@ async function changeFirmMemberAccess(_root, args, context) {
           firmId,
           id: { not: membershipId },
           status: "active",
-          role: { status: "active", canManagePeople: true, canManageRoles: true, canManageFirm: true }
+          role: { firmId, status: "active", canAccessDashboard: true, canManagePeople: true, canManageRoles: true, canManageFirm: true },
+          user: { status: "active", activeFirmId: firmId },
+          firm: { status: "active" }
         }
       });
       if (otherAdministrators === 0) throw new Error("The firm must retain another active administrator before this change.");
@@ -12376,90 +13091,6 @@ async function changeFirmMemberAccess(_root, args, context) {
       }
     });
     return changed;
-  });
-}
-
-// features/keystone/mutations/roleWorkflows.ts
-var administrativePermissions = ["canManagePeople", "canManageRoles", "canManageFirm"];
-function grantedPermissions(value) {
-  if (!Array.isArray(value) || value.length > permissionKeys.length) throw new Error("Granted permissions must be a list of role permissions.");
-  const granted = /* @__PURE__ */ new Set();
-  for (const entry of value) {
-    if (typeof entry !== "string" || !permissionKeys.includes(entry)) throw new Error("Granted permissions contain an unknown permission.");
-    granted.add(entry);
-  }
-  return granted;
-}
-function isAdministrative(role) {
-  return role.status === "active" && administrativePermissions.every((permission) => role[permission] === true);
-}
-async function updateFirmRoleAuthority(_root, args, context) {
-  const session = context.session;
-  if (!isInteractiveHumanSession(session) || !permissions.canManageRoles({ session })) {
-    throw new Error("Changing role authority requires an interactive role-management session.");
-  }
-  const firmId = activeFirmId(session);
-  if (!firmId) throw new Error("An active firm session is required.");
-  const roleId = typeof args.roleId === "string" ? args.roleId.trim() : "";
-  if (!roleId) throw new Error("Role is required.");
-  const reason = typeof args.reason === "string" ? args.reason.trim() : "";
-  if (reason.length < 3 || reason.length > 2e3) throw new Error("Reason must be between 3 and 2000 characters.");
-  const nextStatus = args.status?.trim() || null;
-  if (nextStatus && !["active", "archived"].includes(nextStatus)) throw new Error("Role status must be active or archived.");
-  const granted = grantedPermissions(args.grantedPermissions);
-  return runSerializableTransaction(context.prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageRoles");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`firm-administrator:${firmId}`}))`;
-    await tx.$executeRaw`SELECT id FROM "Role" WHERE id = ${roleId} AND firm = ${firmId} FOR UPDATE`;
-    const role = await tx.role.findFirst({ where: { id: roleId, firmId } });
-    if (!role) throw new Error("Role is unavailable in the active firm.");
-    const next = {
-      status: nextStatus ?? role.status,
-      ...Object.fromEntries(permissionKeys.map((permission) => [permission, granted.has(permission)]))
-    };
-    const changedPermissions = permissionKeys.filter((permission) => Boolean(role[permission]) !== next[permission]);
-    if (!changedPermissions.length && next.status === role.status) throw new Error("The requested role authority is unchanged.");
-    const actorMembership = await tx.firmMembership.findFirst({
-      where: { firmId, userId: session.itemId, status: "active" },
-      select: { roleId: true }
-    });
-    if (actorMembership?.roleId === roleId && (next.status !== "active" || !next.canManageRoles || !next.canManagePeople)) {
-      throw new Error("Administrators cannot remove their own role or people management through their own role.");
-    }
-    if (isAdministrative(role) && !isAdministrative(next)) {
-      const remaining = await tx.firmMembership.count({
-        where: {
-          firmId,
-          status: "active",
-          roleId: { not: roleId },
-          role: { status: "active", canManagePeople: true, canManageRoles: true, canManageFirm: true }
-        }
-      });
-      if (remaining === 0) throw new Error("The firm must retain another active administrator before this role change.");
-    }
-    const updated = await tx.role.update({
-      where: { id: roleId },
-      data: next,
-      select: { id: true, name: true, status: true }
-    });
-    const affectedMemberships = await tx.firmMembership.count({ where: { firmId, roleId, status: { in: ["active", "invited", "suspended"] } } });
-    await recordAuditEvent(tx, {
-      firmId,
-      actorUserId: session.itemId,
-      actorType: "user",
-      eventType: "staff.role_authority_changed",
-      category: "authorization",
-      metadata: {
-        roleId,
-        previousStatus: role.status,
-        nextStatus: updated.status,
-        changedPermissions,
-        grantedPermissions: permissionKeys.filter((permission) => next[permission]),
-        affectedMemberships,
-        reasonDigest: sha256Digest(reason)
-      }
-    });
-    return { roleId: updated.id, name: updated.name, status: updated.status, changedPermissions, affectedMemberships };
   });
 }
 
@@ -13014,8 +13645,9 @@ async function addMatterParty(_root, args, context) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`matter:${firmId}:${args.matterId}`}))`;
     await assertMatterAccess(tx, firmId, args.matterId, userId);
     await assertMatterTeamCapability(tx, firmId, args.matterId, userId, "canEdit");
-    const matter = await tx.matter.findFirst({ where: { id: args.matterId, firmId }, select: { id: true, status: true } });
+    const matter = await tx.matter.findFirst({ where: { id: args.matterId, firmId }, select: { id: true, status: true, clientId: true } });
     if (!matter || ["closed", "declined"].includes(matter.status)) throw new Error("Parties can be added only to an active matter.");
+    if (args.isPrimaryClient && args.contactId !== matter.clientId) throw new Error("The primary client party must match the matter client.");
     const contact = await activeContact(tx, firmId, args.contactId);
     for (const relatedId of [args.representedById, args.counselContactId]) {
       if (relatedId) await activeContact(tx, firmId, relatedId);
@@ -13078,7 +13710,12 @@ async function changeMatterParty(_root, args, context) {
     const roleChanged = Boolean(args.partyRole && args.partyRole !== party.partyRole);
     const sideChanged = Boolean(args.side && args.side !== party.side);
     if (!args.remove && !roleChanged && !sideChanged && notes == null) throw new Error("A role, side, notes or removal change is required.");
-    if (roleChanged && party.isPrimaryClient) throw new Error("Change the primary client designation before changing this party's role.");
+    const matter = await tx.matter.findFirst({ where: { id: party.matterId, firmId }, select: { clientId: true, status: true } });
+    if (!matter || ["closed", "declined"].includes(matter.status)) throw new Error("Only parties on an active matter can be changed.");
+    if (party.isPrimaryClient && party.contactId !== matter.clientId) throw new Error("Inconsistent primary client requires reviewed correction.");
+    if ((args.remove || roleChanged) && (party.isPrimaryClient || party.partyRole === "client" && party.contactId === matter.clientId)) {
+      throw new Error("The authoritative matter client cannot be removed or replaced through party maintenance.");
+    }
     const updated = await tx.matterParty.update({
       where: { id: party.id },
       data: args.remove ? { status: "removed", isPrimaryClient: false } : { ...roleChanged ? { partyRole: args.partyRole } : {}, ...sideChanged ? { side: args.side } : {}, ...notes != null ? { notes } : {} },
@@ -13113,6 +13750,17 @@ async function changeMatterParty(_root, args, context) {
 // features/keystone/lib/portal-auth.ts
 var import_node_crypto15 = require("node:crypto");
 var import_zod2 = require("zod");
+
+// features/keystone/lib/portal-read-error.ts
+var PortalReadError = class extends Error {
+  constructor(code) {
+    super(code === "invalid_session" ? "Portal session is invalid or expired." : code === "invalid_cursor" ? "Portal page is unavailable." : "Shared item is unavailable.");
+    this.code = code;
+    this.name = "PortalReadError";
+  }
+};
+
+// features/keystone/lib/portal-auth.ts
 async function authenticatePortalSession(rawToken, prisma, pepper) {
   const client = prismaWithoutGraphQLErrorConversion(prisma);
   const parsed = parseCredential(rawToken);
@@ -13172,7 +13820,7 @@ async function readPortalSharedResource(rawToken, shareId, prisma, pepper) {
 async function readPortalSharedResourceInTransaction(rawToken, shareId, prisma, pepper) {
   const client = prismaWithoutGraphQLErrorConversion(prisma);
   const identity = await authenticatePortalSession(rawToken, client, pepper);
-  if (!identity) throw new Error("Portal session is invalid or expired.");
+  if (!identity) throw new PortalReadError("invalid_session");
   const now = /* @__PURE__ */ new Date();
   const value = await client.portalShare.findFirst({
     where: { ...portalShareCandidateWhere(identity, now), id: shareId },
@@ -13180,13 +13828,13 @@ async function readPortalSharedResourceInTransaction(rawToken, shareId, prisma, 
   });
   const share = boundPortalShare(value, identity, now);
   if (!share || share.id !== shareId || !await portalShareIsCurrent(client, share)) {
-    throw new Error("Portal share is not available to this account.");
+    throw new PortalReadError("unavailable_resource");
   }
   const current = await client.portalShare.findFirst({
     where: boundPortalShareWhere(share, identity, now),
     select: { id: true }
   });
-  if (!current || current.id !== share.id) throw new Error("Portal share is not available to this account.");
+  if (!current || current.id !== share.id) throw new PortalReadError("unavailable_resource");
   if (share.resourceType === "document") {
     const resource3 = await client.document.findFirst({
       where: {
@@ -13492,6 +14140,7 @@ async function invitePortalAccount(_root, args, context) {
     if (existing && existing.contactId !== contact.id) {
       throw new Error("Portal email is already assigned to another contact in this firm.");
     }
+    if (existing) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-account:${firmId}:${existing.id}`}))`;
     const now = /* @__PURE__ */ new Date();
     const revokedSessions = existing ? await tx.portalSession.updateMany({
       where: { portalAccountId: existing.id, status: "active" },
@@ -13501,6 +14150,8 @@ async function invitePortalAccount(_root, args, context) {
       where: { id: existing.id },
       data: {
         status: "invited",
+        resetTokenDigest: "",
+        resetExpiresAt: null,
         inviteTokenDigest: invite.digest,
         inviteTokenPrefix: invite.prefix,
         inviteExpiresAt: expiresAt,
@@ -13543,8 +14194,11 @@ async function acceptPortalInvitation(_root, args, context) {
   const prisma = context.prisma;
   return runSerializableTransaction(prisma, async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-invite:${digest2}`}))`;
-    const account2 = await tx.portalAccount.findUnique({ where: { inviteTokenDigest: digest2 } });
-    if (!account2 || account2.status !== "invited" || !account2.inviteExpiresAt || account2.inviteExpiresAt <= /* @__PURE__ */ new Date()) {
+    const reference = await tx.portalAccount.findUnique({ where: { inviteTokenDigest: digest2 }, select: { id: true, firmId: true } });
+    if (!reference) throw new Error("Portal invitation is invalid or expired.");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-account:${reference.firmId}:${reference.id}`}))`;
+    const account2 = await tx.portalAccount.findUnique({ where: { inviteTokenDigest: digest2 }, include: { firm: { select: { status: true } }, contact: { select: { status: true, firmId: true } } } });
+    if (!account2 || account2.status !== "invited" || account2.firm?.status !== "active" || account2.contact?.firmId !== account2.firmId || !account2.contact?.status || account2.contact.status === "archived" || !account2.inviteExpiresAt || account2.inviteExpiresAt <= /* @__PURE__ */ new Date()) {
       throw new Error("Portal invitation is invalid or expired.");
     }
     const sessionCredential = issueCredential("portal_session");
@@ -13554,6 +14208,8 @@ async function acceptPortalInvitation(_root, args, context) {
       data: {
         status: "active",
         acceptedAt: now,
+        resetTokenDigest: "",
+        resetExpiresAt: null,
         inviteTokenDigest: null,
         inviteTokenPrefix: "",
         inviteExpiresAt: null
@@ -13730,7 +14386,7 @@ async function revokePortalGrant(_root, args, context) {
       if (!account2) throw new Error("Portal account was not found in the active firm.");
       if (account2.status === "closed") return { id: account2.id, status: account2.status, replayed: true };
       await Promise.all([
-        tx.portalAccount.update({ where: { id: account2.id }, data: { status: "closed", closedAt: now } }),
+        tx.portalAccount.update({ where: { id: account2.id }, data: { status: "closed", closedAt: now, resetTokenDigest: "", resetExpiresAt: null, inviteTokenDigest: null, inviteTokenPrefix: "", inviteExpiresAt: null } }),
         tx.portalSession.updateMany({ where: { portalAccountId: account2.id, status: "active" }, data: { status: "revoked", revokedAt: now } }),
         tx.portalMatterAccess.updateMany({ where: { firmId, portalAccountId: account2.id, status: "active" }, data: { status: "revoked", version: { increment: 1 }, revokedById: userId, revokedAt: now, revocationReason: reason } }),
         tx.portalShare.updateMany({ where: { portalAccountId: account2.id, status: "active" }, data: { status: "revoked", revokedById: userId, revokedAt: now } })
@@ -14481,6 +15137,22 @@ function formatInstant(value, timeZone, { includeTime = true, missing = "Not rec
   }).format(date);
 }
 
+// features/shared/dispatch-outcome.ts
+function communicationDispatchState(status, errorCode) {
+  if (errorCode === "smtp_outcome_unknown") return { status: "unknown", guidance: "Unknown \u2014 do not resend until reconciled." };
+  if (errorCode === "smtp_not_dispatched") return { status: "not_dispatched", guidance: "Not dispatched. Review the original intent and authority; no automatic retry." };
+  if (errorCode === "smtp_send_admitted") return { status: "in_flight", guidance: "Admitted; acceptance is not yet confirmed. Do not resend." };
+  if (status === "sent") return { status: "relay_accepted", guidance: "Accepted by the relay; final delivery is not confirmed." };
+  return { status, guidance: status === "pending" ? "Queued; no final delivery outcome." : "" };
+}
+function webhookDispatchState(status, lastError) {
+  if (lastError?.startsWith("outcome_unknown:")) return { status: "unknown", guidance: "Unknown \u2014 do not resend until reconciled." };
+  if (lastError?.startsWith("not_dispatched:")) return { status: "not_dispatched", guidance: "Not dispatched. Review the original intent and authority before any new admission." };
+  if (lastError === "admitted:awaiting_observation") return { status: "in_flight", guidance: "Admitted; remote outcome is not confirmed. Do not resend." };
+  if (lastError === "claimed:not_admitted") return { status: "claimed", guidance: "Claimed, but not admitted for transport." };
+  return { status, guidance: "" };
+}
+
 // features/keystone/mutations/practiceWorkspace.ts
 var CATEGORIES = /* @__PURE__ */ new Set([
   "intake",
@@ -14515,9 +15187,9 @@ var practiceWorkspaceSources = {
       permissions: ["canReadIntake"],
       where: { status: { in: ["new", "screening", "conflict_review", "consultation", "decision"] } },
       orderBy: [{ receivedAt: "desc" }, { id: "asc" }],
-      query: "id intakeNumber status receivedAt",
+      query: "id intakeNumber title status receivedAt primaryContact { displayName }",
       kind: "Intake",
-      map: (record) => ({ id: record.id, title: record.intakeNumber, subtitle: "Prospective-client intake \xB7 open the pipeline to act", status: record.status, at: iso2(record.receivedAt) })
+      map: (record) => ({ id: record.id, title: record.title || record.intakeNumber, subtitle: [record.primaryContact?.displayName ?? "Client unavailable", record.intakeNumber].join(" \xB7 "), status: record.status, at: iso2(record.receivedAt) })
     },
     {
       key: "conflicts",
@@ -14527,10 +15199,16 @@ var practiceWorkspaceSources = {
       permissions: ["canReadIntake", "canRunConflictChecks", "canResolveConflicts"],
       where: { status: { in: ["requested", "running", "review_required"] } },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      query: "status createdAt",
+      query: "status createdAt intake { intakeNumber title primaryContact { displayName } } matter { matterNumber title }",
       kind: "Conflict check",
       previewOnly: true,
-      map: (record) => ({ id: "conflict-preview", title: "Conflict check", subtitle: "Awaiting conflict review", status: record.status, at: iso2(record.createdAt) })
+      map: (record) => ({
+        id: "conflict-preview",
+        title: record.intake?.title ?? (record.matter ? `${record.matter.matterNumber} \xB7 ${record.matter.title}` : "Conflict check"),
+        subtitle: record.intake ? [record.intake.primaryContact?.displayName ?? "Client unavailable", record.intake.intakeNumber].join(" \xB7 ") : record.matter ? "Matter conflict check" : "Awaiting conflict review",
+        status: record.status,
+        at: iso2(record.createdAt)
+      })
     }
   ],
   matters: [
@@ -14694,9 +15372,9 @@ var practiceWorkspaceSources = {
       permissions: ["canReadCommunications"],
       where: { status: { in: ["pending", "failed", "bounced"] } },
       orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-      query: "id status channel attemptCount lastAttemptAt message { subject }",
+      query: "id status channel errorCode attemptCount lastAttemptAt message { subject }",
       kind: "Delivery",
-      map: (record) => ({ id: record.id, title: record.message?.subject ? `Delivery \xB7 ${record.message.subject}` : "Message delivery", subtitle: `${record.channel} \xB7 ${record.attemptCount ?? 0} attempts`, status: record.status, at: iso2(record.lastAttemptAt) })
+      map: (record) => ({ id: record.id, title: record.message?.subject ? `Delivery \xB7 ${record.message.subject}` : "Message delivery", subtitle: `${record.channel} \xB7 ${record.attemptCount ?? 0} attempts \xB7 ${communicationDispatchState(record.status, record.errorCode).guidance}`, status: communicationDispatchState(record.status, record.errorCode).status, at: iso2(record.lastAttemptAt) })
     }
   ],
   "time-expenses": [
@@ -14914,8 +15592,8 @@ var practiceWorkspaceSources = {
   data: [
     {
       key: "connections",
-      title: "Import connections",
-      description: "Active provider connections that can own source identity mappings for controlled imports.",
+      title: "Import sources",
+      description: "Connections that contacts can be imported from.",
       model: "IntegrationConnection",
       permissions: ["canManageIntegrations"],
       where: { status: { equals: "active" } },
@@ -14926,8 +15604,8 @@ var practiceWorkspaceSources = {
     },
     {
       key: "links",
-      title: "Migration identity map",
-      description: "External record links and synchronization fingerprints used to stage portable data.",
+      title: "Imported records",
+      description: "Records linked to their original source.",
       model: "ExternalRecordLink",
       permissions: ["canReadIntegrations", "canManageIntegrations"],
       orderBy: { updatedAt: "desc" },
@@ -14962,15 +15640,15 @@ var practiceWorkspaceSources = {
     },
     {
       key: "webhooks",
-      title: "Delivery operations",
-      description: "Webhook deliveries waiting, retrying, or moved to dead letter.",
+      title: "Webhook deliveries",
+      description: "Queued, sent, unresolved and rejected deliveries. A delivery with an unknown outcome must be checked, not resent.",
       model: "WebhookDelivery",
       permissions: ["canReadIntegrations", "canManageIntegrations"],
       where: { status: { in: ["pending", "processing", "failed", "dead_letter"] } },
       orderBy: { updatedAt: "desc" },
-      query: "id eventId eventType status attemptCount nextAttemptAt updatedAt subscription { name } matter { matterNumber }",
+      query: "id eventId eventType status lastError attemptCount nextAttemptAt updatedAt subscription { name } matter { matterNumber }",
       kind: "Webhook delivery",
-      map: (record) => ({ id: record.id, title: record.eventType, subtitle: `${record.subscription?.name ?? "Subscription"} \xB7 ${record.eventId} \xB7 ${record.attemptCount ?? 0} attempts`, status: record.status, at: iso2(record.nextAttemptAt ?? record.updatedAt) })
+      map: (record) => ({ id: record.id, title: record.eventType, subtitle: `${record.subscription?.name ?? "Subscription"} \xB7 ${record.eventId} \xB7 ${record.attemptCount ?? 0} attempts \xB7 ${webhookDispatchState(record.status, record.lastError).guidance}`, status: webhookDispatchState(record.status, record.lastError).status, at: iso2(record.nextAttemptAt ?? record.updatedAt) })
     },
     {
       key: "credentials",
@@ -15085,6 +15763,34 @@ async function practiceWorkspace(_root, args, context) {
   };
 }
 
+// features/platform/billing/lib/ratePricing.ts
+function within(at, from, to) {
+  if (from && new Date(from).getTime() > at) return false;
+  if (to && new Date(to).getTime() < at) return false;
+  return true;
+}
+function resolveHourlyRate(rules2, target) {
+  const at = new Date(target.workDate).getTime();
+  if (Number.isNaN(at)) return null;
+  let best = null;
+  for (const rule of rules2) {
+    const card = rule.rateCard;
+    if (!card || card.status !== "active") continue;
+    if (card.matter && card.matter.id !== target.matterId) continue;
+    if (rule.matter && rule.matter.id !== target.matterId) continue;
+    if (rule.user && rule.user.id !== target.userId) continue;
+    if (rule.practiceArea && rule.practiceArea.id !== target.practiceAreaId) continue;
+    if (!within(at, card.effectiveFrom, card.effectiveTo) || !within(at, rule.effectiveFrom, rule.effectiveTo)) continue;
+    if (!Number.isSafeInteger(rule.amountMinor) || rule.amountMinor < 0) continue;
+    const score = (rule.matter ? 8 : 0) + (rule.user ? 4 : 0) + (rule.practiceArea ? 2 : 0) + (card.matter ? 1 : 0);
+    if (!best || score > best.score || score === best.score && (rule.priority ?? 100) < (best.rule.priority ?? 100)) best = { rule, score };
+  }
+  return best?.rule ?? null;
+}
+function priceMinutes(rateMinor, minutes) {
+  return Math.round(rateMinor * minutes / 60);
+}
+
 // features/keystone/mutations/practiceWorkflows.ts
 function durableKey2(value) {
   const key = value?.trim();
@@ -15168,6 +15874,13 @@ async function transitionIntake(_root, args, context) {
     return { intake: updated, replayed: false };
   });
 }
+var intakePartyMapping = {
+  prospective_client: { partyRole: "client", side: "our_client" },
+  adverse_party: { partyRole: "opposing_party", side: "adverse" },
+  related_party: { partyRole: "other", side: "unknown" },
+  witness: { partyRole: "witness", side: "neutral" },
+  other: { partyRole: "other", side: "unknown" }
+};
 async function convertIntakeToMatter(_root, args, context) {
   const { firmId, userId } = requirePermission(context, "canManageMatters", { humanOnly: true });
   requirePermission(context, "canManageIntake", { humanOnly: true });
@@ -15206,6 +15919,8 @@ async function convertIntakeToMatter(_root, args, context) {
       }
       return { matter: existing, replayed: true };
     }
+    const numberTaken = await tx.matter.findFirst({ where: { firmId, matterNumber: args.matterNumber.trim() }, select: { id: true } });
+    if (numberTaken) throw new Error("Matter number is already in use in this firm.");
     const now = /* @__PURE__ */ new Date();
     const matter = await tx.matter.create({
       data: {
@@ -15266,6 +15981,40 @@ async function convertIntakeToMatter(_root, args, context) {
         }
       })
     ]);
+    const participants = await tx.intakeParticipant.findMany({
+      where: { firmId, intakeId: intake.id, status: "active" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { contactId: true, participantRole: true }
+    });
+    const partyKeys = /* @__PURE__ */ new Set();
+    const partyIds = [];
+    const clientParticipants = participants.some((participant) => participant.contactId === intake.primaryContactId && participant.participantRole === "prospective_client") ? participants : [{ contactId: intake.primaryContactId, participantRole: "prospective_client" }, ...participants];
+    for (const participant of clientParticipants) {
+      const party = intakePartyMapping[participant.participantRole];
+      if (!party) continue;
+      const isPrimaryClient = participant.contactId === intake.primaryContactId && party.partyRole === "client";
+      const key = `${participant.contactId}:${party.partyRole}`;
+      if (partyKeys.has(key)) continue;
+      partyKeys.add(key);
+      const created = await tx.matterParty.create({
+        data: {
+          firmId,
+          matterId: matter.id,
+          contactId: participant.contactId,
+          partyRole: party.partyRole,
+          side: party.side,
+          status: "active",
+          isPrimaryClient,
+          notes: ""
+        },
+        select: { id: true }
+      });
+      partyIds.push(created.id);
+    }
+    await tx.contact.updateMany({
+      where: { id: intake.primaryContactId, firmId, status: { in: ["prospective_client", "former_client", "other"] } },
+      data: { status: "client" }
+    });
     await recordAuditEvent(tx, {
       firmId,
       eventType: "intake.converted_to_matter",
@@ -15273,7 +16022,8 @@ async function convertIntakeToMatter(_root, args, context) {
       actorUserId: userId,
       matterId: matter.id,
       intakeId: intake.id,
-      metadata: { responsibleAttorneyId: attorney.id, conflictCheckIds: clearedCheckIds, reasonDigest: sha256Digest(reason) }
+      contactId: intake.primaryContactId,
+      metadata: { responsibleAttorneyId: attorney.id, conflictCheckIds: clearedCheckIds, matterPartyIds: partyIds, reasonDigest: sha256Digest(reason) }
     });
     return { matter: openedMatter, replayed: false };
   });
@@ -15377,8 +16127,32 @@ async function transitionTimeEntry(_root, args, context) {
     toStatus: args.toStatus,
     reason: args.reason,
     humanOnly: true,
-    validate: async (_tx, _item, userId) => args.toStatus === "approved" ? { approvedById: userId, approvedAt: /* @__PURE__ */ new Date() } : args.toStatus === "draft" ? { approvedById: null, approvedAt: null } : {}
+    validate: async (tx, item, userId) => args.toStatus === "approved" ? { approvedById: userId, approvedAt: /* @__PURE__ */ new Date(), ...await priceUnpricedTime(tx, item) } : args.toStatus === "draft" ? { approvedById: null, approvedAt: null } : {}
   });
+}
+async function priceUnpricedTime(tx, item) {
+  if (!item?.isBillable || item.amountMinor !== null && item.amountMinor !== void 0) return {};
+  const matter = await tx.matter.findFirst({ where: { id: item.matterId, firmId: item.firmId }, select: { practiceAreaId: true } });
+  const rows = await tx.rateRule.findMany({
+    where: { firmId: item.firmId, rateType: "hourly", rateCard: { status: "active" } },
+    take: 500,
+    select: { id: true, amountMinor: true, currencyCode: true, priority: true, effectiveFrom: true, effectiveTo: true, matterId: true, userId: true, practiceAreaId: true, rateCard: { select: { id: true, name: true, status: true, matterId: true, effectiveFrom: true, effectiveTo: true } } }
+  });
+  const rules2 = rows.map((row) => ({
+    id: row.id,
+    amountMinor: row.amountMinor,
+    currencyCode: row.currencyCode,
+    priority: row.priority,
+    effectiveFrom: row.effectiveFrom?.toISOString() ?? null,
+    effectiveTo: row.effectiveTo?.toISOString() ?? null,
+    matter: row.matterId ? { id: row.matterId } : null,
+    user: row.userId ? { id: row.userId } : null,
+    practiceArea: row.practiceAreaId ? { id: row.practiceAreaId } : null,
+    rateCard: row.rateCard ? { id: row.rateCard.id, name: row.rateCard.name, status: row.rateCard.status, matter: row.rateCard.matterId ? { id: row.rateCard.matterId } : null, effectiveFrom: row.rateCard.effectiveFrom?.toISOString() ?? null, effectiveTo: row.rateCard.effectiveTo?.toISOString() ?? null } : null
+  }));
+  const rule = resolveHourlyRate(rules2, { matterId: item.matterId, userId: item.userId ?? null, practiceAreaId: matter?.practiceAreaId ?? null, workDate: item.workDate ?? item.createdAt });
+  if (!rule) return {};
+  return { rateMinor: rule.amountMinor, amountMinor: priceMinutes(rule.amountMinor, Number(item.durationMinutes) || 0), currencyCode: rule.currencyCode };
 }
 async function transitionExpense(_root, args, context) {
   if (!["submitted", "approved", "draft", "written_off"].includes(args.toStatus)) {
@@ -15796,282 +16570,6 @@ async function prepareSignatureRequest(_root, args, context) {
   });
 }
 
-// features/keystone/mutations/communicationWorkflows.ts
-var COMMUNICATION_DELIVERY_SNAPSHOT_VERSION = 1;
-var MAX_RECIPIENTS = 50;
-var participantRoles = /* @__PURE__ */ new Set(["staff", "client", "external_counsel", "third_party"]);
-var singleEmailAddress = /^[^\s@<>,;()"]+@[^\s@<>,;()"]+\.[^\s@<>,;()"]+$/;
-function isSingleEmailAddress(value) {
-  return Boolean(value && value.length <= 254 && singleEmailAddress.test(value));
-}
-function communicationEnvelopeDigest(message) {
-  return sha256Digest({ subject: message.subject ?? "", body: message.body ?? "" });
-}
-async function lockThread(tx, firmId, threadId) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`communication-thread:${firmId}:${threadId}`}))`;
-}
-async function resolveParticipantIdentity(tx, firmId, thread, args) {
-  const identities = [args.userId, args.contactId, args.portalAccountId].filter(Boolean);
-  if (identities.length !== 1) throw new Error("Choose exactly one staff member, contact or portal account.");
-  if (args.contactMethodId && !args.contactId) throw new Error("A contact method can be chosen only for a contact participant.");
-  if (args.userId) {
-    if (args.participantRole !== "staff") throw new Error("Firm users can join a thread only as staff.");
-    const membership = await tx.firmMembership.findFirst({
-      where: { firmId, userId: args.userId, status: "active", user: { status: "active" } },
-      select: { user: { select: { email: true } } }
-    });
-    if (!membership) throw new Error("Staff participant must be an active member of the active firm.");
-    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, args.userId);
-    return { userId: args.userId, displayAddress: membership.user?.email ?? "" };
-  }
-  if (args.participantRole === "staff") throw new Error("Staff participants must be firm users.");
-  if (args.portalAccountId) {
-    if (args.participantRole !== "client") throw new Error("Portal accounts can join a thread only as clients.");
-    const account2 = await tx.portalAccount.findFirst({
-      where: { id: args.portalAccountId, firmId, status: "active" },
-      select: { id: true, email: true, contactId: true }
-    });
-    if (!account2) throw new Error("Portal participant must be an active portal account in the active firm.");
-    if (thread.matterId) {
-      const access = await tx.portalMatterAccess.findFirst({
-        where: {
-          firmId,
-          portalAccountId: account2.id,
-          matterId: thread.matterId,
-          status: "active",
-          OR: [{ expiresAt: null }, { expiresAt: { gt: /* @__PURE__ */ new Date() } }]
-        },
-        select: { id: true }
-      });
-      if (!access) throw new Error("Portal participant needs current access to this thread's matter.");
-    }
-    return { portalAccountId: account2.id, contactId: account2.contactId ?? null, displayAddress: account2.email ?? "" };
-  }
-  const contact = await tx.contact.findFirst({
-    where: { id: args.contactId, firmId, status: { not: "archived" } },
-    select: { id: true, primaryEmail: true }
-  });
-  if (!contact) throw new Error("Contact participant must be an active contact in the active firm.");
-  if (args.contactMethodId) {
-    const method = await tx.contactMethod.findFirst({
-      where: { id: args.contactMethodId, firmId, contactId: contact.id, methodType: "email", canContact: true },
-      select: { value: true }
-    });
-    if (!method) throw new Error("Contact method must be a contactable email address of this contact.");
-    return { contactId: contact.id, displayAddress: method.value };
-  }
-  return { contactId: contact.id, displayAddress: contact.primaryEmail ?? "" };
-}
-async function addCommunicationParticipant(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  if (!participantRoles.has(args.participantRole)) throw new Error("Participant role is not available through this command.");
-  const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await lockThread(tx, firmId, args.threadId);
-    const thread = await tx.communicationThread.findFirst({
-      where: { id: args.threadId, firmId },
-      select: { id: true, status: true, matterId: true }
-    });
-    if (!thread) throw new Error("Communication thread was not found in the active firm.");
-    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, userId);
-    if (thread.status !== "open") throw new Error("Participants can be added only to open threads.");
-    const identity = await resolveParticipantIdentity(tx, firmId, thread, args);
-    const existing = await tx.communicationParticipant.findFirst({
-      where: {
-        firmId,
-        threadId: thread.id,
-        status: "active",
-        userId: identity.userId ?? null,
-        contactId: identity.contactId ?? null,
-        portalAccountId: identity.portalAccountId ?? null
-      }
-    });
-    if (existing) {
-      if (existing.participantRole !== args.participantRole) {
-        throw new Error("This identity already participates in the thread with a different role.");
-      }
-      return { participant: existing, replayed: true };
-    }
-    const participant = await tx.communicationParticipant.create({
-      data: {
-        firmId,
-        matterId: thread.matterId ?? null,
-        threadId: thread.id,
-        userId: identity.userId ?? null,
-        contactId: identity.contactId ?? null,
-        portalAccountId: identity.portalAccountId ?? null,
-        participantRole: args.participantRole,
-        status: "active",
-        displayAddress: identity.displayAddress,
-        addedAt: /* @__PURE__ */ new Date()
-      }
-    });
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.participant_added",
-      category: "legal_workflow",
-      ...workflowActor(context, userId),
-      matterId: thread.matterId ?? null,
-      contactId: identity.contactId ?? null,
-      metadata: {
-        threadId: thread.id,
-        participantId: participant.id,
-        participantRole: args.participantRole,
-        identityDigest: sha256Digest({ ...identity, participantRole: args.participantRole })
-      }
-    });
-    return { participant, replayed: false };
-  });
-}
-async function removeCommunicationParticipant(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  const reason = boundedReason(args.reason, "Participant removal reason", 5, 2e3);
-  const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    const identity = await tx.communicationParticipant.findFirst({
-      where: { id: args.participantId, firmId },
-      select: { threadId: true }
-    });
-    if (!identity) throw new Error("Communication participant was not found in the active firm.");
-    await lockThread(tx, firmId, identity.threadId);
-    const participant = await tx.communicationParticipant.findFirst({ where: { id: args.participantId, firmId } });
-    if (!participant) throw new Error("Communication participant was not found in the active firm.");
-    if (participant.matterId) await assertMatterAccess(tx, firmId, participant.matterId, userId);
-    if (participant.status === "removed") return { participant, replayed: true };
-    const removed = await tx.communicationParticipant.update({
-      where: { id: participant.id },
-      data: { status: "removed", removedAt: /* @__PURE__ */ new Date() }
-    });
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.participant_removed",
-      category: "legal_workflow",
-      ...workflowActor(context, userId),
-      matterId: participant.matterId ?? null,
-      contactId: participant.contactId ?? null,
-      metadata: { threadId: participant.threadId, participantId: participant.id, reasonDigest: sha256Digest(reason) }
-    });
-    return { participant: removed, replayed: false };
-  });
-}
-async function prepareCommunicationDeliveries(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  const reason = boundedReason(args.reason, "Delivery preparation reason", 5, 2e3);
-  const participantIds = [...new Set((args.participantIds ?? []).map((id2) => id2?.trim()).filter(Boolean))].sort();
-  if (!participantIds.length || participantIds.length > MAX_RECIPIENTS) {
-    throw new Error(`Choose between 1 and ${MAX_RECIPIENTS} thread participants.`);
-  }
-  const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`message:${firmId}:${args.messageId}`}))`;
-    const message = await tx.communicationMessage.findFirst({
-      where: { id: args.messageId, firmId },
-      include: {
-        attachments: {
-          select: { id: true, firmId: true, checksumSha256: true, byteSize: true, document: { select: { matterId: true, status: true } } }
-        },
-        deliveries: { select: { id: true, status: true, providerMetadata: true } }
-      }
-    });
-    if (!message) throw new Error("Communication message was not found in the active firm.");
-    if (message.matterId) await assertMatterAccess(tx, firmId, message.matterId, userId);
-    if (message.status !== "draft") throw new Error("Deliveries can be prepared only for draft messages.");
-    if (message.direction !== "outbound") throw new Error("Only outbound messages have deliveries.");
-    if (message.channel !== "email") {
-      throw new Error("Only email delivery preparation is available; portal and SMS delivery adapters are not configured.");
-    }
-    if (message.deliveries.some((delivery) => delivery.status !== "pending")) {
-      throw new Error("A message with delivery outcomes cannot be re-prepared.");
-    }
-    await lockThread(tx, firmId, message.threadId);
-    const participants = await tx.communicationParticipant.findMany({
-      where: { id: { in: participantIds }, firmId, threadId: message.threadId, status: "active" },
-      select: { id: true, userId: true, contactId: true, portalAccountId: true, displayAddress: true },
-      orderBy: { id: "asc" }
-    });
-    if (participants.length !== participantIds.length) {
-      throw new Error("Every recipient must be an active participant of this message's thread.");
-    }
-    for (const participant of participants) {
-      if (!isSingleEmailAddress(participant.displayAddress)) {
-        throw new Error("Every email recipient needs one valid email address on the thread participant.");
-      }
-      if (participant.userId && message.matterId) {
-        await assertMatterAccess(tx, firmId, message.matterId, participant.userId);
-      }
-    }
-    const attachments = message.attachments.map((attachment) => {
-      if (attachment.firmId !== firmId || attachment.document?.status === "disposed" || message.matterId && attachment.document?.matterId !== message.matterId) {
-        throw new Error("Attachments must be current versions from this firm and matter.");
-      }
-      return { versionId: attachment.id, checksumSha256: attachment.checksumSha256, byteSize: attachment.byteSize };
-    }).sort((left, right) => left.versionId.localeCompare(right.versionId));
-    let connection = null;
-    if (args.integrationConnectionId) {
-      connection = await tx.integrationConnection.findFirst({
-        where: { id: args.integrationConnectionId, firmId, status: "active", category: "email" },
-        select: { id: true, provider: true }
-      });
-      if (!connection) throw new Error("Delivery connection must be an active email integration in the active firm.");
-    }
-    const provider = connection?.provider ?? "smtp";
-    const envelopeDigest = communicationEnvelopeDigest(message);
-    const snapshots = participants.map((participant) => ({
-      snapshotVersion: COMMUNICATION_DELIVERY_SNAPSHOT_VERSION,
-      participantId: participant.id,
-      envelopeDigest,
-      attachments,
-      destination: { channel: "email", provider, connectionId: connection?.id ?? null }
-    }));
-    const preparationDigest = sha256Digest({
-      messageId: message.id,
-      snapshots,
-      recipients: participants.map((participant) => participant.displayAddress)
-    });
-    if (message.deliveries.length === snapshots.length && message.deliveries.every((delivery) => delivery.providerMetadata?.preparationDigest === preparationDigest)) {
-      return { message, deliveries: message.deliveries, replayed: true };
-    }
-    const replaced = message.deliveries.length;
-    if (replaced) await tx.communicationDelivery.deleteMany({ where: { firmId, messageId: message.id, status: "pending" } });
-    const deliveries = [];
-    for (const [index, participant] of participants.entries()) {
-      deliveries.push(await tx.communicationDelivery.create({
-        data: {
-          firmId,
-          matterId: message.matterId ?? null,
-          messageId: message.id,
-          integrationConnectionId: connection?.id ?? null,
-          channel: "email",
-          status: "pending",
-          recipientContactId: participant.contactId ?? null,
-          recipientAddress: participant.displayAddress,
-          provider,
-          attemptCount: 0,
-          providerMetadata: { ...snapshots[index], preparationDigest }
-        }
-      }));
-    }
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.deliveries_prepared",
-      category: "integration",
-      ...workflowActor(context, userId),
-      matterId: message.matterId ?? null,
-      metadata: {
-        messageId: message.id,
-        deliveryCount: deliveries.length,
-        replacedPendingCount: replaced,
-        preparationDigest,
-        reasonDigest: sha256Digest(reason)
-      }
-    });
-    return { message, deliveries, replayed: false };
-  });
-}
-
 // features/keystone/mutations/redirectToInit.ts
 async function redirectToInit(root, args, context) {
   const userCount = await context.sudo().query.User.count({});
@@ -16112,11 +16610,17 @@ function hasNamedOpposingParty(opposingParties) {
 }
 
 // features/keystone/mutations/customerConsultations.ts
-async function publicFirm(tx, capability) {
+async function servicingFirm(tx) {
   await tx.$executeRaw`SELECT id FROM "Firm" WHERE status = 'active' ORDER BY id FOR SHARE`;
   const firms = await tx.firm.findMany({ where: { status: "active" }, take: 2 });
   if (firms.length !== 1) return null;
   const firm = firms[0];
+  if (firm.isDemo && !await isLocalFixtureFirm(tx, firm.id)) return null;
+  return firm;
+}
+async function publicFirm(tx, capability) {
+  const firm = await servicingFirm(tx);
+  if (!firm) return null;
   if (await isLocalFixtureFirm(tx, firm.id)) return { firm, mode: "fixture", policy: null };
   if (firm.isDemo) return null;
   const policy = await tx.publicSitePolicy.findFirst({ where: { firmId: firm.id, status: "published" } });
@@ -16126,7 +16630,7 @@ async function publicFirm(tx, capability) {
 }
 async function account(tx, context) {
   const session = context.session;
-  if (!session?.itemId || session.listKey !== "User" || session.authenticationType && session.authenticationType !== "human") throw new Error("Sign in to your account.");
+  if (!isHumanIdentitySession(session) || session.listKey !== "User") throw new Error("Sign in to your account.");
   await tx.$executeRaw`SELECT id FROM "User" WHERE id = ${session.itemId} FOR SHARE`;
   const user = await tx.user.findUnique({ where: { id: session.itemId }, select: { id: true, name: true, email: true, status: true } });
   if (!user || user.status !== "active") throw new Error("Sign in to your account.");
@@ -16229,20 +16733,29 @@ function withinHorizon(start, now) {
   return start.getTime() >= now + BOOKING_LEAD_MS && start.getTime() <= now + BOOKING_HORIZON_MS;
 }
 async function eligibleHosts(tx, firm) {
-  const memberships = await tx.firmMembership.findMany({
-    where: { firmId: firm.id, status: "active", user: { status: "active" }, role: { firmId: firm.id, status: "active", canManageIntake: true } },
-    orderBy: { id: "asc" },
-    take: 25,
-    select: { userId: true, primaryOfficeId: true, primaryOffice: { select: { status: true, timezone: true } } }
-  });
   const hosts = [];
-  for (const membership of memberships) {
-    const session = await loadActiveHumanSession(tx, membership.userId, firm.id);
-    if (!session) continue;
-    const officeZone = membership.primaryOffice?.status === "active" ? membership.primaryOffice.timezone : null;
-    hosts.push({ userId: membership.userId, officeId: membership.primaryOfficeId ?? null, timezone: validTimezone(officeZone, validTimezone(firm.defaultTimezone)), session });
+  let after;
+  for (let page = 0; page < 32; page++) {
+    const memberships = await tx.firmMembership.findMany({
+      where: { firmId: firm.id, status: "active", user: { status: "active" }, role: { firmId: firm.id, status: "active", canManageIntake: true }, OR: [{ primaryOfficeId: null }, { primaryOffice: { status: "active" } }], ...after ? { id: { gt: after } } : {} },
+      orderBy: { id: "asc" },
+      take: 100,
+      select: { id: true, userId: true, primaryOfficeId: true, primaryOffice: { select: { status: true, timezone: true } } }
+    });
+    for (const membership of memberships) {
+      const session = await loadActiveHumanSession(tx, membership.userId, firm.id);
+      if (!session) continue;
+      hosts.push({ userId: membership.userId, officeId: membership.primaryOfficeId ?? null, timezone: validTimezone(membership.primaryOffice?.timezone, validTimezone(firm.defaultTimezone)), session });
+    }
+    if (memberships.length < 100) return hosts;
+    after = memberships[memberships.length - 1].id;
   }
-  return hosts;
+  throw new Error("Consultation capacity could not be fully checked. Contact the firm.");
+}
+function requireConfiguredConsultationCalendar(admitted) {
+  if (admitted.mode === "fixture") return;
+  if (admitted.mode === "live" && admitted.policy?.status === "published" && admitted.policy.publicBookingEnabled) return;
+  throw new Error("Online consultation scheduling is unavailable. Contact the firm.");
 }
 function busyWhere(firmId, hostId, start, end) {
   return { firmId, hostId, status: { in: ["requested", "scheduled"] }, startsAt: { lt: end }, endsAt: { gt: start } };
@@ -16253,6 +16766,7 @@ async function consultationAvailability(_root, args, context) {
     const admitted = await publicFirm(tx, "booking");
     if (!admitted) throw new Error("Consultation booking is unavailable.");
     const { firm } = admitted;
+    requireConfiguredConsultationCalendar(admitted);
     const service = await tx.practiceArea.findFirst({ where: { id: args.serviceId, firmId: firm.id, status: "active", isPublic: true } });
     if (!service) throw new Error("Service is unavailable.");
     const timezone2 = validTimezone(firm.defaultTimezone);
@@ -16260,8 +16774,20 @@ async function consultationAvailability(_root, args, context) {
     const hosts = await eligibleHosts(tx, firm);
     const busy = /* @__PURE__ */ new Map();
     for (const host of hosts) {
-      const rows = await tx.consultation.findMany({ where: busyWhere(firm.id, host.userId, new Date(now), new Date(now + BOOKING_HORIZON_MS + 864e5)), select: { startsAt: true, endsAt: true }, take: 2e3 });
-      busy.set(host.userId, rows.map((row) => ({ start: row.startsAt.getTime(), end: row.endsAt.getTime() })));
+      const intervals = [];
+      let after;
+      let complete = false;
+      for (let page = 0; page < 64; page++) {
+        const rows = await tx.consultation.findMany({ where: { ...busyWhere(firm.id, host.userId, new Date(now), new Date(now + BOOKING_HORIZON_MS + 864e5)), ...after ? { id: { gt: after } } : {} }, select: { id: true, startsAt: true, endsAt: true }, orderBy: { id: "asc" }, take: 256 });
+        intervals.push(...rows.map((row) => ({ start: row.startsAt.getTime(), end: row.endsAt.getTime() })));
+        if (rows.length < 256) {
+          complete = true;
+          break;
+        }
+        after = rows[rows.length - 1].id;
+      }
+      if (!complete) throw new Error("Consultation capacity could not be fully checked. Contact the firm.");
+      busy.set(host.userId, intervals);
     }
     const slots = [];
     const first = Math.ceil((now + BOOKING_LEAD_MS) / CANDIDATE_STEP_MS) * CANDIDATE_STEP_MS;
@@ -16297,18 +16823,21 @@ async function bookClientConsultation(_root, args, context) {
   if (!Number.isFinite(start.getTime())) throw new Error("Select an available time.");
   return runSerializableTransaction(context.prisma, async (tx) => {
     const user = await account(tx, context);
-    const admitted = await publicFirm(tx, "booking");
-    if (!admitted) throw new Error("Consultation booking is unavailable.");
-    const { firm, mode } = admitted;
-    const acknowledgment = currentAcknowledgment(admitted);
-    if (args.acknowledgmentVersion !== acknowledgment.version) throw new Error("The first-contact notice has changed. Review it and submit again.");
+    const firm = await servicingFirm(tx);
+    if (!firm) throw new Error("Consultation servicing is unavailable.");
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`consultation-request:${firm.id}:${args.requestKey}`}))`;
-    const fingerprint = sha256Digest({ accountId: user.id, serviceId: args.serviceId, startsAt: start.toISOString(), ...firstContact, acknowledgmentVersion: acknowledgment.version });
+    const fingerprint = sha256Digest({ accountId: user.id, serviceId: args.serviceId, startsAt: start.toISOString(), ...firstContact, acknowledgmentVersion: args.acknowledgmentVersion });
     const prior = await tx.consultation.findUnique({ where: { firmId_requestKey: { firmId: firm.id, requestKey: args.requestKey } } });
     if (prior) {
       if (prior.accountId !== user.id || prior.requestDigest !== fingerprint) throw new Error("Request reference is unavailable for this account or has changed.");
       return dto(prior);
     }
+    const admitted = await publicFirm(tx, "booking");
+    if (!admitted || admitted.firm.id !== firm.id) throw new Error("Consultation booking is unavailable.");
+    const { mode } = admitted;
+    requireConfiguredConsultationCalendar(admitted);
+    const acknowledgment = currentAcknowledgment(admitted);
+    if (args.acknowledgmentVersion !== acknowledgment.version) throw new Error("The first-contact notice has changed. Review it and submit again.");
     const service = await tx.practiceArea.findFirst({ where: { id: args.serviceId, firmId: firm.id, status: "active", isPublic: true } });
     if (!service) throw new Error("Service is unavailable.");
     const end = new Date(start.getTime() + service.consultationMinutes * 6e4);
@@ -16349,9 +16878,8 @@ async function bookClientConsultation(_root, args, context) {
 async function customerConsultationPage(_root, args, context) {
   return runSerializableTransaction(context.prisma, async (tx) => {
     const user = await account(tx, context);
-    const admitted = await publicFirm(tx, "accounts");
-    if (!admitted) return { appointments: [], nextCursor: null };
-    const { firm } = admitted;
+    const firm = await servicingFirm(tx);
+    if (!firm) throw new Error("Appointment history is temporarily unavailable.");
     const after = decodeCursor(args.cursor, ["a", "c", "i"]);
     if (after && after.a !== user.id) throw new Error("This page is unavailable. Start again from the first page.");
     const keyset = after ? { OR: [{ createdAt: { lt: new Date(after.c) } }, { createdAt: new Date(after.c), id: { gt: after.i } }] } : {};
@@ -16371,9 +16899,8 @@ async function customerConsultations(root, _args, context) {
 async function customerConsultation(_root, args, context) {
   return runSerializableTransaction(context.prisma, async (tx) => {
     const user = await account(tx, context);
-    const admitted = await publicFirm(tx, "accounts");
-    if (!admitted) return null;
-    const { firm } = admitted;
+    const firm = await servicingFirm(tx);
+    if (!firm) throw new Error("Appointment history is temporarily unavailable.");
     const row = await tx.consultation.findFirst({ where: { id: args.id, accountId: user.id, firmId: firm.id } });
     return row ? dto(row) : null;
   });
@@ -17307,6 +17834,16 @@ function extendGraphqlSchema(baseSchema) {
           providerPaymentId: String
           failureReason: String
         ): PaymentTransitionResult!
+        recordManualPayment(
+          idempotencyKey: String!
+          payerId: ID!
+          invoiceId: ID
+          amountMinor: Int!
+          currencyCode: String!
+          method: String!
+          receivedAt: DateTime!
+          reference: String
+        ): PaymentTransitionResult!
         allocatePayment(
           paymentId: ID!
           invoiceId: ID!
@@ -17527,6 +18064,7 @@ function extendGraphqlSchema(baseSchema) {
           summary: String
           adversePartySummary: String
           officeId: ID
+          practiceAreaId: ID
           assignedToId: ID
         ): ClientIntakeStartResult!
 
@@ -17713,6 +18251,7 @@ function extendGraphqlSchema(baseSchema) {
         transitionInvoice,
         transitionPayment,
         allocatePayment,
+        recordManualPayment,
         reversePaymentAllocation,
         requestRefund,
         reviewRefund,

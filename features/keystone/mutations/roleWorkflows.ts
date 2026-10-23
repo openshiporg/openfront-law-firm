@@ -6,6 +6,60 @@ import { runSerializableTransaction } from '../lib/transactions'
 import { assertCurrentCommandActor } from './command-authority'
 import { recordAuditEvent } from './workflow-helpers'
 
+/** Standard least-privilege firm roles, seeded at onboarding and offered on People &
+ * access for existing firms. None can manage people, roles, firm settings, integrations,
+ * machine credentials, retention or audit; those stay with the firm administrator.
+ * canManageBilling is included where staff record their own time and expenses. */
+export const standardFirmRoles = [
+  {
+    name: "Attorney",
+    permissions: [
+      "canAccessDashboard", "canReadPeople",
+      "canReadIntake", "canManageIntake", "canRunConflictChecks", "canResolveConflicts",
+      "canReadMatters", "canManageMatters",
+      "canReadCalendar", "canManageCalendar", "canReadTasks", "canManageTasks",
+      "canReadCommunications", "canManageCommunications", "canReadDocuments", "canManageDocuments",
+      "canReadBilling", "canManageBilling", "canReadTrust", "canReadPayments",
+      "canReadPortal", "canManagePortal",
+    ],
+  },
+  {
+    name: "Paralegal",
+    permissions: [
+      "canAccessDashboard", "canReadPeople",
+      "canReadIntake", "canManageIntake", "canRunConflictChecks",
+      "canReadMatters",
+      "canReadCalendar", "canManageCalendar", "canReadTasks", "canManageTasks",
+      "canReadCommunications", "canManageCommunications", "canReadDocuments", "canManageDocuments",
+      "canReadBilling", "canManageBilling",
+      "canReadPortal",
+    ],
+  },
+  {
+    name: "Billing",
+    permissions: [
+      "canAccessDashboard", "canReadPeople", "canReadMatters",
+      "canReadBilling", "canManageBilling", "canReadTrust", "canManageTrust",
+      "canReadPayments", "canManagePayments", "canReadPortal",
+    ],
+  },
+  {
+    name: "Intake coordinator",
+    permissions: [
+      "canAccessDashboard", "canReadPeople",
+      "canReadIntake", "canManageIntake", "canRunConflictChecks",
+      "canReadCalendar", "canManageCalendar", "canReadTasks", "canManageTasks",
+      "canReadCommunications", "canManageCommunications",
+    ],
+  },
+] as const satisfies ReadonlyArray<{ name: string; permissions: readonly PermissionKey[] }>;
+
+/** Role create data (all permission keys explicit) for one standard role. */
+export function standardRolePermissionData(role: (typeof standardFirmRoles)[number]) {
+  const granted = new Set<PermissionKey>(role.permissions);
+  return Object.fromEntries(permissionKeys.map((permission) => [permission, granted.has(permission)])) as Record<PermissionKey, boolean>;
+}
+
 const administrativePermissions = ['canAccessDashboard', 'canManagePeople', 'canManageRoles', 'canManageFirm'] as const satisfies readonly PermissionKey[]
 
 function grantedPermissions(value: unknown) {

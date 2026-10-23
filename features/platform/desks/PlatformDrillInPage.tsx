@@ -8,6 +8,8 @@ import { getPracticeWorkspace } from '@/features/platform/operations/actions'
 import { getPlatformDrillIn } from './getPlatformDrillIn'
 import { deskDetailKinds, deskTitle, type DeskKind } from './OperatingDesk'
 import { ThreadReplyDraft } from './ThreadReplyDraft'
+import { getDocumentVersions } from '@/features/platform/documents/actions/documentVersions'
+import { DocumentVersionPanel } from '@/features/platform/documents/components/DocumentVersionPanel'
 
 // Queue kinds whose section-level action affordance applies to a drill-in record.
 const queueKind: Record<string, string> = { 'Communication thread': 'Thread' }
@@ -32,6 +34,7 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
   const canAct = canActOn(actionKind)
   // Reply drafts need communication-management permission, which the desk exposes on drafts.
   const canDraftReply = kind === 'thread' && canActOn('Message')
+  const documentFiles = kind === 'document' ? await getDocumentVersions(recordId) : null
   return <PracticePage
     title={record.title}
     description={`${record.kind} in ${deskName}.`}
@@ -54,7 +57,8 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
             {record.facts.map(([term, value]) => <div key={term} className="min-w-0 bg-card px-4 py-3"><dt className="text-xs text-muted-foreground">{term}</dt><dd className="mt-1 break-words text-sm font-medium leading-5 text-foreground">{value}</dd></div>)}
           </dl>
         </section>
-        {record.lists.map((list) => (
+        {documentFiles ? <DocumentVersionPanel documentId={recordId} storage={documentFiles.storage} currentVersionId={documentFiles.currentVersionId} versions={documentFiles.versions} /> : null}
+        {record.lists.filter((list) => !(documentFiles && list.title === 'Version history')).map((list) => (
           <Panel key={list.title} title={<h2 id={`list-${list.title}`} className="flex items-baseline gap-2 text-sm font-semibold">{list.title}<span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{list.total.toLocaleString()}</span></h2>} bodyClassName="p-0">
             {list.rows.length ? (
               <ul className="divide-y divide-border">

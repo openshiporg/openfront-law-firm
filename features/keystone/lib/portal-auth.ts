@@ -95,6 +95,9 @@ export type PortalSharedResourceSummary = {
   expiresAt: Date | null;
   matterNumber: string;
   matterTitle: string;
+  /** Client-visible label of the shared item: document title, document-version file
+   * name, invoice number, or thread subject. Null when the record carries none. */
+  resourceTitle: string | null;
 };
 
 export type PortalSharedResourcePage = { items: PortalSharedResourceSummary[]; nextCursor: string | null };
@@ -186,10 +189,21 @@ async function listPortalSharedResourcesInTransaction(rawToken: string, prisma: 
   const rows: unknown[] = await client.portalShare.findMany({
     where: { OR: predicates },
     orderBy: [{ grantedAt: "desc" }, { id: "asc" }], take: PORTAL_SHARE_PAGE_SIZE,
-    select: { ...portalShareHeaderSelect, matter: { select: { id: true, firmId: true, matterNumber: true, title: true } } },
+    select: {
+      ...portalShareHeaderSelect,
+      matter: { select: { id: true, firmId: true, matterNumber: true, title: true } },
+      document: { select: { ...portalShareHeaderSelect.document.select, title: true } },
+      documentVersion: { select: { ...portalShareHeaderSelect.documentVersion.select, fileName: true, document: { select: { ...portalShareHeaderSelect.documentVersion.select.document.select, title: true } } } },
+      invoice: { select: { ...portalShareHeaderSelect.invoice.select, invoiceNumber: true } },
+      communicationThread: { select: { ...portalShareHeaderSelect.communicationThread.select, subject: true } },
+    },
   });
   const summary = z.object({ id: z.string(), resourceType: z.string(), grantedAt: z.date(), expiresAt: z.date().nullable(),
-    matter: z.object({ matterNumber: z.string(), title: z.string() }) });
+    matter: z.object({ matterNumber: z.string(), title: z.string() }),
+    document: z.object({ title: z.string().nullable().optional() }).nullable().optional(),
+    documentVersion: z.object({ fileName: z.string().nullable().optional(), document: z.object({ title: z.string().nullable().optional() }).nullable().optional() }).nullable().optional(),
+    invoice: z.object({ invoiceNumber: z.string().nullable().optional() }).nullable().optional(),
+    communicationThread: z.object({ subject: z.string().nullable().optional() }).nullable().optional() });
   const result: PortalSharedResourceSummary[] = [];
   const admitted = new Map(predicates.map((predicate) => [predicate.id, JSON.stringify(predicate)]));
   for (const row of rows) {
@@ -200,9 +214,24 @@ async function listPortalSharedResourcesInTransaction(rawToken: string, prisma: 
     }
     const share = parsed.data;
     result.push({ id: share.id, resourceType: share.resourceType, grantedAt: share.grantedAt, expiresAt: share.expiresAt,
-      matterNumber: share.matter.matterNumber, matterTitle: share.matter.title });
+      matterNumber: share.matter.matterNumber, matterTitle: share.matter.title, resourceTitle: portalResourceTitle(share) });
   }
   return { items: result, nextCursor };
+}
+
+function portalResourceTitle(share: {
+  resourceType: string;
+  document?: { title?: string | null } | null;
+  documentVersion?: { fileName?: string | null; document?: { title?: string | null } | null } | null;
+  invoice?: { invoiceNumber?: string | null } | null;
+  communicationThread?: { subject?: string | null } | null;
+}) {
+  const value = share.resourceType === "document" ? share.document?.title
+    : share.resourceType === "document_version" ? share.documentVersion?.document?.title || share.documentVersion?.fileName
+    : share.resourceType === "invoice" ? share.invoice?.invoiceNumber
+    : share.resourceType === "communication_thread" ? share.communicationThread?.subject
+    : null;
+  return value?.trim() ? value.trim().slice(0, 300) : null;
 }
 
 async function recordPortalRead(
