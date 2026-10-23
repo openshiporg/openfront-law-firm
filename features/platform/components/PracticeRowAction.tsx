@@ -3,6 +3,8 @@
 import { useActionState, useState } from 'react'
 import { FormSelect } from '@/components/ui/form-select'
 import { Check, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass } from './ui'
 
 import {
   runPracticeAction,
@@ -120,15 +122,15 @@ export function PracticeRowAction({
     : action.operation
 
   return (
-    <details className="relative justify-self-end text-left">
-      <summary className="cursor-pointer list-none whitespace-nowrap rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-        {action.label}
+    <details className="group/action relative justify-self-end text-left">
+      <summary className={cn(trackClass, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>
+        <span className={cn(trackItemClass(true), 'h-7 px-3 text-xs')}>{action.label}</span>
       </summary>
-      <form action={formAction} className="absolute right-0 z-20 mt-2 box-border w-72 max-w-[calc(100vw-2rem)] space-y-3 rounded-md border border-border bg-background p-3 shadow-lg">
+      <form action={formAction} className="absolute right-0 z-20 mt-2 box-border grid w-80 max-w-[calc(100vw-2rem)] gap-3 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg">
         {action.alternates?.length ? (
-          <label className="block text-xs font-semibold text-foreground" htmlFor={`operation-${id}`}>
+          <label className={labelClass} htmlFor={`operation-${id}`}>
             Action
-            <FormSelect id={`operation-${id}`} name="operation" value={selectedOperation} onValueChange={(value) => setChoice({ identity: actionIdentity, operation: value as PracticeActionOperation })} className="mt-2 min-h-10 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <FormSelect id={`operation-${id}`} name="operation" value={selectedOperation} onValueChange={(value) => setChoice({ identity: actionIdentity, operation: value as PracticeActionOperation })} className={fieldClass}>
               <option value={action.operation}>{action.operation === 'approveInvoice' ? 'Approve invoice' : action.label}</option>
               {action.alternates.map((alternate) => <option key={alternate.operation} value={alternate.operation}>{alternate.label}</option>)}
             </FormSelect>
@@ -136,47 +138,50 @@ export function PracticeRowAction({
         ) : <input type="hidden" name="operation" value={action.operation} />}
         <input type="hidden" name="recordId" value={id} />
         <input type="hidden" name="path" value={path} />
-        <label className="block text-xs font-semibold text-foreground" htmlFor={`reason-${id}`}>
-          Reason
-        </label>
         {selectedOperation === 'finalizeConflictReview' ? (
-          <label className="block text-xs font-semibold text-foreground" htmlFor={`outcome-${id}`}>
-            Human review outcome
-            <FormSelect id={`outcome-${id}`} name="outcome" required className="mt-2 min-h-10 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <option value="cleared">Cleared</option>
-              <option value="conflict_found">Conflict found</option>
-            </FormSelect>
-          </label>
+          <fieldset className="grid gap-1.5">
+            <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Review outcome</legend>
+            <div className={trackClass}>
+              {([["cleared", "Cleared"], ["conflict_found", "Conflict found"]] as const).map(([value, label]) => (
+                <label key={value} className="relative">
+                  <input type="radio" name="outcome" value={value} required className="peer sr-only" />
+                  <span className={cn(trackItemClass(false), 'cursor-pointer peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-black/5 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50 dark:peer-checked:bg-zinc-800')}>{label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         ) : null}
         {selectedOperation === 'issueInvoice' ? (
-          <label className="block text-xs font-semibold text-foreground" htmlFor={`due-${id}`}>
+          <label className={labelClass} htmlFor={`due-${id}`}>
             Due date (end of day UTC)
-            <input id={`due-${id}`} name="dueAt" type="date" required className="mt-2 min-h-10 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            <input id={`due-${id}`} name="dueAt" type="date" required className={fieldClass} />
           </label>
         ) : null}
-        <textarea
-          id={`reason-${id}`}
-          name="reason"
-          required
-          minLength={5}
-          maxLength={2000}
-          rows={3}
-          className="w-full resize-y rounded-md border border-input bg-background px-2.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          placeholder="Record the operational reason for this transition."
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md bg-foreground px-3 text-sm font-semibold text-background disabled:opacity-60"
-        >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-          Confirm update
-        </button>
-        {state.message ? (
-          <p role="status" className={state.ok ? 'text-xs text-foreground' : 'text-xs text-destructive'}>
-            {state.message}
-          </p>
-        ) : null}
+        <label className={labelClass} htmlFor={`reason-${id}`}>
+          Reason
+          <textarea
+            id={`reason-${id}`}
+            name="reason"
+            required
+            minLength={5}
+            maxLength={2000}
+            rows={3}
+            className={textareaClass}
+          />
+        </label>
+        <div className="flex items-center justify-between gap-2">
+          {state.message ? (
+            <p role="status" className={cn('min-w-0 text-xs [overflow-wrap:anywhere]', state.ok ? 'text-foreground' : 'text-destructive')}>
+              {state.message}
+            </p>
+          ) : <span />}
+          <div className={trackClass}>
+            <button type="submit" disabled={pending} className={pillPrimaryClass}>
+              {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Check className="size-3.5" aria-hidden="true" />}
+              Confirm
+            </button>
+          </div>
+        </div>
       </form>
     </details>
   )

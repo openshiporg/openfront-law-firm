@@ -1,32 +1,35 @@
-import { CheckCircle2, Quote } from 'lucide-react'
+import { Quote } from 'lucide-react'
+
+import { Notice, Panel, StatusDot } from '@/features/platform/components/ui'
 
 const rules = [
-  'Every factual statement must identify an authorized source record and immutable document version.',
-  'A citation must preserve the source checksum and a reviewable excerpt or location when extraction exists.',
-  'Missing, inaccessible, superseded, or disposed evidence must produce a refusal—not a guessed answer.',
-  'Citations are evidence pointers, not a representation that a proposition is current law or legally correct.',
+  'Each factual statement cites an authorized source record and an immutable document version.',
+  'Each citation keeps the source checksum and an excerpt or location when extraction exists.',
+  'Missing, inaccessible, superseded or disposed evidence returns a refusal, not a guess.',
+  'A citation points to evidence; it does not establish current law or legal correctness.',
 ]
 
 export function CitationPolicy() {
   return (
-    <section className="border-t border-border pt-4">
-      <div className="flex items-start gap-3">
-        <Quote className="mt-0.5 h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <div className="min-w-0">
-          <h2 className="text-base font-bold text-foreground">Citation contract</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Model execution remains disabled until these evidence requirements can be enforced and evaluated.
-          </p>
+    <Panel
+      title={
+        <div className="flex min-w-0 items-center gap-2">
+          <Quote className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <h2 className="truncate text-sm font-semibold text-foreground">Citation gate</h2>
         </div>
-      </div>
-      <ul className="mt-4 divide-y divide-border border-y border-border">
-        {rules.map((rule) => (
-          <li key={rule} className="flex min-w-0 items-start gap-3 px-2 py-3 text-sm leading-6 text-foreground">
-            <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      }
+      actions={<span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><StatusDot tone="amber" />Unverified</span>}
+      bodyClassName="space-y-3"
+    >
+      <Notice>Model execution stays off until these requirements are enforced and evaluated.</Notice>
+      <ol className="space-y-2.5">
+        {rules.map((rule, index) => (
+          <li key={rule} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 text-sm leading-6 text-foreground">
+            <span className="pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
             <span>{rule}</span>
           </li>
         ))}
-      </ul>
-    </section>
+      </ol>
+    </Panel>
   )
 }

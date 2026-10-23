@@ -1,11 +1,10 @@
 import Link from 'next/link'
-import { ArrowRight, Clock3, Settings2 } from 'lucide-react'
+import { ArrowUpRight, Settings2 } from 'lucide-react'
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 
-import { PracticeRowAction } from '@/features/platform/components/PracticeRowAction'
-import { PracticeLoadError, PracticePage, PracticeStatus } from '@/features/platform/components/PracticeSurface'
+import { PracticeLoadError, PracticePage, QueueRow, SectionJumps } from '@/features/platform/components/PracticeSurface'
+import { EmptyState, Pager, Track, trackItemClass } from '@/features/platform/components/ui'
 import { WorkspaceRegisterView } from '@/features/platform/components/WorkspaceRegisterView'
-import { formatInstant, isTimeSensitiveKind } from '@/features/platform/lib/datetime'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 import { platformDestinationTitle } from '@/features/platform/lib/navigation'
 import { getPracticeWorkspace } from '@/features/platform/operations/actions'
@@ -116,17 +115,20 @@ export async function OperatingDesk({
     <PracticePage
       title={definition.title}
       description={definition.description}
-      actions={<Link href="/dashboard/models" className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Settings2 className="h-4 w-4" aria-hidden="true" /> Configuration</Link>}
+      actions={<Track><Link href="/dashboard/models" className={trackItemClass(true)}><Settings2 className="size-4" aria-hidden="true" /> Data model</Link></Track>}
     >
       {!response.success ? <PracticeLoadError message={response.error} /> : registerResult ? (
         registerResult.success
           ? <WorkspaceRegisterView register={registerResult.data} backHref={`/dashboard/platform/${desk}`} backLabel={definition.title} timeZone={timeZone} rowHref={(item) => deskItemHref(desk, item)} />
           : <PracticeLoadError message={registerResult.error} />
       ) : (
-        <div className="space-y-8">
-          <DeskCreatePanel desk={desk} timeZone={timeZone} />
-          {desk === 'time-expenses' ? <LocalTimer /> : null}
-          <div className="space-y-10">
+        <div className="space-y-6">
+          <SectionJumps sections={response.data.sections.map((section) => ({ key: section.key, title: section.title, total: section.total }))} />
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            <DeskCreatePanel desk={desk} timeZone={timeZone} />
+            {desk === 'time-expenses' ? <LocalTimer /> : null}
+          </div>
+          <div className="space-y-6">
             {response.data.sections.map((section) => (
               <DeskLane
                 key={section.key}
@@ -138,7 +140,6 @@ export async function OperatingDesk({
               />
             ))}
           </div>
-          <Link href="/dashboard/models" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Data model explorer</Link>
         </div>
       )}
     </PracticePage>
@@ -147,51 +148,35 @@ export async function OperatingDesk({
 
 function DeskLane({ desk, section, label, timeZone, paginationHrefs }: { desk: DeskKind; section: PracticeWorkspaceSection; label: string; timeZone: string; paginationHrefs?: { previous: string | null; next: string | null } }) {
   return (
-    <section id={section.key} className="scroll-mt-20" aria-labelledby={`${section.key}-heading`}>
-      <div className="flex min-w-0 items-end justify-between gap-4 border-b border-border pb-3">
-        <div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p><h2 id={`${section.key}-heading`} className="mt-1 text-lg font-bold tracking-tight text-foreground">{section.title}</h2></div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="font-mono text-xs text-muted-foreground">{section.total.toLocaleString()}</span>
-          {section.total ? <Link href={registerHref(desk, { view: section.key })} className="inline-flex min-h-11 items-center text-sm font-semibold text-foreground underline-offset-4 hover:underline">Search all</Link> : null}
+    <section id={section.key} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-labelledby={`${section.key}-heading`}>
+      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="min-w-0">
+          <h2 id={`${section.key}-heading`} className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground">
+            <span className="truncate">{section.title}</span>
+            <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{section.total.toLocaleString()}</span>
+          </h2>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{label}</p>
         </div>
-      </div>
-      {!section.items.length ? <div className="mt-4 border-y border-dashed border-border px-3 py-6 text-sm text-muted-foreground">No authorized records currently require attention.</div> : (
-        <div className="mt-4 divide-y divide-border border-y border-border">
-          {section.items.map((item) => {
-            const href = deskItemHref(desk, item)
-            const heading = <>
-              <span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-bold text-foreground group-hover:underline group-hover:underline-offset-4">{item.title}</span>{href ? <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" /> : null}</span>
-              <span className="mt-1 block truncate text-sm text-muted-foreground">{item.subtitle}</span>
-            </>
-            return <article key={`${item.kind}-${item.id}`} className="grid min-w-0 gap-3 px-1 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-3">
-              {href ? <Link href={href} className="group min-w-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">{heading}</Link> : <div className="min-w-0">{heading}</div>}
-              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
-                <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs tabular-nums text-muted-foreground">{item.at ? <Clock3 className="h-3.5 w-3.5" aria-hidden="true" /> : null}{item.at ? formatInstant(item.at, timeZone, { includeTime: isTimeSensitiveKind(item.kind) }) : 'No date'}</span>
-                <PracticeStatus status={item.status} />
-                <PracticeRowAction id={item.id} kind={item.kind} status={item.status} path={`/dashboard/platform/${desk}`} canAct={item.canAct} />
-              </div>
-            </article>
-          })}
-        </div>
+        {section.total ? <Track><Link href={registerHref(desk, { view: section.key })} className={trackItemClass(true)}>Search all <ArrowUpRight className="size-3.5" aria-hidden="true" /></Link></Track> : null}
+      </header>
+      {!section.items.length ? <div className="p-4"><EmptyState title={`No ${section.title.toLowerCase()}`} /></div> : (
+        <ul className="divide-y divide-border">
+          {section.items.map((item) => (
+            <QueueRow key={`${item.kind}-${item.id}`} item={item} href={deskItemHref(desk, item)} actionPath={`/dashboard/platform/${desk}`} timeZone={timeZone} />
+          ))}
+        </ul>
       )}
       {section.pagination && paginationHrefs ? (
-        <nav aria-label={`${section.title} pages`} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-          <div className="space-y-1 text-xs leading-5 text-muted-foreground">
-            <p>
-              {section.pagination.loadedCount
-                ? `Showing ${section.pagination.firstItem.toLocaleString()}–${section.pagination.lastItem.toLocaleString()}`
-                : 'No records returned on this page'} of {section.total.toLocaleString()} authorized records · page {section.pagination.page} of {section.pagination.pageCount}.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {paginationHrefs.previous ? (
-              <Link href={paginationHrefs.previous} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Previous</Link>
-            ) : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Previous</span>}
-            {paginationHrefs.next ? (
-              <Link href={paginationHrefs.next} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Next</Link>
-            ) : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Next</span>}
-          </div>
-        </nav>
+        <div className="border-t border-border px-4 py-3">
+          <Pager
+            label={`${section.title} pages`}
+            previous={paginationHrefs.previous}
+            next={paginationHrefs.next}
+            summary={section.pagination.loadedCount
+              ? `${section.pagination.firstItem.toLocaleString()}–${section.pagination.lastItem.toLocaleString()} of ${section.total.toLocaleString()} · page ${section.pagination.page} of ${section.pagination.pageCount}`
+              : `0 of ${section.total.toLocaleString()} · page ${section.pagination.page} of ${section.pagination.pageCount}`}
+          />
+        </div>
       ) : null}
     </section>
   )
@@ -251,8 +236,7 @@ function getWorkPageHrefs(section: PracticeWorkspaceSection, sections: PracticeW
 async function LocalTimer() {
   const response = await keystoneClient<{ authenticatedItem: { id: string; status: string; activeFirm: { id: string; status: string } | null } | null }>(`query TimerScope { authenticatedItem { ... on User { id status activeFirm { id status } } } }`)
   const viewer = response.success ? response.data.authenticatedItem : null
-  if (!viewer || viewer.status !== "active" || viewer.activeFirm?.status !== "active") return <p role="status">The timer is unavailable. Reload after signing in to your firm.</p>
+  if (!viewer || viewer.status !== "active" || viewer.activeFirm?.status !== "active") return <p role="status" className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">Timer unavailable. Sign in to your firm and reload.</p>
   const scopeKey = `${viewer.id}:${viewer.activeFirm.id}`
-  return <section className="border-y border-border bg-background px-4 py-5" aria-labelledby="local-timer-heading"><p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Timer capture</p><h2 id="local-timer-heading" className="mt-1 text-lg font-bold tracking-tight">Personal elapsed time</h2><LocalTimerClient key={scopeKey} scopeKey={scopeKey} /></section>
+  return <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-labelledby="local-timer-heading"><header className="border-b border-border px-4 py-3"><h2 id="local-timer-heading" className="text-sm font-semibold">Timer</h2></header><div className="p-4"><LocalTimerClient key={scopeKey} scopeKey={scopeKey} /></div></section>
 }
-

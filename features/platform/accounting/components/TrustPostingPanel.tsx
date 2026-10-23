@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from 'react'
 import { FormSelect } from '@/components/ui/form-select'
-import { Landmark } from 'lucide-react'
 
+import { cn } from '@/lib/utils'
+import { Notice, Panel, Track, fieldClass, labelClass, pillClass, pillPrimaryClass, textareaClass } from '@/features/platform/components/ui'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 import { currencyFractionDigits } from '@/features/platform/lib/money'
 import type { PracticeOption } from '@/features/platform/operations/lib/practiceOptions'
@@ -29,51 +30,59 @@ export function TrustPostingPanel({ accounts, ledgers, accountTotal, ledgerTotal
   }, initialState)
   const [currencyCode, setCurrencyCode] = useState('USD')
   const digits = currencyFractionDigits(currencyCode) ?? 2
+  const unavailable = !accounts.length || !ledgers.length
 
   return (
-    <section aria-labelledby="trust-posting-title" className="border-y border-border py-5">
-      <div className="mb-5 flex max-w-3xl items-start gap-3">
-        <Landmark className="mt-1 h-5 w-5 shrink-0" aria-hidden="true" />
-        <div>
-          <h2 id="trust-posting-title" className="text-lg font-bold tracking-tight">Guided trust posting</h2>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Record a balanced deposit or disbursement between bank control and one exact client/matter subledger. Corrections use the separate exact-reversal workflow.
-          </p>
-        </div>
-      </div>
+    <Panel title={<h2 id="trust-posting-title" className="min-w-0 truncate text-sm font-semibold text-foreground">Trust posting</h2>} bodyClassName="p-0">
+      <form action={action} aria-labelledby="trust-posting-title" className="min-w-0">
+        <div className="space-y-5 p-4">
+          {unavailable ? <Notice>Requires an active trust account and client ledger.</Notice> : null}
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <SearchableOptionSelect id="trust-posting-account" name="trustAccountId" label="Trust account" emptyLabel="Select an account" required kind="trustAccount" total={accountTotal} options={accounts} onOptionChange={(option) => setCurrencyCode(option?.currencyCode || 'USD')} />
+            <SearchableOptionSelect id="trust-posting-ledger" name="ledgerAccountId" label="Client or matter ledger" emptyLabel="Select a ledger" required kind="trustLedger" total={ledgerTotal} options={ledgers} />
+          </div>
 
-      <form action={action} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <SearchableOptionSelect id="trust-posting-account" name="trustAccountId" label="Trust account" emptyLabel="Select an account" required kind="trustAccount" total={accountTotal} options={accounts} onOptionChange={(option) => setCurrencyCode(option?.currencyCode || 'USD')} />
-        <SearchableOptionSelect id="trust-posting-ledger" name="ledgerAccountId" label="Client or matter ledger" emptyLabel="Select a ledger" required kind="trustLedger" total={ledgerTotal} options={ledgers} />
-        <label className="space-y-1.5 text-sm font-medium">
-          <span>Posting type</span>
-          <FormSelect name="transactionType" className="min-h-10 w-full rounded-md border border-input bg-background px-3">
-            <option value="deposit">Deposit</option>
-            <option value="disbursement">Disbursement</option>
-          </FormSelect>
-        </label>
-        <label className="space-y-1.5 text-sm font-medium">
-          <span>Amount ({currencyCode})</span>
-          <input name="amount" inputMode="decimal" required autoComplete="off" pattern={digits ? `\\d+(\\.\\d{1,${digits}})?` : '\\d+'} placeholder={digits ? `250.${'0'.repeat(digits)}` : '250'} className="min-h-10 w-full rounded-md border border-input bg-background px-3" />
-          <span className="block text-xs font-normal text-muted-foreground">{digits ? `Up to ${digits} decimal place${digits === 1 ? '' : 's'}.` : 'Whole amounts only.'}</span>
-        </label>
-        <label className="space-y-1.5 text-sm font-medium">
-          <span>Currency</span>
-          <input name="currencyCode" value={currencyCode} readOnly className="min-h-10 w-full rounded-md border border-input bg-muted/30 px-3 uppercase" />
-        </label>
-        <label className="space-y-1.5 text-sm font-medium md:col-span-2 xl:col-span-3">
-          <span>Description</span>
-          <textarea name="description" minLength={5} maxLength={500} required rows={3} className="w-full rounded-md border border-input bg-background p-3" placeholder="Describe the source and purpose without including unnecessary confidential content." />
-        </label>
-        <div className="space-y-2 md:col-span-2 xl:col-span-3">
-          <button disabled={pending || !accounts.length || !ledgers.length} className="min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60">
-            {pending ? 'Posting…' : 'Post balanced transaction'}
-          </button>
-          {!accounts.length || !ledgers.length ? <p className="text-xs text-muted-foreground">An active trust account and active client ledger are required.</p> : null}
-          {operationKey ? <p className="text-xs text-muted-foreground">Operation reference <span className="font-mono">{operationKey}</span> — submitting again repeats this same posting. <button type="button" className="underline" onClick={() => setOperationKey(null)}>Start a new posting</button></p> : null}
-          {state.message ? <p role="status" className={state.ok ? 'text-sm text-foreground' : 'text-sm text-destructive'}>{state.message}</p> : null}
+          <div className="grid min-w-0 gap-4 border-t border-border pt-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={labelClass}>
+              <label htmlFor="trust-posting-type">Posting type</label>
+              <FormSelect id="trust-posting-type" name="transactionType" className={cn(fieldClass, 'text-foreground')}>
+                <option value="deposit">Deposit</option>
+                <option value="disbursement">Disbursement</option>
+              </FormSelect>
+            </div>
+            <label className={labelClass}>
+              <span className="flex items-baseline justify-between gap-2">
+                <span>Amount ({currencyCode})</span>
+                <span className="font-normal">{digits ? `${digits} decimal${digits === 1 ? '' : 's'} max` : 'Whole amounts'}</span>
+              </span>
+              <input name="amount" inputMode="decimal" required autoComplete="off" pattern={digits ? `\\d+(\\.\\d{1,${digits}})?` : '\\d+'} placeholder={digits ? `250.${'0'.repeat(digits)}` : '250'} className={cn(fieldClass, 'text-right font-mono tabular-nums')} />
+            </label>
+            <label className={labelClass}>
+              Currency
+              <input name="currencyCode" value={currencyCode} readOnly className={cn(fieldClass, 'bg-muted/40 font-mono uppercase')} />
+            </label>
+            <label className={cn(labelClass, 'sm:col-span-2 xl:col-span-3')}>
+              Description
+              <textarea name="description" minLength={5} maxLength={500} required rows={3} className={textareaClass} placeholder="Source and purpose" />
+            </label>
+          </div>
+
+          <Notice>Balanced entry between bank control and one client/matter ledger. Corrections use exact reversal.</Notice>
         </div>
+
+        <footer className="flex min-w-0 flex-wrap items-center gap-3 border-t border-border bg-muted/30 px-4 py-3">
+          <Track>
+            <button disabled={pending || unavailable} className={pillPrimaryClass}>{pending ? 'Posting…' : 'Post balanced transaction'}</button>
+            {operationKey ? <button type="button" className={pillClass} onClick={() => setOperationKey(null)}>Start a new posting</button> : null}
+          </Track>
+          {state.message ? <p role="status" className={state.ok ? 'min-w-0 break-words text-sm text-foreground' : 'min-w-0 break-words text-sm text-destructive'}>{state.message}</p> : null}
+          {operationKey ? (
+            <p className="w-full min-w-0 break-all text-xs text-muted-foreground">
+              Reference <span className="font-mono text-foreground">{operationKey}</span> · resubmitting repeats this same posting
+            </p>
+          ) : null}
+        </footer>
       </form>
-    </section>
+    </Panel>
   )
 }

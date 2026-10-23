@@ -18,18 +18,18 @@ export default async function PortalAcceptPage({
   // an unverified invitation token never selects or reveals a tenant.
   const published = await getStorefrontSettings()
   return (
-    <main style={portalThemeStyle(published)} className="flex min-h-svh items-center justify-center overflow-x-clip bg-muted/25 px-4 py-12">
-      <section className="w-full max-w-md border border-border bg-background p-6 shadow-sm sm:p-8">
-        <FirmBrand brand={{ name: published.firmName, brandTagline: published.tagline, logoIcon: published.logoIcon, logoColor: published.logoColor }} />
-        <h1 className="mt-10 text-3xl font-bold tracking-[-0.035em]">Client portal</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Use the one-time invitation sent by your law firm to see the documents, invoices, and conversations it has shared with you.
-        </p>
-        <PortalAcceptForm token={typeof token === 'string' ? token : ''} />
-        <p className="mt-8 border-t border-border pt-5 text-xs leading-5 text-muted-foreground">
-          Already accepted an invitation? <Link href="/portal/signin" className="font-semibold text-foreground underline-offset-4 hover:underline">Sign in with your email</Link>. Need a new invitation? <Link href="/contact#existing-clients" className="font-semibold text-foreground underline-offset-4 hover:underline">Ask the firm for a new invitation</Link>. For staff access,{' '}
-          <Link href="/dashboard" className="font-semibold text-foreground underline-offset-4 hover:underline">sign in here</Link>.
-        </p>
+    <main style={portalThemeStyle(published)} className="storefront flex min-h-svh items-center justify-center overflow-x-clip px-4 py-12">
+      <section className="sf-card sf-portal-card">
+        <div className="sf-card__body grid gap-6">
+          <FirmBrand brand={{ name: published.firmName, brandTagline: published.tagline, logoIcon: published.logoIcon, logoColor: published.logoColor }} />
+          <header className="grid gap-2"><p className="sf-label">Client portal</p><h1 className="sf-h2">Accept your invitation</h1></header>
+          <PortalAcceptForm token={typeof token === 'string' ? token : ''} />
+        </div>
+        <div className="sf-card__foot text-sm">
+          <Link href="/portal/signin" className="sf-link">Already accepted? Sign in</Link>
+          <Link href="/contact#existing-clients" className="sf-link">Request a new invitation</Link>
+          <Link href="/dashboard" className="sf-link sf-muted">Staff sign in</Link>
+        </div>
       </section>
     </main>
   )

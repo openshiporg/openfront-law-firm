@@ -20,8 +20,8 @@ export function FirmBrand({ brand }: { brand: PortalBrand }) {
     <div className="flex min-w-0 items-center gap-3">
       <StoreLogo icon={brand.logoIcon ?? ''} hue={brand.logoColor ?? '0'} />
       <div className="min-w-0">
-        <p className="truncate text-sm font-bold text-foreground">{name}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{brand.brandTagline || 'Secure client portal'}</p>
+        <p className="truncate font-[family-name:var(--font-display)] text-lg font-semibold leading-tight text-foreground">{name}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{brand.brandTagline || 'Client portal'}</p>
       </div>
     </div>
   )

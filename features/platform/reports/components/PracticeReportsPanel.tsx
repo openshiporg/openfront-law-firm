@@ -1,14 +1,26 @@
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 · audience: firm operators · use: review access-scoped financial and control registers · tone: technical/austere · genre: modern-minimal · macrostructure: Control ledger · theme: Quiet */
 import Link from 'next/link'
-import { BarChart3, CircleAlert } from 'lucide-react'
+import type { ReactNode } from 'react'
 
-import { PracticeStatus } from '@/features/platform/components/PracticeSurface'
 import { getPracticeReports } from '../actions/getPracticeReports'
 import { formatInstant, validTimeZone } from '@/features/platform/lib/datetime'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 import { formatMinorUnits } from '@/features/platform/lib/money'
 import { registerHref } from '@/features/platform/operations/lib/workspaceRegister'
 import type { WorkQueuePageInfo } from '@/features/platform/operations/lib/workQueuePagination'
+import {
+  EmptyState,
+  Notice,
+  Pager,
+  RowList,
+  SectionHeader,
+  Stats,
+  StatusDot,
+  TitleLine,
+  Track,
+  pillClass,
+  statusLabel,
+  statusTone,
+} from '@/features/platform/components/ui'
 import {
   ACCOUNTS_RECEIVABLE_DISPLAY_CAP,
   ACCOUNTS_RECEIVABLE_SOURCE_CAP,
@@ -25,6 +37,8 @@ import {
   summarizeReportWipAmounts,
   type ReportWipAmountSummary,
 } from '../lib/wipAmountSummary'
+
+type ArRow = { id: string; invoiceNumber: string; status: string; balanceDueMinor: number; currencyCode: string; dueAt?: string | null; matter?: { matterNumber?: string | null } | null; client?: { displayName?: string | null } | null }
 
 export async function PracticeReportsPanel({ auditPage = 1, reportDeadlinePage = 1 }: { auditPage?: number; reportDeadlinePage?: number }) {
   const [reports, timeZone] = await Promise.all([getPracticeReports(auditPage, reportDeadlinePage), getFirmTimeZone()])
@@ -45,32 +59,47 @@ export async function PracticeReportsPanel({ auditPage = 1, reportDeadlinePage =
   const wipSummary = summarizeReportWipAmounts(time, expenses)
   const audit = reports.audit.success ? reports.audit.data : (notices.push('Audit events are unavailable to this role.'), null)
 
+  const registers: Array<[string, string]> = [
+    ['Receivables', registerHref('billing', { view: 'invoices' })],
+    ['Time WIP', registerHref('time-expenses', { view: 'time' })],
+    ['Expense WIP', registerHref('time-expenses', { view: 'expenses' })],
+    ['Client ledgers', registerHref('accounting', { view: 'ledgers' })],
+  ]
+
   return (
-    <section className="space-y-8 border-y border-border py-5" aria-labelledby="operational-reports-heading">
-      <div className="flex items-start gap-3 px-1">
-        <BarChart3 className="mt-0.5 h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <div><h2 id="operational-reports-heading" className="text-base font-bold text-foreground">Operational reports</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">Access-scoped source registers with amount totals grouped by currency. Bounded results disclose their row caps and do not claim a general ledger or certified financial statement.</p></div>
+    <section className="min-w-0 space-y-6" aria-labelledby="operational-reports-heading">
+      <SectionHeader
+        id="operational-reports-heading"
+        title="Practice reports"
+        actions={(
+          <nav aria-label="Complete registers">
+            <Track>
+              {registers.map(([label, href]) => <Link key={label} href={href} className={pillClass}>{label}</Link>)}
+            </Track>
+          </nav>
+        )}
+      />
+
+      {notices.length ? <Notice>{notices.join(' ')}</Notice> : null}
+
+      <div className="space-y-3">
+        <Stats
+          items={[
+            ['Receivables (sample)', <Amounts key="ar" amounts={sumCurrencies(ar)} />],
+            ['Unbilled WIP (known)', <Amounts key="wip" amounts={wipSummary.knownAmountsByCurrency} />],
+            ['Client trust (sample)', <Amounts key="trust" amounts={sumCurrencies(snapshots)} />],
+            ['Pending / missed deadlines', deadlines?.total.toLocaleString() ?? '—'],
+          ]}
+        />
+        <div className="grid min-w-0 gap-3 md:grid-cols-3">
+          <AccountsReceivableBasis sample={arSample} />
+          <WipBasis summary={wipSummary} />
+          <TrustBasis sample={trustSample} />
+        </div>
       </div>
 
-      {notices.length ? <div role="note" className="flex items-start gap-3 border-y border-border bg-muted/20 px-4 py-4 text-sm text-muted-foreground"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p>{notices.join(' ')}</p></div> : null}
-
-      <div className="grid border-y border-border sm:grid-cols-2 xl:grid-cols-4">
-        <AccountsReceivableMetric amounts={sumCurrencies(ar)} sample={arSample} />
-        <WipAmountMetric summary={wipSummary} />
-        <TrustSnapshotMetric amounts={sumCurrencies(snapshots)} sample={trustSample} />
-        <div className="min-w-0 border-b border-r border-border px-4 py-4 xl:border-b-0"><p className="text-2xl font-bold tabular-nums text-foreground">{deadlines?.total.toLocaleString() ?? '—'}</p><p className="mt-2 text-sm text-muted-foreground">authorized pending/missed deadline records · bounded register below</p></div>
-      </div>
-
-      <nav aria-label="Complete registers" className="flex flex-wrap gap-2 px-1">
-        <span className="self-center text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Complete registers</span>
-        <Link href={registerHref('billing', { view: 'invoices' })} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted">Receivables</Link>
-        <Link href={registerHref('time-expenses', { view: 'time' })} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted">Time WIP</Link>
-        <Link href={registerHref('time-expenses', { view: 'expenses' })} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted">Expense WIP</Link>
-        <Link href={registerHref('accounting', { view: 'ledgers' })} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted">Client ledgers</Link>
-      </nav>
-
-      <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-        <ReportRows title="Accounts receivable aging source sample" rows={ar.map((item) => ({ id: item.id, title: item.invoiceNumber, meta: `${item.matter?.matterNumber ?? 'no matter'} · ${item.client?.displayName ?? 'no client'} · ${money(item.balanceDueMinor, item.currencyCode)} due · ${date(item.dueAt)}`, status: item.status }))} emptyMessage={arSourceRows === null ? 'Invoice source unavailable to this role.' : 'No invoice rows were returned in this sample.'} />
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+        <AccountsReceivableRegister rows={ar} unavailable={arSourceRows === null} />
         <TrustSnapshotRegister rows={snapshots} sample={trustSample} />
       </div>
       <ReportDeadlineRegister register={deadlines} auditPage={auditPage} timeZone={timeZone} />
@@ -79,79 +108,124 @@ export async function PracticeReportsPanel({ auditPage = 1, reportDeadlinePage =
   )
 }
 
-function AccountsReceivableMetric({
-  amounts,
-  sample,
-}: {
-  amounts: Map<string, number>
-  sample: ReturnType<typeof summarizeAccountsReceivableSample>
-}) {
-  const sourceLabel = sample.rawSourceRows === null
-    ? 'source unavailable'
-    : `${sample.rawSourceRows.toLocaleString()} raw rows returned / ${sample.sourceCap}-row source cap · ${sample.displayedRows?.toLocaleString() ?? 0} shown / ${sample.displayCap}-row register display cap`
+function Amounts({ amounts }: { amounts: Map<string, number> }) {
+  if (!amounts.size) return <>—</>
+  return <span className="block space-y-0.5">{[...amounts].map(([currency, value]) => <span key={currency} className="block truncate">{money(value, currency)}</span>)}</span>
+}
+
+/** Figure basis: the caveats that qualify a headline figure, one line each. */
+function Basis({ title, lines }: { title: string; lines: Array<ReactNode | null | false> }) {
+  const shown = lines.filter(Boolean)
   return (
-    <div className="min-w-0 border-b border-r border-border px-4 py-4 xl:border-b-0">
-      <div className="space-y-1">
-        {amounts.size ? [...amounts].map(([currency, value]) => <p key={currency} className="text-xl font-bold tabular-nums text-foreground">{money(value, currency)}</p>) : <p className="text-xl font-bold text-foreground">—</p>}
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">Accounts receivable · returned-sample invoice balances due · grouped by currency</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">{sourceLabel}</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">Amounts sum every returned invoice row, including rows beyond the register display cap; the register shows only its first {sample.displayCap} rows.</p>
-      {sample.sourceCapReached ? (
-        <p role="note" className="mt-1 text-xs leading-5 text-muted-foreground">The {sample.sourceCap}-row source cap was reached; additional matching invoices may be omitted.</p>
-      ) : sample.rawSourceRows === null ? (
-        <p role="note" className="mt-1 text-xs leading-5 text-muted-foreground">Invoice balance data is unavailable to this role.</p>
-      ) : sample.rawSourceRows === 0 ? (
-        <p role="note" className="mt-1 text-xs leading-5 text-muted-foreground">No invoice rows were returned; this is not a certified zero receivable.</p>
-      ) : null}
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">The query requests no total count. These returned balances are not a certified or as-of receivable balance.</p>
+    <div role="note" className="min-w-0 rounded-lg bg-muted/60 px-3 py-2">
+      <p className="text-xs font-medium text-foreground">{title}</p>
+      <ul className="mt-1 space-y-0.5 text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">
+        {shown.map((line, index) => <li key={index}>{line}</li>)}
+      </ul>
     </div>
   )
 }
 
-function WipAmountMetric({ summary }: { summary: ReportWipAmountSummary }) {
+function AccountsReceivableBasis({ sample }: { sample: ReturnType<typeof summarizeAccountsReceivableSample> }) {
+  return (
+    <Basis
+      title="Receivables basis"
+      lines={[
+        sample.rawSourceRows === null
+          ? 'Source unavailable.'
+          : `${sample.rawSourceRows.toLocaleString()} of ${sample.sourceCap} max rows returned; ${sample.displayedRows?.toLocaleString() ?? 0} shown (display cap ${sample.displayCap}). Total sums every returned row.`,
+        sample.sourceCapReached ? `Source cap of ${sample.sourceCap} reached; more invoices may be omitted.` : null,
+        sample.rawSourceRows === 0 ? 'No invoices returned; not a certified zero receivable.' : null,
+        'Returned-sample balances due, by currency; not a certified or as-of receivable.',
+      ]}
+    />
+  )
+}
+
+function WipBasis({ summary }: { summary: ReportWipAmountSummary }) {
   const unknownTimeAmountCount = [...summary.unknownTimeAmountsByCurrency.values()].reduce((total, count) => total + count, 0)
   const sourceRows = (count: number | null, atCap: boolean) => count === null
     ? 'unavailable'
-    : `${count.toLocaleString()} returned${atCap ? ' · source cap reached' : ''}`
+    : `${count.toLocaleString()} returned${atCap ? ' (cap reached)' : ''}`
   return (
-    <div className="min-w-0 border-b border-r border-border px-4 py-4 xl:border-b-0">
-      <div className="space-y-1">
-        {summary.knownAmountsByCurrency.size
-          ? [...summary.knownAmountsByCurrency].map(([currency, value]) => <p key={currency} className="text-xl font-bold tabular-nums text-foreground">{money(value, currency)}</p>)
-          : <p className="text-xl font-bold text-foreground">—</p>}
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">Unbilled WIP · known amounts in returned samples · grouped by currency</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">Time entries: {sourceRows(summary.timeEntryRows, summary.timeEntriesAtCap)} · expenses: {sourceRows(summary.expenseRows, summary.expensesAtCap)}.</p>
-      {unknownTimeAmountCount ? (
-        <p role="note" className="mt-1 text-xs leading-5 text-muted-foreground">
-          {unknownTimeAmountCount.toLocaleString()} returned time {unknownTimeAmountCount === 1 ? 'entry has' : 'entries have'} no recorded amount and {unknownTimeAmountCount === 1 ? 'is' : 'are'} excluded from the known subtotal; the WIP amount is partial/unknown.
-          {' '}Unknown amount counts by currency: {[...summary.unknownTimeAmountsByCurrency].map(([currency, count]) => `${count} ${currency}`).join(', ')}.
-        </p>
-      ) : null}
-      {summary.timeEntriesUnavailable || summary.expensesUnavailable ? (
-        <p role="note" className="mt-1 text-xs leading-5 text-muted-foreground">At least one source is unavailable, so the displayed known subtotal is incomplete.</p>
-      ) : null}
-      {summary.timeEntriesAtCap ? <p role="note" className="mt-1 text-xs leading-5 text-muted-foreground">The time-entry query returned its {REPORT_WIP_SOURCE_CAP} row cap; additional matching records may be omitted.</p> : null}
-      {summary.expensesAtCap ? <p role="note" className="mt-1 text-xs leading-5 text-muted-foreground">The expense query returned its {REPORT_WIP_SOURCE_CAP} row cap; additional matching records may be omitted.</p> : null}
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">Each submitted/approved source query independently returns up to {REPORT_WIP_SOURCE_CAP} rows and requests no total count; results below the cap do not establish complete coverage.</p>
+    <Basis
+      title="WIP basis"
+      lines={[
+        `Time ${sourceRows(summary.timeEntryRows, summary.timeEntriesAtCap)} · expenses ${sourceRows(summary.expenseRows, summary.expensesAtCap)}; each capped at ${REPORT_WIP_SOURCE_CAP} rows, no total count.`,
+        unknownTimeAmountCount
+          ? `${unknownTimeAmountCount.toLocaleString()} time ${unknownTimeAmountCount === 1 ? 'entry has' : 'entries have'} no amount and ${unknownTimeAmountCount === 1 ? 'is' : 'are'} excluded; WIP is partial (${[...summary.unknownTimeAmountsByCurrency].map(([currency, count]) => `${count} ${currency}`).join(', ')}).`
+          : null,
+        summary.timeEntriesUnavailable || summary.expensesUnavailable ? 'A source is unavailable; the known subtotal is incomplete.' : null,
+        summary.timeEntriesAtCap || summary.expensesAtCap ? 'Row cap reached; more matching records may be omitted.' : null,
+      ]}
+    />
+  )
+}
+
+function TrustBasis({ sample }: { sample: TrustSnapshotSampleSummary }) {
+  return (
+    <Basis
+      title="Trust basis"
+      lines={[
+        sample.rawSourceRows === null
+          ? 'Source unavailable.'
+          : `${sample.rawSourceRows.toLocaleString()} of ${sample.sourceCap} max snapshot rows · ${sample.representedLedgers.toLocaleString()} ledgers represented.`,
+        'Latest sampled row per ledger, by currency; not complete, as-of or reconciled client balances.',
+        sample.sourceCapReached ? `Cap of ${sample.sourceCap} reached before per-ledger dedup; rows or ledgers may be omitted.` : null,
+      ]}
+    />
+  )
+}
+
+function RegisterHeading({ id, title, meta }: { id?: string; title: string; meta: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <h3 id={id} className="min-w-0 truncate text-sm font-semibold text-foreground">{title}</h3>
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">{meta}</span>
     </div>
   )
 }
 
-function TrustSnapshotMetric({ amounts, sample }: { amounts: Map<string, number>; sample: TrustSnapshotSampleSummary }) {
-  const sourceLabel = sample.rawSourceRows === null
-    ? 'source unavailable'
-    : `${sample.rawSourceRows.toLocaleString()} raw rows / ${sample.sourceCap} global source cap`
+const th = 'whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-muted-foreground'
+const td = 'px-3 py-2.5 align-top'
+
+function AccountsReceivableRegister({ rows, unavailable }: { rows: ArRow[]; unavailable: boolean }) {
+  const visibleRows = rows.slice(0, ACCOUNTS_RECEIVABLE_DISPLAY_CAP)
   return (
-    <div className="min-w-0 border-b border-r border-border px-4 py-4 xl:border-b-0">
-      <div className="space-y-1">
-        {amounts.size ? [...amounts].map(([currency, value]) => <p key={currency} className="text-xl font-bold tabular-nums text-foreground">{money(value, currency)}</p>) : <p className="text-xl font-bold text-foreground">—</p>}
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">Sampled trust snapshot amounts · {sourceLabel} · {sample.representedLedgers.toLocaleString()} ledgers represented</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">Sum of one returned row per represented ledger within this bounded sample, grouped by currency—not complete per-ledger/as-of or reconciled client balances.</p>
-      {sample.sourceCapReached ? <p className="mt-1 text-xs leading-5 text-muted-foreground">The 100-row cap was reached on raw query rows before dedup; additional global rows or ledgers may be omitted.</p> : null}
-    </div>
+    <section className="min-w-0 space-y-3">
+      <RegisterHeading
+        title="Receivables aging sample"
+        meta={`${visibleRows.length} of ${rows.length}${rows.length === ACCOUNTS_RECEIVABLE_SOURCE_CAP ? ' · source cap' : ''}`}
+      />
+      {!rows.length ? (
+        <EmptyState title={unavailable ? 'Invoice source unavailable to this role.' : 'No invoices returned.'} />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <table className="w-full min-w-[34rem] text-sm tabular-nums">
+            <thead className="border-b border-border bg-muted/40">
+              <tr><th className={th}>Invoice</th><th className={th}>Matter</th><th className={th}>Client</th><th className={th}>Due</th><th className={`${th} text-right`}>Balance due</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {visibleRows.map((item) => (
+                <tr key={item.id}>
+                  <td className={td}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <StatusDot tone={statusTone(item.status)} />
+                      <span className="truncate font-medium text-foreground">{item.invoiceNumber}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{statusLabel(item.status)}</span>
+                    </span>
+                  </td>
+                  <td className={`${td} whitespace-nowrap text-muted-foreground`}>{item.matter?.matterNumber ?? '—'}</td>
+                  <td className={`${td} max-w-[12rem] truncate text-muted-foreground`}>{item.client?.displayName ?? '—'}</td>
+                  <td className={`${td} whitespace-nowrap text-muted-foreground`}>{date(item.dueAt)}</td>
+                  <td className={`${td} whitespace-nowrap text-right font-medium text-foreground`}>{money(item.balanceDueMinor, item.currencyCode)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -164,95 +238,91 @@ function TrustSnapshotRegister({
 }) {
   const visibleRows = rows.slice(0, 50)
   return (
-    <section className="min-w-0 border-t border-border pt-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h3 className="text-sm font-bold text-foreground">Client trust snapshot sample</h3>
-        <span className="font-mono text-xs text-muted-foreground">
-          {sample.rawSourceRows === null
-            ? 'Unavailable'
-            : `${sample.rawSourceRows.toLocaleString()} raw rows · ${sample.representedLedgers.toLocaleString()} ledgers represented`}
-        </span>
-      </div>
-      <p className="mt-2 max-w-4xl text-xs leading-5 text-muted-foreground">
-        The session-aware query samples up to {sample.sourceCap} global client-balance snapshot rows ordered by as-of time descending, then ID ascending, and keeps the first returned row for each ledger. The ID tie-break makes equal-time selection repeatable but does not determine which tied balance is correct as of that timestamp. This is not complete per-ledger coverage, an authoritative as-of report, or a reconciled client balance.
-      </p>
-      {sample.sourceCapReached ? (
-        <p role="note" className="mt-2 border-y border-border bg-muted/20 px-3 py-2 text-xs leading-5 text-muted-foreground">
-          {sample.sourceCap} raw source rows were returned, reaching the global query cap before per-ledger deduplication. Additional rows—including an otherwise-unseen ledger after the sample boundary—may be omitted.
-        </p>
-      ) : sample.rawSourceRows !== null ? (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">The query returned fewer than {sample.sourceCap} raw rows; it has no total count, so this does not establish complete ledger coverage.</p>
+    <section className="min-w-0 space-y-3">
+      <RegisterHeading
+        title="Client trust snapshot sample"
+        meta={sample.rawSourceRows === null ? 'Unavailable' : `${visibleRows.length} of ${rows.length} ledgers${rows.length > visibleRows.length ? ' · 50 cap' : ''}`}
+      />
+      {sample.rawSourceRows !== null && !sample.sourceCapReached ? (
+        <Notice>Fewer than {sample.sourceCap} rows returned; no total count, so ledger coverage is not established.</Notice>
       ) : null}
-      <div className="mt-3 divide-y divide-border border-y border-border">
-        {visibleRows.map((item) => (
-          <article key={item.id} className="grid min-w-0 gap-2 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-            <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{item.ledgerAccount?.client.displayName ?? 'Client ledger'}</p><p className="mt-1 truncate text-sm text-muted-foreground">{item.ledgerAccount?.ledgerNumber ?? 'ledger unavailable'} · {money(item.balanceMinor, item.currencyCode)} · {date(item.asOf)}</p></div>
-            <PracticeStatus status={item.balanceMinor < 0 ? 'exception' : 'recorded'} />
-          </article>
-        ))}
-        {!sample.rawSourceRows ? (
-          <p className="px-2 py-6 text-sm text-muted-foreground">
-            {sample.rawSourceRows === null
-              ? 'Client trust snapshot data is unavailable to this role.'
-              : 'No client-balance snapshot rows were returned; this does not certify zero or reconciled client balances.'}
-          </p>
-        ) : !rows.length ? (
-          <p className="px-2 py-6 text-sm text-muted-foreground">No ledger-linked client trust snapshot rows were represented in this sample.</p>
-        ) : null}
-      </div>
-      {sample.rawSourceRows !== null ? (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          {visibleRows.length.toLocaleString()} shown of {rows.length.toLocaleString()} ledger rows represented after within-sample deduplication{rows.length > visibleRows.length ? ' · 50-row display cap' : ''}.
-        </p>
-      ) : null}
+      {!sample.rawSourceRows ? (
+        <EmptyState title={sample.rawSourceRows === null ? 'Trust snapshot data unavailable to this role.' : 'No snapshots returned; not a certified zero or reconciled balance.'} />
+      ) : !rows.length ? (
+        <EmptyState title="No ledger-linked snapshots in this sample." />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <table className="w-full min-w-[30rem] text-sm tabular-nums">
+            <thead className="border-b border-border bg-muted/40">
+              <tr><th className={th}>Client</th><th className={th}>Ledger</th><th className={th}>As of</th><th className={`${th} text-right`}>Balance</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {visibleRows.map((item) => {
+                return (
+                  <tr key={item.id}>
+                    <td className={td}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <StatusDot tone={item.balanceMinor < 0 ? 'rose' : 'emerald'} />
+                        <span className="max-w-[12rem] truncate font-medium text-foreground">{item.ledgerAccount?.client.displayName ?? 'Client ledger'}</span>
+                        {item.balanceMinor < 0 ? <span className="shrink-0 text-xs font-medium text-destructive">Exception</span> : <span className="sr-only">Recorded</span>}
+                      </span>
+                    </td>
+                    <td className={`${td} whitespace-nowrap text-muted-foreground`}>{item.ledgerAccount?.ledgerNumber ?? '—'}</td>
+                    <td className={`${td} whitespace-nowrap text-muted-foreground`}>{date(item.asOf)}</td>
+                    <td className={`${td} whitespace-nowrap text-right font-medium ${item.balanceMinor < 0 ? 'text-destructive' : 'text-foreground'}`}>{money(item.balanceMinor, item.currencyCode)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
-}
-
-function ReportRows({ title, rows, emptyMessage }: { title: string; rows: Array<{ id: string; title: string; meta: string; status: string }>; emptyMessage: string }) {
-  const visibleRows = rows.slice(0, ACCOUNTS_RECEIVABLE_DISPLAY_CAP)
-  return <section className="min-w-0 border-t border-border pt-4"><div className="flex items-end justify-between gap-3"><h3 className="text-sm font-bold text-foreground">{title}</h3><span className="font-mono text-xs text-muted-foreground">{visibleRows.length} shown of {rows.length} loaded · {ACCOUNTS_RECEIVABLE_DISPLAY_CAP}-row display cap{rows.length === ACCOUNTS_RECEIVABLE_SOURCE_CAP ? ' · 100-row source cap' : ''}</span></div><div className="mt-3 divide-y divide-border border-y border-border">{visibleRows.map((row) => <article key={row.id} className="grid min-w-0 gap-2 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{row.title}</p><p className="mt-1 truncate text-sm text-muted-foreground">{row.meta}</p></div><PracticeStatus status={row.status} /></article>)}{!rows.length ? <p className="px-2 py-6 text-sm text-muted-foreground">{emptyMessage}</p> : null}</div></section>
 }
 
 type AuditRow = { id: string; eventId: string | null; eventType: string; category: string; outcome: string; occurredAt: string | null; actorType: string | null; actorUser: { name: string | null } | null; matter: { id: string; matterNumber: string | null } | null }
 
 function AuditEventRegister({ register, reportDeadlinePage, timeZone }: { register: { auditEvents: AuditRow[]; total: number; pagination: WorkQueuePageInfo } | null; reportDeadlinePage: number; timeZone: string }) {
   return (
-    <section id="audit-evidence" className="min-w-0 border-t border-border pt-4" aria-labelledby="audit-evidence-heading">
-      <div className="flex items-end justify-between gap-3">
-        <h3 id="audit-evidence-heading" className="text-sm font-bold text-foreground">Recent audit evidence</h3>
-        <span className="font-mono text-xs text-muted-foreground">{register ? `${register.total.toLocaleString()} authorized` : 'Unavailable'}</span>
-      </div>
-      <div className="mt-3 divide-y divide-border border-y border-border">
-        {register?.auditEvents.map((item) => (
-          <article key={item.id} className="grid min-w-0 gap-2 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{item.eventType}</p>
-              <p className="mt-1 truncate text-sm text-muted-foreground">{item.category} · {formatInstant(item.occurredAt, timeZone)} · {item.actorUser?.name ?? (item.actorType ? `${item.actorType.replaceAll('_', ' ')} actor` : 'actor restricted')}{item.matter ? <> · <Link href={`/dashboard/platform/matters/${encodeURIComponent(item.matter.id)}`} className="underline-offset-4 hover:underline">{item.matter.matterNumber ?? 'Matter'}</Link></> : null}</p>
+    <section id="audit-evidence" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="audit-evidence-heading">
+      <RegisterHeading id="audit-evidence-heading" title="Audit evidence" meta={register ? register.total.toLocaleString() : 'Unavailable'} />
+      {!register ? (
+        <EmptyState title="Audit events are unavailable to this role." />
+      ) : !register.auditEvents.length ? (
+        <EmptyState title="No audit events on this page." />
+      ) : (
+        <RowList label="Audit events">
+          {register.auditEvents.map((item) => (
+            <li key={item.id} className="min-w-0 px-4 py-3">
+              <TitleLine as="p" status={item.outcome} headingClassName="text-sm">{item.eventType}</TitleLine>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {item.category} · {formatInstant(item.occurredAt, timeZone)} · {item.actorUser?.name ?? (item.actorType ? `${item.actorType.replaceAll('_', ' ')} actor` : 'actor restricted')}
+                {item.matter ? <> · <Link href={`/dashboard/platform/matters/${encodeURIComponent(item.matter.id)}`} className="underline-offset-4 hover:underline">{item.matter.matterNumber ?? 'Matter'}</Link></> : null}
+              </p>
               <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">Ref {item.eventId ?? item.id}</p>
-            </div>
-            <PracticeStatus status={item.outcome} />
-          </article>
-        ))}
-        {!register ? <p className="px-2 py-6 text-sm text-muted-foreground">Audit events are unavailable to this role.</p> : !register.auditEvents.length ? <p className="px-2 py-6 text-sm text-muted-foreground">No audit events were returned on this page.</p> : null}
-      </div>
+            </li>
+          ))}
+        </RowList>
+      )}
       {register ? <AuditEventPagination total={register.total} pagination={register.pagination} reportDeadlinePage={reportDeadlinePage} /> : null}
     </section>
   )
 }
 
+function pageSummary(pagination: WorkQueuePageInfo, total: number) {
+  return `${pagination.loadedCount ? `${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()}` : 'None'} of ${total.toLocaleString()} · page ${pagination.page} of ${pagination.pageCount}`
+}
+
 function AuditEventPagination({ total, pagination, reportDeadlinePage }: { total: number; pagination: WorkQueuePageInfo; reportDeadlinePage: number }) {
   const href = (page: number) => `/dashboard/platform/reports?auditPage=${page}&reportDeadlinePage=${reportDeadlinePage}#audit-evidence`
   return (
-    <nav aria-label="Audit event pages" className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-      <div className="space-y-1 text-xs leading-5 text-muted-foreground">
-        <p>{pagination.loadedCount ? `Showing ${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()}` : 'No records returned on this page'} of {total.toLocaleString()} authorized audit events · page {pagination.page} of {pagination.pageCount}.</p>
-      </div>
-      <div className="flex items-center gap-2">
-        {pagination.hasPrevious ? <Link href={href(pagination.page - 1)} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Previous</Link> : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Previous</span>}
-        {pagination.hasNext ? <Link href={href(pagination.page + 1)} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Next</Link> : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Next</span>}
-      </div>
-    </nav>
+    <Pager
+      label="Audit event pages"
+      summary={pageSummary(pagination, total)}
+      previous={pagination.hasPrevious ? href(pagination.page - 1) : null}
+      next={pagination.hasNext ? href(pagination.page + 1) : null}
+    />
   )
 }
 
@@ -264,20 +334,30 @@ function ReportDeadlineRegister({ register, auditPage, timeZone }: {
   timeZone: string
 }) {
   return (
-    <section id="deadline-control" className="min-w-0 border-t border-border pt-4" aria-labelledby="deadline-control-heading">
-      <div className="flex items-end justify-between gap-3">
-        <div><h3 id="deadline-control-heading" className="text-sm font-bold text-foreground">Deadline control</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Due times are shown in each deadline’s own time zone. Verification state is shown as recorded; deadlines are not calculated from court rules here.</p></div>
-        <span className="shrink-0 font-mono text-xs text-muted-foreground">{register ? `${register.total.toLocaleString()} authorized` : 'Unavailable'}</span>
-      </div>
-      <div className="mt-3 divide-y divide-border border-y border-border">
-        {register?.deadlines.map((item) => (
-          <article key={item.id} className="grid min-w-0 gap-2 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-            <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground"><Link href={`/dashboard/platform/work/deadline/${encodeURIComponent(item.id)}`} className="underline-offset-4 hover:underline">{item.title || 'Untitled deadline'}</Link></p><p className="mt-1 truncate text-sm text-muted-foreground">Due {formatInstant(item.dueAt, validTimeZone(item.timezone) ?? timeZone, { missing: 'time unavailable' })} · {item.matter?.matterNumber ?? 'Firm-level'} · {item.assignedTo?.name ?? 'owner restricted or unassigned'} · {item.isVerified ? 'verified' : 'requires verification'}</p></div>
-            <PracticeStatus status={item.status ?? 'unknown'} />
-          </article>
-        ))}
-        {!register ? <p className="px-2 py-6 text-sm text-muted-foreground">Deadline control is unavailable to this role.</p> : !register.deadlines.length ? <p className="px-2 py-6 text-sm text-muted-foreground">No deadlines were returned on this page.</p> : null}
-      </div>
+    <section id="deadline-control" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="deadline-control-heading">
+      <RegisterHeading id="deadline-control-heading" title="Deadline control" meta={register ? register.total.toLocaleString() : 'Unavailable'} />
+      <Notice>Due times in each deadline’s own time zone. Verification as recorded; not calculated from court rules.</Notice>
+      {!register ? (
+        <EmptyState title="Deadline control is unavailable to this role." />
+      ) : !register.deadlines.length ? (
+        <EmptyState title="No deadlines on this page." />
+      ) : (
+        <RowList label="Deadlines">
+          {register.deadlines.map((item) => (
+            <li key={item.id} className="min-w-0 px-4 py-3">
+              <TitleLine as="p" status={item.status ?? 'unknown'} headingClassName="text-sm">
+                <Link href={`/dashboard/platform/work/deadline/${encodeURIComponent(item.id)}`} className="underline-offset-4 hover:underline">{item.title || 'Untitled deadline'}</Link>
+              </TitleLine>
+              <div className="mt-1 flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                <span className="tabular-nums">Due {formatInstant(item.dueAt, validTimeZone(item.timezone) ?? timeZone, { missing: 'time unavailable' })}</span>
+                <span>{item.matter?.matterNumber ?? 'Firm-level'}</span>
+                <span className="truncate">{item.assignedTo?.name ?? 'Unassigned or restricted'}</span>
+                <span className={item.isVerified ? undefined : 'font-medium text-amber-700 dark:text-amber-400'}>{item.isVerified ? 'Verified' : 'Unverified'}</span>
+              </div>
+            </li>
+          ))}
+        </RowList>
+      )}
       {register ? <ReportDeadlinePagination total={register.total} pagination={register.pagination} auditPage={auditPage} /> : null}
     </section>
   )
@@ -286,17 +366,14 @@ function ReportDeadlineRegister({ register, auditPage, timeZone }: {
 function ReportDeadlinePagination({ total, pagination, auditPage }: { total: number; pagination: WorkQueuePageInfo; auditPage: number }) {
   const href = (page: number) => `/dashboard/platform/reports?auditPage=${auditPage}&reportDeadlinePage=${page}#deadline-control`
   return (
-    <nav aria-label="Report deadline pages" className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-      <div className="space-y-1 text-xs leading-5 text-muted-foreground">
-        <p>{pagination.loadedCount ? `Showing ${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()}` : 'No records returned on this page'} of {total.toLocaleString()} authorized pending/missed deadline records · page {pagination.page} of {pagination.pageCount}.</p>
-      </div>
-      <div className="flex items-center gap-2">
-        {pagination.hasPrevious ? <Link href={href(pagination.page - 1)} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Previous</Link> : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Previous</span>}
-        {pagination.hasNext ? <Link href={href(pagination.page + 1)} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Next</Link> : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Next</span>}
-      </div>
-    </nav>
+    <Pager
+      label="Report deadline pages"
+      summary={pageSummary(pagination, total)}
+      previous={pagination.hasPrevious ? href(pagination.page - 1) : null}
+      next={pagination.hasNext ? href(pagination.page + 1) : null}
+    />
   )
 }
 
 function money(value: number, currency: string) { return formatMinorUnits(value, currency) }
-function date(value: unknown) { const parsed = value ? new Date(String(value)) : null; return parsed && !Number.isNaN(parsed.getTime()) ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(parsed) : 'no date' }
+function date(value: unknown) { const parsed = value ? new Date(String(value)) : null; return parsed && !Number.isNaN(parsed.getTime()) ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(parsed) : '—' }

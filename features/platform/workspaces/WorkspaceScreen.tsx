@@ -2,6 +2,7 @@ import {
   PracticeLoadError,
   PracticePage,
   QueuePanel,
+  SectionJumps,
 } from '@/features/platform/components/PracticeSurface'
 import { getPracticeWorkspace } from '@/features/platform/operations/actions'
 import type { PracticeWorkspaceSection } from '@/features/platform/operations/types'
@@ -68,9 +69,8 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
       {!response.success ? (
         <PracticeLoadError message={response.error} />
       ) : (
-        <div className="space-y-8">
-
-
+        <div className="space-y-6">
+          <SectionJumps sections={response.data.sections.map((section) => ({ key: section.key, title: section.title, total: section.total }))} />
           {category === 'intake' ? <IntakeOperationsPanel reviewPage={conflictReviewPage} decisionPage={decisionPage} pageHref={(page) => `/dashboard/platform/intake?intakePage=${activeIntakePage}&conflictPage=${activeConflictPage}&reviewPage=${page}&decisionPage=${decisionPage ?? 1}#conflict-review`} decisionPageHref={(page) => `/dashboard/platform/intake?intakePage=${activeIntakePage}&conflictPage=${activeConflictPage}&reviewPage=${conflictReviewPage ?? 1}&decisionPage=${page}#intake-conversion`} /> : null}
           {category === 'billing' ? <BillingOperationsPanel /> : null}
           {category === 'reports' ? <PracticeReportsPanel auditPage={auditPage} reportDeadlinePage={reportDeadlinePage} /> : null}
@@ -85,7 +85,7 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
             />
           ) : null}
           {category === 'accounting' ? (
-            <div className="space-y-8">
+            <div className="grid gap-6 xl:grid-cols-2">
               <TrustPostingPanel
                 accounts={trustOptions(response.data.sections, 'accounts')}
                 accountTotal={response.data.sections.find((section) => section.key === 'accounts')?.total}
@@ -115,7 +115,7 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
             />
           ) : null}
 
-          <div className="space-y-10">
+          <div className="space-y-6">
             {response.data.sections.map((section) => {
               const isContactDirectoryPreview = category === 'contacts' && section.key === 'directory'
               const isActionInvoicePreview = category === 'billing' && section.key === 'invoices'
@@ -143,12 +143,13 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
                     <QueuePanel
                       title={previewCopy
                         ? `${isPortalContactPreview ? 'Portal invitation candidates' : section.title} · ${previewCopy.summary}`
-                        : `${section.title} · ${section.total.toLocaleString()}`}
+                        : section.title}
+                      count={previewCopy ? undefined : section.total}
                       description={previewCopy
                         ? `${section.description} ${previewCopy.description}`
                         : section.description}
                       items={section.items}
-                      empty={`No ${section.title.toLowerCase()} records currently require attention.`}
+                      empty={`No ${section.title.toLowerCase()}`}
                       viewAllHref={category === 'reports' ? `/dashboard/platform/${section.key}` : registerHref(category, { view: section.key })}
                       showViewAll={section.total > 0 && (category === 'reports' || Boolean(registerDefinition(category, section.key)))}
                       anchor={section.key}

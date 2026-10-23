@@ -2,9 +2,8 @@
 
 import { useActionState, useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Pause, Play, RotateCcw, Save } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+import { fieldClass, labelClass, pillClass, pillPrimaryClass, trackClass, trackItemClass } from '@/features/platform/components/ui'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 import { saveTimerEntry, type TimerSaveState } from '@/features/platform/time-expenses/actions/saveTimerEntry'
 
@@ -102,26 +101,36 @@ export function LocalTimerClient({ scopeKey }: { scopeKey: string }) {
     setNow(at)
   }
   function reset() { writeDraft(storageKey, null); setAnnouncement('Timer reset.') }
-  return <div className="mt-4 space-y-4">
-    {legacyPresent ? <div role="alert" className="space-y-2 rounded-md border p-3 text-sm"><p>An older unsaved timer draft is on this device. Its owner cannot be verified, so it has not been restored or saved. Reconstruct and reconcile any missing work from your own records before discarding it.</p><button type="button" className="min-h-11 rounded-md border px-3 focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { try { window.localStorage.removeItem("openfront-law-firm:timer-draft"); setLegacyPresent(false); setAnnouncement("The older unverified draft was discarded. No time entry was saved."); } catch { setAnnouncement("The older draft could not be removed from this device."); } }}>Discard older unverified draft</button></div> : null}
-    <div className="flex flex-wrap items-center gap-3">
-      <output aria-label="Elapsed time" aria-live="off" className="min-w-28 font-mono text-2xl font-bold tabular-nums text-foreground">{duration}</output>
-      <button type="button" onClick={toggle} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-foreground px-3 text-sm font-semibold text-background focus-visible:ring-2 focus-visible:ring-ring">{running ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}{running ? 'Pause' : draft.accumulatedMs ? 'Resume' : 'Start timer'}</button>
-      <button type="button" onClick={reset} disabled={saving || elapsed === 0} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><RotateCcw className="size-4" aria-hidden="true" />Reset</button>
+  return <div className="space-y-4">
+    {legacyPresent ? <div role="alert" className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p>An older unsaved timer draft on this device has an unverified owner. It was not restored or saved.</p><div className={trackClass}><button type="button" className={pillClass} onClick={() => { try { window.localStorage.removeItem("openfront-law-firm:timer-draft"); setLegacyPresent(false); setAnnouncement("The older unverified draft was discarded. No time entry was saved."); } catch { setAnnouncement("The older draft could not be removed from this device."); } }}>Discard older draft</button></div></div> : null}
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/60 px-4 py-3 shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
+      <div className="flex items-center gap-2.5">
+        <span aria-hidden="true" className={cn('size-2 rounded-full ring-2 ring-background', running ? 'animate-pulse bg-emerald-500' : elapsed ? 'bg-amber-500' : 'bg-zinc-400')} />
+        <output aria-label="Elapsed time" aria-live="off" className="font-mono text-3xl font-semibold tabular-nums tracking-tight text-foreground">{duration}</output>
+      </div>
+      <div className={trackClass}>
+        <button type="button" onClick={toggle} disabled={saving} className={running ? trackItemClass(true) : pillPrimaryClass}>{running ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}{running ? 'Pause' : draft.accumulatedMs ? 'Resume' : 'Start'}</button>
+        <button type="button" onClick={reset} disabled={saving || elapsed === 0} className={trackItemClass(false)}><RotateCcw className="size-4" aria-hidden="true" />Reset</button>
+      </div>
     </div>
     <p role="status" className="sr-only">{announcement}</p>
-    <p className="text-xs text-muted-foreground">Elapsed time is retained for one day. Reselect the matter and describe the work after reloading.</p>
+    <p className="text-xs text-muted-foreground">Elapsed time is kept on this device for one day. Matter and description are not.</p>
     <form action={saveAction}>
-      <fieldset disabled={saving} className="grid min-w-0 gap-3 sm:grid-cols-2">
+      <fieldset disabled={saving} className="grid min-w-0 gap-4 sm:grid-cols-2">
         <input type="hidden" name="captureId" value={draft.captureId} />
         <input type="hidden" name="startedAt" value={draft.firstStartedAt ?? ''} />
         <input type="hidden" name="endedAt" value={new Date(now).toISOString()} />
         <input type="hidden" name="elapsedMs" value={String(elapsed)} />
         <SearchableOptionSelect id="timer-matter" name="matterId" label="Matter" emptyLabel="Search for the matter" required kind="matter" options={[]} value={matterId} onValueChange={setMatterId} />
-        <div className="space-y-2"><Label htmlFor="timer-description">Work description</Label><Input id="timer-description" name="description" required minLength={3} maxLength={2000} value={description} onChange={event => setDescription(event.target.value)} className="min-h-11" /></div>
-        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="isBillable" checked={isBillable} onChange={event => setIsBillable(event.target.checked)} className="size-4" />Billable</label>
-        <div className="flex flex-wrap items-center gap-3"><Button type="submit" className="min-h-11" disabled={saving || running || elapsed < 1_000 || !draft.firstStartedAt}><Save className="size-4" aria-hidden="true" />{saving ? 'Saving…' : 'Save time'}</Button>{running ? <span className="text-xs text-muted-foreground">Pause the timer to save.</span> : null}</div>
-        {saveState.message ? <p role={saveState.ok ? 'status' : 'alert'} className={`sm:col-span-2 text-sm ${saveState.ok ? 'text-foreground' : 'text-destructive'}`}>{saveState.message}</p> : null}
+        <label htmlFor="timer-description" className={labelClass}>Work description<input id="timer-description" name="description" required minLength={3} maxLength={2000} value={description} onChange={event => setDescription(event.target.value)} className={fieldClass} /></label>
+        <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+          <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" name="isBillable" checked={isBillable} onChange={event => setIsBillable(event.target.checked)} className="size-4 accent-foreground" />Billable</label>
+          <div className="flex items-center gap-3">
+            {running ? <span className="text-xs text-muted-foreground">Pause to save</span> : null}
+            <div className={trackClass}><button type="submit" className={pillPrimaryClass} disabled={saving || running || elapsed < 1_000 || !draft.firstStartedAt}><Save className="size-4" aria-hidden="true" />{saving ? 'Saving…' : 'Save time'}</button></div>
+          </div>
+        </div>
+        {saveState.message ? <p role={saveState.ok ? 'status' : 'alert'} className={cn('text-sm sm:col-span-2', saveState.ok ? 'text-foreground' : 'text-destructive')}>{saveState.message}</p> : null}
       </fieldset>
     </form>
   </div>

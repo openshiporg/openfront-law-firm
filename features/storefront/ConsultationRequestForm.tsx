@@ -10,7 +10,7 @@ import { requestConsultation, type ConsultationRequestState } from './actions/re
 
 function SubmitButton() {
   const { pending } = useFormStatus()
-  return <button type="submit" disabled={pending} className="sf-btn sf-btn--block">{pending ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}{pending ? 'Submitting…' : 'Request consultation'}</button>
+  return <button type="submit" disabled={pending} className="sf-pill sf-pill--primary sf-pill--lg w-full">{pending ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}{pending ? 'Submitting…' : 'Request consultation'}</button>
 }
 
 const inputClass = 'sf-field'
@@ -19,7 +19,7 @@ export function ConsultationRequestForm({ requestKey, initialPractice = '' }: { 
   const [state, formAction] = useActionState<ConsultationRequestState, FormData>(requestConsultation, { error: null, values: { practiceArea: initialPractice }, revision: 0 })
   const value = (name: string) => state.values[name] ?? ''
   return (
-    <form key={state.revision} action={formAction} aria-describedby="intake-notice consultation-error" className="space-y-5">
+    <form key={state.revision} action={formAction} aria-describedby="intake-notice consultation-error" className="sf-form">
       <input type="hidden" name="idempotencyKey" value={requestKey} />
       <div className="absolute -left-[10000px] top-auto size-px overflow-hidden" aria-hidden="true"><label htmlFor="website">Website</label><input id="website" name="website" tabIndex={-1} autoComplete="off" /></div>
       <div className="grid gap-5 sm:grid-cols-2">
@@ -41,7 +41,7 @@ export function ConsultationRequestForm({ requestKey, initialPractice = '' }: { 
       <label className="sf-check"><input type="checkbox" name="acknowledgment" value="yes" required /><span>I understand that submitting this request does not create an attorney-client relationship, the firm has not agreed to represent me, and I should not rely on this form for emergencies or deadlines.</span></label>
       {state.error ? <p id="consultation-error" role="alert" aria-live="polite" className="sf-error">{state.error}</p> : <span id="consultation-error" />}
       <SubmitButton />
-      <p className="sf-form-note">By submitting, you consent to the firm using this information to evaluate and respond to your request. Review the <a href="/privacy" className="underline">privacy notice</a>.</p>
+      <p className="sf-fine">By submitting, you consent to the firm using this information to evaluate and respond to your request. Review the <a href="/privacy" className="underline">privacy notice</a>.</p>
     </form>
   )
 }

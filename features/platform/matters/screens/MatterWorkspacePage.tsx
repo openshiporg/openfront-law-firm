@@ -1,52 +1,64 @@
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 · audience: matter team · use: inspect one authorized matter and its daily work · tone: technical/austere · genre: modern-minimal · macrostructure: Matter register · theme: Quiet */
 import Link from 'next/link'
-import { ArrowLeft, BrainCircuit } from 'lucide-react'
+import { ArrowLeft, BrainCircuit, Settings2 } from 'lucide-react'
 
-import { PracticePage, PracticeStatus } from '@/features/platform/components/PracticeSurface'
+import { PracticePage, PracticeStatus, SectionJumps } from '@/features/platform/components/PracticeSurface'
+import { EmptyState, ErrorBanner, Pager, StatusDot, Track, statusLabel, statusTone, trackItemClass } from '@/features/platform/components/ui'
 import type { WorkQueuePageInfo } from '@/features/platform/operations/lib/workQueuePagination'
 import { getMatterWorkspace } from '../actions/getMatterWorkspace'
 
 export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 1, communicationPage = 1, deadlinePage = 1, taskPage = 1, documentPage = 1, invoicePage = 1 }: { matterId: string; teamPage?: number; partyPage?: number; communicationPage?: number; deadlinePage?: number; taskPage?: number; documentPage?: number; invoicePage?: number }) {
   const result = await getMatterWorkspace(matterId, { teamPage, partyPage, communicationPage, deadlinePage, taskPage, documentPage, invoicePage })
   if (!result.success) {
-    return <PracticePage title="Matter unavailable" description="The requested matter was not returned within the current authorization scope." trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: 'Matter unavailable' }]}><p role="alert" className="border-y border-destructive/30 px-4 py-6 text-sm text-destructive">{result.error}</p></PracticePage>
+    return <PracticePage title="Matter unavailable" description="The requested matter was not returned within the current authorization scope." trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: 'Matter unavailable' }]}><ErrorBanner>{result.error}</ErrorBanner></PracticePage>
   }
   const { matter, sections } = result.data
   return (
-    <PracticePage title={`${matter.matterNumber} · ${matter.title}`} description="Authorized matter workspace for team, parties, work, documents, communications, and billing evidence." trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: matter.matterNumber }]}>
-      <div className="space-y-8">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Link href="/dashboard/platform/matters" className="mr-2 inline-flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Matters</Link>
-          <PracticeStatus status={matter.status} />
-          <PracticeStatus status={matter.confidentiality} />
-          <Link href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`} className="ml-auto inline-flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground underline-offset-4 hover:underline"><BrainCircuit className="h-4 w-4" aria-hidden="true" /> AI evidence</Link>
-        </div>
-
-        <section className="grid border-y border-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Matter identity">
+    <PracticePage
+      title={matter.title}
+      description="Authorized matter workspace for team, parties, work, documents, communications, and billing evidence."
+      status={<PracticeStatus status={matter.status} />}
+      meta={<span className="font-mono text-xs">{matter.matterNumber} · {statusLabel(matter.confidentiality)}</span>}
+      trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: matter.matterNumber }]}
+      actions={<Track>
+        <Link href="/dashboard/platform/matters" className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />Matters</Link>
+        <Link href={`/dashboard/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(false)}><Settings2 className="size-4" aria-hidden="true" />Fields</Link>
+        <Link href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(true)}><BrainCircuit className="size-4" aria-hidden="true" />AI evidence</Link>
+      </Track>}
+    >
+      <div className="space-y-6">
+        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border xl:grid-cols-4" aria-label="Matter identity">
           {[
             ['Client', matter.client?.displayName || 'Unavailable'],
             ['Responsible attorney', matter.responsibleAttorney?.name || 'Unassigned'],
             ['Office', matter.office?.name || 'No office'],
             ['Practice area', matter.practiceArea?.name || 'No practice area'],
-          ].map(([label, value]) => <div key={label} className="min-w-0 border-b border-r border-border px-4 py-4 last:border-r-0 xl:border-b-0"><p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p><p className="mt-2 truncate text-sm font-semibold text-foreground">{value}</p></div>)}
-        </section>
+          ].map(([label, value]) => <div key={label} className="min-w-0 bg-card px-4 py-3"><dt className="truncate text-xs text-muted-foreground">{label}</dt><dd className="mt-1 truncate text-sm font-semibold text-foreground">{value}</dd></div>)}
+        </dl>
 
+        <SectionJumps sections={sections.map((section) => ({ key: section.key, title: section.title, total: section.pagination ? section.total ?? 0 : section.rows.length }))} />
 
-        <div className="space-y-10">
+        <div className="grid items-start gap-6 xl:grid-cols-2">
           {sections.map((section) => (
-            <section key={section.key} id={section.key} className="scroll-mt-20" aria-labelledby={`${section.key}-heading`}>
-              <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Matter register</p><h2 id={`${section.key}-heading`} className="mt-1 text-lg font-bold tracking-tight text-foreground">{section.title}</h2></div><span className="font-mono text-xs text-muted-foreground">{section.pagination ? `${(section.total ?? 0).toLocaleString()} authorized` : `${section.rows.length} shown`}</span></div>
-              {!section.rows.length ? <p className="mt-4 border-y border-dashed border-border px-3 py-6 text-sm text-muted-foreground">No authorized {section.title.toLowerCase()} records are available.</p> : (
-                <div className="mt-4 divide-y divide-border border-y border-border">
-                  {section.rows.map((row) => <article key={row.id} className="grid min-w-0 gap-2 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><h3 className="truncate text-sm font-bold text-foreground">{row.href ? <Link href={row.href} className="underline-offset-4 hover:underline">{row.title}</Link> : row.title}</h3><p className="mt-1 truncate text-sm text-muted-foreground">{row.meta}</p></div><PracticeStatus status={row.status} /></article>)}
-                </div>
+            <section key={section.key} id={section.key} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-labelledby={`${section.key}-heading`}>
+              <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                <h2 id={`${section.key}-heading`} className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground"><span className="truncate">{section.title}</span><span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{(section.pagination ? section.total ?? 0 : section.rows.length).toLocaleString()}</span></h2>
+              </header>
+              {!section.rows.length ? <div className="p-4"><EmptyState title={`No ${section.title.toLowerCase()}`} /></div> : (
+                <ul className="divide-y divide-border">
+                  {section.rows.map((row) => <li key={row.id} className="min-w-0 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <StatusDot tone={statusTone(row.status)} />
+                      <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{row.href ? <Link href={row.href} className="underline-offset-4 hover:underline">{row.title}</Link> : row.title}</h3>
+                      <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{statusLabel(row.status)}</span>
+                    </div>
+                    <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground">{row.meta}</p>
+                  </li>)}
+                </ul>
               )}
               {(section.key === 'team' || section.key === 'parties' || section.key === 'communications' || section.key === 'deadlines' || section.key === 'tasks' || section.key === 'documents' || section.key === 'invoices') && section.pagination ? <MatterWorkspacePagination sectionKey={section.key} matterId={matter.id} total={section.total ?? 0} pagination={section.pagination} teamPage={teamPage} partyPage={partyPage} communicationPage={communicationPage} deadlinePage={deadlinePage} taskPage={taskPage} documentPage={documentPage} invoicePage={invoicePage} /> : null}
             </section>
           ))}
         </div>
-
-        <Link href={`/dashboard/matters/${encodeURIComponent(matter.id)}`} className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline">Field configuration (data model explorer)</Link>
       </div>
     </PracticePage>
   )
@@ -80,14 +92,13 @@ function MatterWorkspacePagination({ sectionKey, matterId, total, pagination, te
   const registerLabel = sectionKey === 'team' ? 'Matter team' : sectionKey === 'parties' ? 'Matter parties' : sectionKey === 'communications' ? 'Matter communications' : sectionKey === 'deadlines' ? 'Matter deadlines' : sectionKey === 'tasks' ? 'Matter tasks' : sectionKey === 'documents' ? 'Matter documents' : 'Matter invoices'
   const recordLabel = sectionKey === 'team' ? 'active team assignments' : sectionKey === 'parties' ? 'active party relationships' : sectionKey === 'communications' ? 'matter communication threads' : sectionKey === 'deadlines' ? 'matter deadlines' : sectionKey === 'tasks' ? 'matter tasks' : sectionKey === 'documents' ? 'matter documents' : 'matter invoices'
   return (
-    <nav aria-label={`${registerLabel} register pages`} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-      <div className="space-y-1 text-xs leading-5 text-muted-foreground">
-        <p>{pagination.loadedCount ? `Showing ${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()}` : 'No records returned on this page'} of {total.toLocaleString()} authorized {recordLabel} · page {pagination.page} of {pagination.pageCount}.</p>
-      </div>
-      <div className="flex items-center gap-2">
-        {pagination.hasPrevious ? <Link href={href(pagination.page - 1)} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Previous</Link> : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Previous</span>}
-        {pagination.hasNext ? <Link href={href(pagination.page + 1)} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Next</Link> : <span aria-disabled="true" className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Next</span>}
-      </div>
-    </nav>
+    <div className="border-t border-border px-4 py-3">
+      <Pager
+        label={`${registerLabel} register pages`}
+        previous={pagination.hasPrevious ? href(pagination.page - 1) : null}
+        next={pagination.hasNext ? href(pagination.page + 1) : null}
+        summary={`${pagination.loadedCount ? `${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()}` : '0'} of ${total.toLocaleString()} ${recordLabel} · page ${pagination.page} of ${pagination.pageCount}`}
+      />
+    </div>
   )
 }

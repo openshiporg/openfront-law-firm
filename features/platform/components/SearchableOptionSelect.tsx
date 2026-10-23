@@ -3,10 +3,10 @@
 import { useRef, useState, useTransition } from 'react'
 import { Search } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
 import { FormSelect } from '@/components/ui/form-select'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+
+import { fieldClass, trackClass, trackItemClass } from './ui'
 
 import { searchPracticeOptions } from '../operations/actions/searchPracticeOptions'
 import type { PracticeOption, PracticeOptionKind } from '../operations/lib/practiceOptions'
@@ -63,8 +63,8 @@ export function SearchableOptionSelect({
   }
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+    <div className="grid min-w-0 gap-1.5">
+      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</label>
       <FormSelect
         id={id}
         name={name}
@@ -74,28 +74,30 @@ export function SearchableOptionSelect({
           onValueChange?.(next)
           onOptionChange?.(merged.find((option) => `${valuePrefix}${option.value}` === next))
         }}
-        className="flex h-11 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+        className={fieldClass}
       >
         <option value="" disabled={required}>{emptyLabel}</option>
         {merged.map((option) => <option key={option.value} value={`${valuePrefix}${option.value}`}>{option.label}</option>)}
       </FormSelect>
       {searchable ? (
-        <div className="flex gap-2">
-          <Input
+        <div className="flex min-w-0 items-center gap-2">
+          <input
             aria-label={`Search ${label.toLowerCase()}`}
             value={query}
             onChange={(event) => { searchRevision.current++; setQuery(event.target.value); setNextPage(null); setMessage('') }}
             onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search() } }}
             maxLength={100}
             placeholder={total === undefined ? 'Search' : `Search all ${total.toLocaleString()}`}
-            className="min-h-11"
+            className={cn(fieldClass, 'rounded-full')}
           />
-          <Button type="button" variant="outline" className="min-h-11" onClick={() => search()} disabled={searching}>
-            <Search className="h-4 w-4" aria-hidden="true" />Find
-          </Button>
+          <div className={trackClass}>
+            <button type="button" className={trackItemClass(true)} onClick={() => search()} disabled={searching}>
+              <Search className="size-3.5" aria-hidden="true" />Find
+            </button>
+            {nextPage ? <button type="button" className={trackItemClass(false)} disabled={searching} onClick={() => search(nextPage)}>More</button> : null}
+          </div>
         </div>
       ) : null}
-      {nextPage ? <Button type="button" variant="outline" className="min-h-11" disabled={searching} onClick={() => search(nextPage)}>More matching options</Button> : null}
       {message ? <p role="status" className="text-xs text-muted-foreground">{message}</p> : null}
     </div>
   )

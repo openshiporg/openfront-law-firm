@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 
 import { PublicPage } from '@/features/storefront/PublicSiteChrome'
 import { firmMetadata } from '@/features/storefront/lib/metadata'
@@ -15,51 +15,32 @@ export default async function AttorneyPage({ params }: { params: Promise<{ slug:
   if (!person) notFound()
   const areas = practiceAreas.filter((area) => person.practiceSlugs.some((slug) => slug === area.slug))
   return <PublicPage>
-    <article className="sf-doc">
-      <header className="sf-doc__head">
-        <p className="sf-doc__meta">Profile · {person.role}</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-lg)', marginBlockEnd: 'var(--space-lg)' }}>
-          <span className="sf-seal" style={{ width: '4.5rem', height: '4.5rem', fontSize: 'var(--text-2xl)' }} aria-hidden="true">{initialsOf(person.name)}</span>
-          <div>
-            <p className="sf-register__role" style={{ marginBlockEnd: 'var(--space-2xs)' }}>{person.role} · {person.focus}</p>
-            <h1 className="sf-doc__title" style={{ margin: 0, maxWidth: 'none' }}>{person.name}</h1>
+    <div className="sf-shell sf-page">
+      <nav aria-label="Breadcrumb" className="mb-8"><Link href="/attorneys" className="sf-link text-sm">Attorneys</Link></nav>
+      <div className="sf-split">
+        <article className="grid gap-6">
+          <div className="flex items-center gap-5">
+            <span aria-hidden="true" className="grid size-20 shrink-0 place-items-center rounded-full bg-[var(--sf-tint)] font-[family-name:var(--font-display)] text-3xl">{initialsOf(person.name)}</span>
+            <div className="grid gap-1"><p className="sf-label">{person.role} · {person.focus}</p><h1 className="sf-title">{person.name}</h1></div>
           </div>
-        </div>
-        <p className="sf-doc__lede">{person.summary}</p>
-        <p style={{ margin: 'var(--space-md) 0 0' }}>
-          <Link href="/attorneys" className="sf-link sf-link--muted">← Register of attorneys</Link>
-        </p>
-      </header>
-
-      <h2 className="sf-doc__head-inline">Practice areas</h2>
-      <div className="sf-register">
-        {areas.map((area) => (
-          <div key={area.slug} className="sf-register__row">
-            <div>
-              <h3 className="sf-register__name">{area.name}</h3>
-              <p className="sf-register__sum">{area.summary}</p>
-              <p className="sf-register__foot">
-                <Link href={`/practice-areas/${area.slug}`} className="sf-link">Open this practice <ArrowRight className="size-3.5" aria-hidden="true" /></Link>
-              </p>
-            </div>
-          </div>
-        ))}
+          <div className="sf-prose sf-prose--lead"><p>{person.summary}</p></div>
+          {areas.length ? <section className="sf-section" aria-labelledby="attorney-areas">
+            <div className="sf-section__head"><h2 id="attorney-areas" className="sf-h2">Practice areas</h2></div>
+            <ul className="sf-rows">{areas.map((area) => <li key={area.slug}><Link href={`/practice-areas/${area.slug}`} className="sf-row"><span className="sf-row__title"><span>{area.name}</span></span><span className="sf-row__meta" style={{ paddingLeft: 0 }}>{area.summary}</span><ArrowUpRight className="sf-row__end size-4" aria-hidden="true" /></Link></li>)}</ul>
+          </section> : null}
+        </article>
+        <aside className="sf-split__aside">
+          <div className="sf-card"><div className="sf-card__body grid gap-4">
+            {PUBLIC_INTAKE_ENABLED ? <>
+              <p className="sf-muted text-sm">Contact begins with a conflict check.</p>
+              <div className="sf-track sf-track--block"><Link href="/consultation" className="sf-pill sf-pill--primary">Request a consultation</Link></div>
+            </> : <>
+              <p className="sf-notice sf-notice--plain">Consultation requests are not enabled here. Do not send confidential or time-critical information.</p>
+              <div className="sf-track sf-track--block"><Link href="/contact" className="sf-pill sf-pill--raised">Contact guidance</Link></div>
+            </>}
+          </div></div>
+        </aside>
       </div>
-
-      <footer className="sf-doc__close">
-        {PUBLIC_INTAKE_ENABLED ? (
-          <>
-            <p>Contact begins through the firm&rsquo;s limited intake process so conflicts and fit can be reviewed before substantive information is exchanged.</p>
-            <p>
-              <Link href="/consultation" className="sf-link">Request a consultation <ArrowRight className="size-3.5" aria-hidden="true" /></Link>
-            </p>
-          </>
-        ) : (
-          <p>
-            Consultation requests are not enabled. Prospective clients should use contact information obtained independently from a trusted source. Existing clients should use the verified phone, email, and secure channels in their engagement materials. Do not send confidential, sensitive, or time-critical information here, and do not use this site for emergencies or to protect a deadline. <Link href="/contact" className="sf-link">Review contact guidance</Link>.
-          </p>
-        )}
-      </footer>
-    </article>
+    </div>
   </PublicPage>
 }

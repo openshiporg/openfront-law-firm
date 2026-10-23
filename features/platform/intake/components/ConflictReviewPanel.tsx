@@ -3,32 +3,38 @@
 import { useActionState, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { FormSelect } from '@/components/ui/form-select'
-import { Search, SearchCheck } from 'lucide-react'
+import { Search } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { PracticeStatus } from '@/features/platform/components/PracticeSurface'
+import { cn } from '@/lib/utils'
+import {
+  EmptyState,
+  Pager,
+  StatusDot,
+  Track,
+  fieldClass,
+  labelClass,
+  pillClass,
+  pillPrimaryClass,
+  statusLabel,
+  statusTone,
+} from '@/features/platform/components/ui'
 import { loadConflictCheckDetail, manageConflictReview, searchConflictSources, type ConflictReviewSetup, type ConflictReviewSource, type ConflictReviewState } from '../actions/manageConflictReview'
 import { shouldShowDispositionForm } from '../lib/conflictReviewState'
 
 export function ConflictReviewPanel({ setup, pageHrefs }: { setup: ConflictReviewSetup; pageHrefs?: { previous: string | null; next: string | null } }) {
   return (
-    <section id="conflict-review" className="scroll-mt-20 border-y border-border py-5" aria-labelledby="manual-conflicts-heading">
-      <div className="flex items-start gap-3 px-1"><SearchCheck className="mt-0.5 h-5 w-5 text-muted-foreground" aria-hidden="true" /><div><h2 id="manual-conflicts-heading" className="text-base font-bold text-foreground">Conflict review · {setup.total.toLocaleString()}</h2><p className="mt-1 text-sm text-muted-foreground">Manual source review</p></div></div>
-      {!setup.conflictChecks.length ? <p className="mt-4 border-y border-dashed border-border px-3 py-6 text-sm text-muted-foreground">No conflict check is awaiting work.</p> : (
-        <div className="mt-5 divide-y divide-border border-y border-border">
+    <section id="conflict-review" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="manual-conflicts-heading">
+      <h2 id="manual-conflicts-heading" className="flex min-w-0 items-baseline gap-2 text-base font-semibold tracking-tight text-foreground">
+        <span className="truncate">Conflict review</span>
+        <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{setup.total.toLocaleString()}</span>
+      </h2>
+      {!setup.conflictChecks.length ? <EmptyState title="No conflict checks awaiting work" /> : (
+        <div className="space-y-4">
           {setup.conflictChecks.map((check) => <ConflictCheck key={check.id} check={check} setup={setup} />)}
         </div>
       )}
       {setup.pageCount > 1 && pageHrefs ? (
-        <nav aria-label="Conflict review pages" className="mt-4 flex flex-wrap items-center justify-between gap-3 px-1">
-          <p className="text-xs text-muted-foreground">Page {setup.page} of {setup.pageCount}</p>
-          <div className="flex gap-2">
-            {pageHrefs.previous ? <Link href={pageHrefs.previous} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs font-semibold">Previous</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs text-muted-foreground">Previous</span>}
-            {pageHrefs.next ? <Link href={pageHrefs.next} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs font-semibold">Next</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs text-muted-foreground">Next</span>}
-          </div>
-        </nav>
+        <Pager label="Conflict review pages" previous={pageHrefs.previous} next={pageHrefs.next} summary={`Page ${setup.page} of ${setup.pageCount}`} />
       ) : null}
     </section>
   )
@@ -63,99 +69,145 @@ function ConflictCheck({ check, setup }: { check: ConflictReviewSetup['conflictC
       else setDetailError(result.error)
     })
   }
+  const heading = check.intake ? `${check.intake.intakeNumber} · ${check.intake.title}` : check.matter ? `${check.matter.matterNumber} · ${check.matter.title}` : check.checkNumber
   return (
-    <article id={`conflict-${check.id}`} className="space-y-4 px-2 py-5">
-      <div className="flex min-w-0 flex-wrap items-center gap-2"><span className="font-mono text-xs text-muted-foreground">{check.checkNumber}</span><PracticeStatus status={check.status} /><h3 className="min-w-0 truncate text-sm font-bold text-foreground">{check.intake ? `${check.intake.intakeNumber} · ${check.intake.title}` : check.matter ? `${check.matter.matterNumber} · ${check.matter.title}` : check.checkNumber}</h3></div>
-      <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-        {setup.canRun && check.status !== 'review_required' ? (
-          <>
-            <form action={action} className="grid gap-3 border-t border-border pt-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end">
-              <input type="hidden" name="operation" value="term" /><input type="hidden" name="checkId" value={check.id} />
-              <Field id={`term-${check.id}`} name="term" label="Additional search term" />
-              <Select id={`term-type-${check.id}`} name="termType" label="Type" options={[['person', 'Person'], ['organization', 'Organization'], ['alias', 'Alias'], ['matter', 'Matter'], ['other', 'Other']]} />
-              <Button type="submit" variant="outline" className="min-h-11 whitespace-nowrap" disabled={pending}>Add term</Button>
-            </form>
-            <div className="grid gap-3 border-t border-border pt-3">
-              <div className="space-y-2">
-                <Label htmlFor={`source-search-${check.id}`}>Find a contact or matter</Label>
-                <div className="flex gap-2">
-                  <Input id={`source-search-${check.id}`} value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); findSources() } }} maxLength={100} className="min-h-11" />
-                  <Button type="button" variant="outline" className="min-h-11" onClick={findSources} disabled={loading || !sourceQuery.trim()}><Search className="h-4 w-4" aria-hidden="true" />Find</Button>
-                </div>
-              </div>
-              {sources ? (
-                sources.length ? (
-                  <form action={action} className="grid gap-3 sm:grid-cols-2">
-                    <input type="hidden" name="operation" value="match" /><input type="hidden" name="checkId" value={check.id} />
-                    <Select id={`source-${check.id}`} name="source" label="Current source" options={sources.map(source => [`${source.kind}:${source.id}`, `${source.kind} · ${source.label}`])} />
-                    <Select id={`match-type-${check.id}`} name="matchType" label="Match kind" options={[["manual", "Manual"], ["exact_name", "Exact name"], ["alias", "Alias"], ["fuzzy_name", "Similar name"], ["related_party", "Related party"]]} />
-                    <Button type="submit" variant="outline" disabled={pending}>Link source candidate</Button>
-                  </form>
-                ) : <p className="text-sm text-muted-foreground">No authorized contact or matter matches “{sourceQuery}”.</p>
-              ) : null}
-            </div>
-          </>
-        ) : null}
-      </div>
-      <div className="grid gap-3 text-sm md:grid-cols-2">
-        <div>
-          <p className="font-semibold text-foreground">Terms · {check.termsCount.toLocaleString()}</p>
-          <ul className="mt-2 space-y-1 text-muted-foreground">{terms.map((term) => <li key={term.id} className="truncate">{term.term} · {term.termType}</li>)}</ul>
-          {terms.length < check.termsCount ? <Button type="button" variant="outline" className="mt-2 min-h-11" onClick={() => loadMore('terms')} disabled={loading}>Show more terms ({(check.termsCount - terms.length).toLocaleString()} more)</Button> : null}
+    <article id={`conflict-${check.id}`} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <StatusDot tone={statusTone(check.status)} />
+          <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{heading}</h3>
+          <span className="shrink-0 whitespace-nowrap text-xs font-medium text-muted-foreground">{statusLabel(check.status)}</span>
         </div>
-        <div>
-          <p className="font-semibold text-foreground">Candidates · {check.matchesCount.toLocaleString()}</p>
-          <div className="mt-2 space-y-3">
-            {matches.map((match) => {
-              const latestDisposition = match.latestDisposition?.[0]
-              const source = match.matchedContact ? { label: match.matchedContact.displayName, href: `/dashboard/contacts/${match.matchedContact.id}` } : match.matchedMatter ? { label: `${match.matchedMatter.matterNumber} · ${match.matchedMatter.title}`, href: `/dashboard/platform/matters/${match.matchedMatter.id}` } : match.matchedMatterParty ? { label: 'Linked matter party', href: `/dashboard/matter-parties/${match.matchedMatterParty.id}` } : null
-              const canContinueReview = setup.canResolve && !!source && shouldShowDispositionForm(check.status, match)
-              return (
-                <div key={match.id} className="space-y-3 border-t border-border pt-3">
-                  <div className="space-y-1 text-sm">
-                    <p className="font-semibold text-foreground">{match.matchType.replaceAll('_', ' ')}</p>
-                    {source ? <Link href={source.href} className="inline-flex min-h-11 items-center underline">{source.label}</Link> : <p className="text-muted-foreground">Source unavailable</p>}
-                    {match.dispositionsCount > 0 ? (
-                      <>
-                        <p className="text-muted-foreground">Disposition history · {match.dispositionsCount} recorded; showing latest</p>
-                        {latestDisposition ? (
-                          <>
-                            <p className="text-muted-foreground">
-                              Latest: {formatDispositionOutcome(latestDisposition.outcome)} · {formatDecisionDate(latestDisposition.decidedAt)}
-                            </p>
-                            <p className="text-muted-foreground">
-                              {latestDisposition.outcome === 'needs_more_information'
-                                ? 'Further review required.'
-                                : 'Final disposition recorded.'}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-muted-foreground">Disposition unavailable under current source access.</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-muted-foreground">No disposition recorded · {match.status.replaceAll('_', ' ')}</p>
-                    )}
-                  </div>
-                  {canContinueReview ? <DispositionForm checkId={check.id} match={match} action={action} pending={pending} /> : null}
-                </div>
-              )
-            })}
-            {matches.length < check.matchesCount ? <Button type="button" variant="outline" className="min-h-11" onClick={() => loadMore('matches')} disabled={loading}>Show more candidates ({(check.matchesCount - matches.length).toLocaleString()} more)</Button> : null}
+        <span className="font-mono text-xs text-muted-foreground">{check.checkNumber}</span>
+      </header>
+
+      {setup.canRun && check.status !== 'review_required' ? (
+        <div className="grid min-w-0 gap-4 border-b border-border bg-muted/30 px-4 py-4 xl:grid-cols-2">
+          <form action={action} className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-end">
+            <input type="hidden" name="operation" value="term" /><input type="hidden" name="checkId" value={check.id} />
+            <Field id={`term-${check.id}`} name="term" label="Search term" />
+            <Select id={`term-type-${check.id}`} name="termType" label="Type" options={[['person', 'Person'], ['organization', 'Organization'], ['alias', 'Alias'], ['matter', 'Matter'], ['other', 'Other']]} />
+            <Track className="justify-self-start sm:col-span-2"><button type="submit" className={pillClass} disabled={pending}>Add term</button></Track>
+          </form>
+          <div className="grid min-w-0 content-start gap-3">
+            <div className={labelClass}>
+              <label htmlFor={`source-search-${check.id}`}>Contact or matter</label>
+              <div className="flex min-w-0 items-center gap-2">
+                <input id={`source-search-${check.id}`} value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); findSources() } }} maxLength={100} className={cn(fieldClass, 'text-foreground')} />
+                <Track><button type="button" className={pillClass} onClick={findSources} disabled={loading || !sourceQuery.trim()}><Search className="size-3.5" aria-hidden="true" />Find</button></Track>
+              </div>
+            </div>
+            {sources ? (
+              sources.length ? (
+                <form action={action} className="grid min-w-0 gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="operation" value="match" /><input type="hidden" name="checkId" value={check.id} />
+                  <Select id={`source-${check.id}`} name="source" label="Source" options={sources.map(source => [`${source.kind}:${source.id}`, `${source.kind} · ${source.label}`])} />
+                  <Select id={`match-type-${check.id}`} name="matchType" label="Match kind" options={[["manual", "Manual"], ["exact_name", "Exact name"], ["alias", "Alias"], ["fuzzy_name", "Similar name"], ["related_party", "Related party"]]} />
+                  <Track className="justify-self-start sm:col-span-2"><button type="submit" className={pillClass} disabled={pending}>Link candidate</button></Track>
+                </form>
+              ) : <p className="break-words text-sm text-muted-foreground">No contact or matter matches “{sourceQuery}”</p>
+            ) : null}
           </div>
         </div>
+      ) : null}
+
+      <div className="grid min-w-0 md:grid-cols-2 md:divide-x md:divide-border">
+        <div className="min-w-0 px-4 py-4">
+          <ColumnHeading label="Terms" count={check.termsCount} />
+          {terms.length ? (
+            <ul className="mt-2 divide-y divide-border text-sm">
+              {terms.map((term) => (
+                <li key={term.id} className="flex min-w-0 items-baseline justify-between gap-3 py-2">
+                  <span className="min-w-0 truncate text-foreground">{term.term}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{term.termType}</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="mt-2 text-sm text-muted-foreground">None</p>}
+          {terms.length < check.termsCount ? <Track className="mt-3"><button type="button" className={pillClass} onClick={() => loadMore('terms')} disabled={loading}>{(check.termsCount - terms.length).toLocaleString()} more terms</button></Track> : null}
+        </div>
+        <div className="min-w-0 border-t border-border px-4 py-4 md:border-t-0">
+          <ColumnHeading label="Candidates" count={check.matchesCount} />
+          {matches.length ? (
+            <ul className="mt-2 divide-y divide-border">
+              {matches.map((match) => {
+                const latestDisposition = match.latestDisposition?.[0]
+                const source = match.matchedContact ? { label: match.matchedContact.displayName, href: `/dashboard/contacts/${match.matchedContact.id}` } : match.matchedMatter ? { label: `${match.matchedMatter.matterNumber} · ${match.matchedMatter.title}`, href: `/dashboard/platform/matters/${match.matchedMatter.id}` } : match.matchedMatterParty ? { label: 'Linked matter party', href: `/dashboard/matter-parties/${match.matchedMatterParty.id}` } : null
+                const canContinueReview = setup.canResolve && !!source && shouldShowDispositionForm(check.status, match)
+                return (
+                  <li key={match.id} className="min-w-0 space-y-2 py-3 text-sm">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <StatusDot tone={statusTone(match.status)} />
+                      {source ? <Link href={source.href} className="min-w-0 truncate font-medium text-foreground underline-offset-4 hover:underline">{source.label}</Link> : <span className="min-w-0 truncate text-muted-foreground">Source unavailable</span>}
+                      <span className="shrink-0 text-xs capitalize text-muted-foreground">{match.matchType.replaceAll('_', ' ')}</span>
+                    </div>
+                    <p className="break-words pl-4 text-xs text-muted-foreground">
+                      {match.dispositionsCount > 0
+                        ? latestDisposition
+                          ? <>{formatDispositionOutcome(latestDisposition.outcome)} · {formatDecisionDate(latestDisposition.decidedAt)} · {latestDisposition.outcome === 'needs_more_information' ? 'Further review required' : 'Final'} · {match.dispositionsCount} recorded</>
+                          : <>Disposition unavailable under current source access · {match.dispositionsCount} recorded</>
+                        : <>No disposition · {match.status.replaceAll('_', ' ')}</>}
+                    </p>
+                    {canContinueReview ? <DispositionForm checkId={check.id} match={match} action={action} pending={pending} /> : null}
+                  </li>
+                )
+              })}
+            </ul>
+          ) : <p className="mt-2 text-sm text-muted-foreground">None</p>}
+          {matches.length < check.matchesCount ? <Track className="mt-3"><button type="button" className={pillClass} onClick={() => loadMore('matches')} disabled={loading}>{(check.matchesCount - matches.length).toLocaleString()} more candidates</button></Track> : null}
+        </div>
       </div>
-      {detailError ? <p role="alert" className="text-sm text-destructive">{detailError}</p> : null}
-      {setup.canRun && check.status === 'requested' ? <form action={action}><input type="hidden" name="operation" value="transition" /><input type="hidden" name="checkId" value={check.id} /><input type="hidden" name="toStatus" value="running" /><Button type="submit" variant="outline" disabled={pending}>Start manual review</Button></form> : null}
-      {setup.canRun && check.status === 'running' ? <form action={action} className="grid gap-3 border-t pt-3"><input type="hidden" name="operation" value="transition" /><input type="hidden" name="checkId" value={check.id} /><input type="hidden" name="toStatus" value="review_required" /><Field id={`completed-${check.id}`} name="summary" label="Completed review summary" minLength={10} /><Button type="submit" disabled={pending} className="justify-self-start">Send to final review</Button></form> : null}
-      {setup.canResolve && check.status === 'review_required' ? <form action={action} className="grid gap-3 border-t pt-3"><input type="hidden" name="operation" value="finalize" /><input type="hidden" name="checkId" value={check.id} /><Select id={`final-${check.id}`} name="outcome" label="Review outcome" options={[["cleared", "Cleared"], ["conflict_found", "Conflict found"]]} /><Field id={`summary-${check.id}`} name="summary" label="Final review summary" minLength={10} /><Button type="submit" disabled={pending} className="justify-self-start">Record final review</Button></form> : null}
-      <div className="min-h-6 text-sm">{state.message ? <p role={state.ok ? 'status' : 'alert'} className={state.ok ? 'text-foreground' : 'text-destructive'}>{state.message}</p> : null}</div>
+
+      {setup.canRun && check.status === 'requested' ? (
+        <form action={action} className="border-t border-border px-4 py-3">
+          <input type="hidden" name="operation" value="transition" /><input type="hidden" name="checkId" value={check.id} /><input type="hidden" name="toStatus" value="running" />
+          <Track><button type="submit" className={pillPrimaryClass} disabled={pending}>Start manual review</button></Track>
+        </form>
+      ) : null}
+      {setup.canRun && check.status === 'running' ? (
+        <form action={action} className="grid gap-3 border-t border-border px-4 py-4">
+          <input type="hidden" name="operation" value="transition" /><input type="hidden" name="checkId" value={check.id} /><input type="hidden" name="toStatus" value="review_required" />
+          <Field id={`completed-${check.id}`} name="summary" label="Review summary" minLength={10} />
+          <Track className="justify-self-start"><button type="submit" className={pillPrimaryClass} disabled={pending}>Send to final review</button></Track>
+        </form>
+      ) : null}
+      {setup.canResolve && check.status === 'review_required' ? (
+        <form action={action} className="grid gap-3 border-t border-border px-4 py-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-end">
+          <input type="hidden" name="operation" value="finalize" /><input type="hidden" name="checkId" value={check.id} />
+          <Select id={`final-${check.id}`} name="outcome" label="Outcome" options={[["cleared", "Cleared"], ["conflict_found", "Conflict found"]]} />
+          <Field id={`summary-${check.id}`} name="summary" label="Final summary" minLength={10} />
+          <Track className="justify-self-start sm:col-span-2"><button type="submit" className={pillPrimaryClass} disabled={pending}>Record final review</button></Track>
+        </form>
+      ) : null}
+
+      {detailError || state.message ? (
+        <div className="space-y-1 border-t border-border px-4 py-3 text-sm">
+          {detailError ? <p role="alert" className="text-destructive">{detailError}</p> : null}
+          {state.message ? <p role={state.ok ? 'status' : 'alert'} className={state.ok ? 'text-foreground' : 'text-destructive'}>{state.message}</p> : null}
+        </div>
+      ) : null}
     </article>
   )
 }
 
+function ColumnHeading({ label, count }: { label: string; count: number }) {
+  return (
+    <h4 className="flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {label}<span className="font-mono font-normal tabular-nums">{count.toLocaleString()}</span>
+    </h4>
+  )
+}
+
 function DispositionForm({ checkId, match, action, pending }: { checkId: string; match: ConflictReviewSetup['conflictChecks'][number]['matches'][number]; action: (payload: FormData) => void; pending: boolean }) {
-  return <form action={action} className="grid gap-2 border-t border-border pt-3"><input type="hidden" name="operation" value="disposition" /><input type="hidden" name="checkId" value={checkId} /><input type="hidden" name="matchId" value={match.id} /><p className="truncate font-semibold text-foreground">{match.dispositionsCount > 0 ? 'Follow-up decision' : 'First decision'}</p><Select id={`outcome-${match.id}`} name="outcome" label="Disposition" options={[['clear', 'Clear'], ['conflict', 'Conflict'], ['needs_more_information', 'Needs more information'], ['approved_exception', 'Approved exception']]} /><Field id={`rationale-${match.id}`} name="rationale" label="Rationale" minLength={10} /><Button type="submit" variant="outline" className="min-h-11 whitespace-nowrap justify-self-start" disabled={pending}>Record disposition</Button></form>
+  return (
+    <form action={action} className="grid min-w-0 gap-3 rounded-lg border border-border bg-background p-3">
+      <input type="hidden" name="operation" value="disposition" /><input type="hidden" name="checkId" value={checkId} /><input type="hidden" name="matchId" value={match.id} />
+      <p className="truncate text-xs font-semibold text-foreground">{match.dispositionsCount > 0 ? 'Follow-up decision' : 'First decision'}</p>
+      <Select id={`outcome-${match.id}`} name="outcome" label="Disposition" options={[['clear', 'Clear'], ['conflict', 'Conflict'], ['needs_more_information', 'Needs more information'], ['approved_exception', 'Approved exception']]} />
+      <Field id={`rationale-${match.id}`} name="rationale" label="Rationale" minLength={10} />
+      <Track className="justify-self-start"><button type="submit" className={pillClass} disabled={pending}>Record disposition</button></Track>
+    </form>
+  )
 }
 
 const dispositionLabels: Record<string, string> = {
@@ -174,5 +226,15 @@ function formatDecisionDate(value: string) {
   return Number.isNaN(date.valueOf()) ? 'date unavailable' : `${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`
 }
 
-function Field({ id, name, label, minLength }: { id: string; name: string; label: string; minLength?: number }) { return <div className="space-y-2"><Label htmlFor={id}>{label}</Label><Input id={id} name={name} className="min-h-11" required minLength={minLength} /></div> }
-function Select({ id, name, label, options }: { id: string; name: string; label: string; options: string[][] }) { return <div className="space-y-2"><Label htmlFor={id}>{label}</Label><FormSelect id={id} name={name} className="flex h-11 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50">{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</FormSelect></div> }
+function Field({ id, name, label, minLength }: { id: string; name: string; label: string; minLength?: number }) {
+  return <label htmlFor={id} className={labelClass}>{label}<input id={id} name={name} className={fieldClass} required minLength={minLength} /></label>
+}
+
+function Select({ id, name, label, options }: { id: string; name: string; label: string; options: string[][] }) {
+  return (
+    <div className={labelClass}>
+      <label htmlFor={id}>{label}</label>
+      <FormSelect id={id} name={name} className={cn(fieldClass, 'text-foreground')}>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</FormSelect>
+    </div>
+  )
+}

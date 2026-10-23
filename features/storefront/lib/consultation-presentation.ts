@@ -6,14 +6,14 @@ export type AvailabilitySlot = { startsAt: string; endsAt: string }
 export type ServiceAvailability = { timezone: string; slots: AvailabilitySlot[] }
 
 const appointmentLabels: Record<string, { label: string; tone: string }> = {
-  requested: { label: 'Requested — awaiting confirmation', tone: 'bg-amber-600' },
-  scheduled: { label: 'Scheduled', tone: 'bg-emerald-600' },
-  completed: { label: 'Completed', tone: 'bg-slate-500' },
-  cancelled: { label: 'Cancelled', tone: 'bg-rose-700' },
-  no_show: { label: 'No show', tone: 'bg-rose-700' },
+  requested: { label: 'Awaiting confirmation', tone: 'sf-dot--amber' },
+  scheduled: { label: 'Scheduled', tone: 'sf-dot--green' },
+  completed: { label: 'Completed', tone: 'sf-dot--slate' },
+  cancelled: { label: 'Cancelled', tone: 'sf-dot--red' },
+  no_show: { label: 'No show', tone: 'sf-dot--red' },
 }
 export function appointmentStatus(status: string) {
-  return appointmentLabels[status] ?? { label: status.replaceAll('_', ' ').replace(/^./, first => first.toUpperCase()) || 'Unknown', tone: 'bg-slate-500' }
+  return appointmentLabels[status] ?? { label: status.replaceAll('_', ' ').replace(/^./, first => first.toUpperCase()) || 'Unknown', tone: 'sf-dot--slate' }
 }
 export function appointmentPaymentState(row: Pick<CustomerConsultation, 'feeMinor' | 'status'>) {
   if (row.feeMinor <= 0) return 'No consultation fee'

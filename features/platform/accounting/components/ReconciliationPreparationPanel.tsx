@@ -1,8 +1,9 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { Scale } from 'lucide-react'
 
+import { cn } from '@/lib/utils'
+import { Notice, Panel, Track, fieldClass, labelClass, pillPrimaryClass, textareaClass } from '@/features/platform/components/ui'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 import { currencyFractionDigits } from '@/features/platform/lib/money'
 import type { PracticeOption } from '@/features/platform/operations/lib/practiceOptions'
@@ -18,25 +19,33 @@ export function ReconciliationPreparationPanel({ accounts, accountTotal }: { acc
   const [currencyCode, setCurrencyCode] = useState('USD')
   const digits = currencyFractionDigits(currencyCode) ?? 2
   const amountPattern = digits ? `-?\\d+(\\.\\d{1,${digits}})?` : '-?\\d+'
+  const amountClass = cn(fieldClass, 'text-right font-mono tabular-nums')
   return (
-    <section aria-labelledby="reconciliation-preparation-title" className="border-y border-border py-5">
-      <div className="mb-5 flex max-w-3xl items-start gap-3">
-        <Scale className="mt-1 h-5 w-5 shrink-0" aria-hidden="true" />
-        <div>
-          <h2 id="reconciliation-preparation-title" className="text-lg font-bold tracking-tight">Prepare trust reconciliation</h2>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">Capture one period, its adjusted bank-statement balance, and the cashbook/control balance. The server verifies the submitted cashbook against posted bank-control entries and the total individual client/matter ledgers as of period end. A different authorized reviewer must complete a zero-difference reconciliation.</p>
+    <Panel title={<h2 id="reconciliation-preparation-title" className="min-w-0 truncate text-sm font-semibold text-foreground">Trust reconciliation</h2>} bodyClassName="p-0">
+      <form action={action} aria-labelledby="reconciliation-preparation-title" className="min-w-0">
+        <div className="space-y-5 p-4">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="min-w-0 sm:col-span-2 xl:col-span-1">
+              <SearchableOptionSelect id="reconciliation-account" name="trustAccountId" label="Trust account" emptyLabel="Select an active account" required kind="trustAccount" total={accountTotal} options={accounts} onOptionChange={(option) => setCurrencyCode(option?.currencyCode || 'USD')} />
+            </div>
+            <label className={labelClass}>Period start<input name="periodStart" type="date" required className={fieldClass} /></label>
+            <label className={labelClass}>Period end<input name="periodEnd" type="date" required className={fieldClass} /></label>
+          </div>
+
+          <div className="grid min-w-0 gap-4 border-t border-border pt-5 sm:grid-cols-2 xl:grid-cols-3">
+            <label className={labelClass}>Adjusted bank statement ({currencyCode})<input name="statementBalance" inputMode="decimal" required autoComplete="off" pattern={amountPattern} className={amountClass} /></label>
+            <label className={labelClass}>Cashbook / control ({currencyCode})<input name="bookBalance" inputMode="decimal" required autoComplete="off" pattern={amountPattern} className={amountClass} /></label>
+            <label className={labelClass}>Currency<input name="currencyCode" value={currencyCode} readOnly className={cn(fieldClass, 'bg-muted/40 font-mono uppercase')} /></label>
+            <label className={cn(labelClass, 'sm:col-span-2 xl:col-span-3')}>Preparation notes<textarea name="notes" maxLength={4000} rows={3} className={textareaClass} /></label>
+          </div>
+
+          <Notice>Cashbook is verified against posted entries and client ledgers at period end. Completion requires a different reviewer and zero difference.</Notice>
         </div>
-      </div>
-      <form action={action} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <SearchableOptionSelect id="reconciliation-account" name="trustAccountId" label="Trust account" emptyLabel="Select an active account" required kind="trustAccount" total={accountTotal} options={accounts} onOptionChange={(option) => setCurrencyCode(option?.currencyCode || 'USD')} />
-        <label className="space-y-1.5 text-sm font-medium"><span>Period start</span><input name="periodStart" type="date" required className="min-h-10 w-full rounded-md border border-input bg-background px-3" /></label>
-        <label className="space-y-1.5 text-sm font-medium"><span>Period end</span><input name="periodEnd" type="date" required className="min-h-10 w-full rounded-md border border-input bg-background px-3" /></label>
-        <label className="space-y-1.5 text-sm font-medium"><span>Adjusted bank-statement balance ({currencyCode})</span><input name="statementBalance" inputMode="decimal" required autoComplete="off" pattern={amountPattern} className="min-h-10 w-full rounded-md border border-input bg-background px-3" /></label>
-        <label className="space-y-1.5 text-sm font-medium"><span>Cashbook/control balance ({currencyCode})</span><input name="bookBalance" inputMode="decimal" required autoComplete="off" pattern={amountPattern} className="min-h-10 w-full rounded-md border border-input bg-background px-3" /></label>
-        <label className="space-y-1.5 text-sm font-medium"><span>Currency</span><input name="currencyCode" value={currencyCode} readOnly className="min-h-10 w-full rounded-md border border-input bg-muted/30 px-3 uppercase" /></label>
-        <label className="space-y-1.5 text-sm font-medium md:col-span-2 xl:col-span-3"><span>Preparation notes</span><textarea name="notes" maxLength={4000} rows={3} className="w-full rounded-md border border-input bg-background p-3" /></label>
-        <div className="space-y-2 md:col-span-2 xl:col-span-3"><button disabled={pending || !accounts.length} className="min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60">{pending ? 'Preparing…' : 'Prepare draft reconciliation'}</button>{state.message ? <p role="status" className={state.ok ? 'text-sm text-foreground' : 'text-sm text-destructive'}>{state.message}</p> : null}</div>
+        <footer className="flex min-w-0 flex-wrap items-center gap-3 border-t border-border bg-muted/30 px-4 py-3">
+          <Track><button disabled={pending || !accounts.length} className={pillPrimaryClass}>{pending ? 'Preparing…' : 'Prepare draft reconciliation'}</button></Track>
+          {state.message ? <p role="status" className={state.ok ? 'min-w-0 break-words text-sm text-foreground' : 'min-w-0 break-words text-sm text-destructive'}>{state.message}</p> : null}
+        </footer>
       </form>
-    </section>
+    </Panel>
   )
 }

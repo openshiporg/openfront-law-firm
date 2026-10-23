@@ -3,7 +3,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Rocket } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { StatusDot, Track, pillClass, pillPrimaryClass, trackItemClass } from "@/features/platform/components/ui";
 
 export interface OnboardingStep {
   href: string;
@@ -19,8 +19,9 @@ interface CommonCardProps extends React.HTMLAttributes<HTMLDivElement> {
 const InfoCardTitle = React.memo(
   ({ children, className, ...props }: CommonCardProps) => {
     return (
-      <div className={cn("font-medium mb-1", className)} {...props}>
-        {children}
+      <div className={cn("flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground", className)} {...props}>
+        <StatusDot tone="sky" className="animate-pulse motion-reduce:animate-none" />
+        <span className="min-w-0 truncate">{children}</span>
       </div>
     );
   }
@@ -30,10 +31,7 @@ InfoCardTitle.displayName = "InfoCardTitle";
 const InfoCardDescription = React.memo(
   ({ children, className, ...props }: CommonCardProps) => {
     return (
-      <div
-        className={cn("text-muted-foreground leading-4", className)}
-        {...props}
-      >
+      <div className={cn("pl-4 text-xs leading-5 text-muted-foreground", className)} {...props}>
         {children}
       </div>
     );
@@ -44,7 +42,7 @@ InfoCardDescription.displayName = "InfoCardDescription";
 const InfoCardContent = React.memo(
   ({ children, className, ...props }: CommonCardProps) => {
     return (
-      <div className={cn("flex flex-col gap-1 text-xs", className)} {...props}>
+      <div className={cn("flex min-w-0 flex-col gap-0.5", className)} {...props}>
         {children}
       </div>
     );
@@ -55,19 +53,8 @@ InfoCardContent.displayName = "InfoCardContent";
 const InfoCardFooter = ({
   children,
   className,
-  isHovered,
-}: CommonCardProps & { isHovered: boolean }) => {
-  return (
-    <div
-      className={cn(
-        "flex justify-between text-xs text-muted-foreground mt-2 overflow-hidden transition-all duration-300 ease-spring",
-        isHovered ? "max-h-[60px] opacity-100" : "max-h-0 opacity-0",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
+}: CommonCardProps) => {
+  return <div className={cn("mt-3", className)}>{children}</div>;
 };
 
 export function OnboardingCards({
@@ -130,7 +117,6 @@ function OnboardingCard({
   onDismiss?: () => void;
   onOpenDialog?: () => void;
 }) {
-  const [isHovered, setIsHovered] = React.useState(false);
   const [isDismissed, setIsDismissed] = React.useState(false);
 
   const handleDismiss = () => {
@@ -145,61 +131,29 @@ function OnboardingCard({
   return (
     <>
       {/* Full sidebar view */}
-      <div
-        className={cn(
-          "group relative rounded-lg border bg-white dark:bg-black transition-all duration-300 ease-spring group-has-[[data-collapsible=icon]]/sidebar-wrapper:hidden",
-          "opacity-100 translate-y-0",
-          "hover:shadow-sm"
-        )}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        <div className="absolute -top-1 -right-1.5 z-10">
-          <div className="h-3 w-3 rounded-full bg-blue-700 dark:bg-blue-400 border-blue-200 dark:border-blue-800/50 border-3 animate-pulse" />
-        </div>
-        <div className="flex items-start">
-          <InfoCardContent className="pt-2 px-2">
-            <InfoCardTitle>{title}</InfoCardTitle>
-            <InfoCardDescription>{description}</InfoCardDescription>
-          </InfoCardContent>
-        </div>
-
-        <InfoCardFooter isHovered={isHovered}>
-          <div className="m-2 space-x-2">
-            <Button size="sm" onClick={onOpenDialog} className="text-xs h-6">
+      <div className="rounded-xl border border-border bg-card p-3 shadow-xs group-has-[[data-collapsible=icon]]/sidebar-wrapper:hidden">
+        <InfoCardContent>
+          <InfoCardTitle>{title}</InfoCardTitle>
+          <InfoCardDescription>{description}</InfoCardDescription>
+        </InfoCardContent>
+        <InfoCardFooter>
+          <Track className="flex w-full">
+            <button type="button" onClick={onOpenDialog} className={cn(pillPrimaryClass, "h-7 flex-1 px-3 text-xs")}>
               Get started
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDismiss}
-              className="text-xs h-6"
-            >
+            </button>
+            <button type="button" onClick={handleDismiss} className={cn(trackItemClass(false), "h-7 px-2.5 text-xs")}>
               Skip for now
-            </Button>
-          </div>
+            </button>
+          </Track>
         </InfoCardFooter>
       </div>
 
       {/* Icon-only sidebar view */}
-      <div
-        className={cn(
-          "hidden group-has-[[data-collapsible=icon]]/sidebar-wrapper:block",
-          "relative"
-        )}
-      >
-        <div className="absolute -top-1 -right-1.5 z-10">
-          <div className="h-3 w-3 rounded-full bg-blue-700 dark:bg-blue-400 border-blue-200 dark:border-blue-800/50 border-3 animate-pulse" />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-8"
-          // className="w-full h-9 hover:bg-accent hover:text-accent-foreground"
-          onClick={onOpenDialog}
-        >
-          <Rocket className="size-3" />
-        </Button>
+      <div className="relative hidden group-has-[[data-collapsible=icon]]/sidebar-wrapper:block">
+        <StatusDot tone="sky" className="absolute -right-0.5 -top-0.5 z-10 animate-pulse motion-reduce:animate-none" />
+        <button type="button" onClick={onOpenDialog} aria-label="Firm setup" className={cn(pillClass, "size-8 px-0")}>
+          <Rocket className="size-3.5" aria-hidden="true" />
+        </button>
       </div>
     </>
   );

@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, CircleAlert, Settings2 } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Settings2 } from 'lucide-react'
 
 import { PracticeRowAction } from '@/features/platform/components/PracticeRowAction'
 import { PracticeLoadError, PracticePage, PracticeStatus } from '@/features/platform/components/PracticeSurface'
+import { EmptyState, Notice, Panel, Track, trackItemClass } from '@/features/platform/components/ui'
 import { getPracticeWorkspace } from '@/features/platform/operations/actions'
 import { getPlatformDrillIn } from './getPlatformDrillIn'
 import { deskDetailKinds, deskTitle, type DeskKind } from './OperatingDesk'
@@ -34,40 +35,52 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
   return <PracticePage
     title={record.title}
     description={`${record.kind} in ${deskName}.`}
+    status={<PracticeStatus status={record.status} />}
+    meta={record.kind}
     trail={[{ label: deskName, href: deskHref }, { label: record.kind, href: deskHref }, { label: record.title }]}
-    actions={<Link href="/dashboard/models" className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Settings2 className="h-4 w-4" aria-hidden="true" /> Configuration</Link>}
+    actions={<>
+      <PracticeRowAction id={recordId} kind={actionKind} status={record.status} path={deskHref} canAct={canAct} />
+      <Track>
+        <Link href={deskHref} className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />{deskName}</Link>
+        <Link href="/dashboard/models" className={trackItemClass(true)}><Settings2 className="size-4" aria-hidden="true" />Data model</Link>
+      </Track>
+    </>}
   >
-    <div className="space-y-8">
-      <nav aria-label="Platform record breadcrumb" className="overflow-x-auto border-b border-border pb-3"><ol className="flex min-w-max items-center gap-2 whitespace-nowrap text-sm"><li><Link href={deskHref} className="inline-flex items-center gap-2 font-semibold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"><ArrowLeft className="h-4 w-4" aria-hidden="true" />{deskName}</Link></li><li aria-hidden="true" className="text-muted-foreground">/</li><li className="text-muted-foreground">{record.kind}</li></ol></nav>
-      <div className="flex flex-wrap items-center gap-3">
-        <PracticeStatus status={record.status} />
-        <PracticeRowAction id={recordId} kind={actionKind} status={record.status} path={deskHref} canAct={canAct} />
-      </div>
-      <section aria-labelledby="record-facts" className="border-y border-border"><h2 id="record-facts" className="sr-only">Record facts</h2><dl className="grid min-w-0 sm:grid-cols-2 xl:grid-cols-3">{record.facts.map(([term, value]) => <div key={term} className="min-w-0 border-b border-r border-border px-4 py-4 last:border-r-0 xl:nth-[n+4]:border-b-0"><dt className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{term}</dt><dd className="mt-2 break-words text-sm font-semibold leading-5 text-foreground">{value}</dd></div>)}</dl></section>
-      {record.related.length ? (
-        <nav aria-label="Related records" className="flex flex-wrap gap-2">
-          {record.related.map((link) => <Link key={link.href} href={link.href} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted">{link.label}<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>)}
-        </nav>
-      ) : null}
-      {record.lists.map((list) => (
-        <section key={list.title} aria-labelledby={`list-${list.title}`} className="space-y-3">
-          <div className="flex items-end justify-between gap-3 border-b border-border pb-2"><h2 id={`list-${list.title}`} className="text-base font-bold text-foreground">{list.title}</h2><span className="font-mono text-xs text-muted-foreground">{list.total.toLocaleString()}</span></div>
-          {list.rows.length ? (
-            <ul className="divide-y divide-border border-b border-border">
-              {list.rows.map((row, index) => (
-                <li key={`${row.title}-${index}`} className="min-w-0 px-1 py-3">
-                  {row.href ? <Link href={row.href} className="block text-sm font-semibold text-foreground underline-offset-4 hover:underline [overflow-wrap:anywhere]">{row.title}</Link> : <p className="text-sm font-semibold text-foreground [overflow-wrap:anywhere]">{row.title}</p>}
-                  <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground [overflow-wrap:anywhere]">{row.meta}</p>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>}
-          {list.total > list.rows.length ? <p className="text-xs text-muted-foreground">Showing {list.rows.length.toLocaleString()} of {list.total.toLocaleString()}.</p> : null}
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="min-w-0 space-y-6">
+        <section aria-labelledby="record-facts" className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+          <h2 id="record-facts" className="sr-only">Record facts</h2>
+          <dl className="grid min-w-0 gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
+            {record.facts.map(([term, value]) => <div key={term} className="min-w-0 bg-card px-4 py-3"><dt className="text-xs text-muted-foreground">{term}</dt><dd className="mt-1 break-words text-sm font-medium leading-5 text-foreground">{value}</dd></div>)}
+          </dl>
         </section>
-      ))}
-      {canDraftReply ? <ThreadReplyDraft threadId={recordId} subject={record.title} /> : null}
-      <div role="note" className="flex items-start gap-3 border-y border-border bg-muted/20 px-4 py-4 text-sm leading-6 text-muted-foreground"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><p>{record.notice}</p></div>
-      <p className="text-xs leading-5 text-muted-foreground">Field-level configuration is available in the <Link href="/dashboard/models" className="font-semibold text-foreground underline-offset-4 hover:underline">data model explorer</Link>.</p>
+        {record.lists.map((list) => (
+          <Panel key={list.title} title={<h2 id={`list-${list.title}`} className="flex items-baseline gap-2 text-sm font-semibold">{list.title}<span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{list.total.toLocaleString()}</span></h2>} bodyClassName="p-0">
+            {list.rows.length ? (
+              <ul className="divide-y divide-border">
+                {list.rows.map((row, index) => (
+                  <li key={`${row.title}-${index}`} className="min-w-0 px-4 py-3">
+                    {row.href ? <Link href={row.href} className="block text-sm font-semibold text-foreground underline-offset-4 hover:underline [overflow-wrap:anywhere]">{row.title}</Link> : <p className="text-sm font-semibold text-foreground [overflow-wrap:anywhere]">{row.title}</p>}
+                    <p className="mt-0.5 whitespace-pre-line text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{row.meta}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : <div className="p-4"><EmptyState title="Nothing recorded" /></div>}
+            {list.total > list.rows.length ? <p className="border-t border-border px-4 py-2 text-xs tabular-nums text-muted-foreground">{list.rows.length.toLocaleString()} of {list.total.toLocaleString()}</p> : null}
+          </Panel>
+        ))}
+        {canDraftReply ? <ThreadReplyDraft threadId={recordId} subject={record.title} /> : null}
+      </div>
+      <aside className="min-w-0 space-y-4 lg:sticky lg:top-4">
+        {record.related.length ? (
+          <Panel title="Related" bodyClassName="p-2">
+            <nav aria-label="Related records" className="grid">
+              {record.related.map((link) => <Link key={link.href} href={link.href} className="flex min-h-10 items-center justify-between gap-2 rounded-lg px-2 text-sm font-medium text-foreground hover:bg-muted">{link.label}<ArrowUpRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link>)}
+            </nav>
+          </Panel>
+        ) : null}
+        <Notice>{record.notice}</Notice>
+      </aside>
     </div>
   </PracticePage>
 }

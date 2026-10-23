@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { ArrowRight, BriefcaseBusiness, CircleOff, LockKeyhole } from 'lucide-react'
+import { ArrowRight, LockKeyhole } from 'lucide-react'
 
-import { PracticeStatus } from '@/features/platform/components/PracticeSurface'
+import { ErrorBanner, RowList, Stats, StatusDot, TitleLine, statusLabel } from '@/features/platform/components/ui'
 import { getLegalAiOverview } from '../actions/getLegalAiWorkspace'
 import {
   EmptyEvidence,
@@ -19,74 +19,72 @@ export async function LegalAiHomePage({ searchParams }: { searchParams?: Promise
   const result = await getLegalAiOverview(Number(first(params.page)) || 1, first(params.q))
   const matters = result.success ? result.data.matters : []
   const pageHref = (page: number) => `/dashboard/platform/ai?${new URLSearchParams({ ...(result.success && result.data.query ? { q: result.data.query } : {}), page: String(page) }).toString()}#matter-evidence-heading`
+  const total = result.success ? result.data.page.total : null
 
   return (
     <LegalAiPage
       title="Legal AI workbench"
-      description="Prepare authorized matter evidence, reviews, and controlled workflow definitions. Model execution is deliberately unavailable."
+      description="Authorized matter evidence, reviews and workflow definitions. Model execution unavailable."
     >
+      <LegalAiNav current="/dashboard/platform/ai" />
       <LegalAiBoundaryNotice />
-      <LegalAiNav />
 
-      <section aria-labelledby="matter-evidence-heading">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Authorized scope</p>
-            <h2 id="matter-evidence-heading" className="mt-1 text-xl font-bold tracking-tight text-foreground">Matter evidence sets</h2>
-            
-          </div>
+      <Stats
+        items={[
+          ['Authorized matters', total === null ? '—' : total.toLocaleString()],
+          ['Model execution', <span key="model" className="inline-flex items-center gap-2 text-base"><StatusDot tone="zinc" />Off</span>],
+          ['Citation gate', <span key="cite" className="inline-flex items-center gap-2 text-base"><StatusDot tone="amber" />Required</span>],
+          ['Human review', <span key="review" className="inline-flex items-center gap-2 text-base"><StatusDot tone="amber" />Required</span>],
+        ]}
+      />
+
+      <section aria-labelledby="matter-evidence-heading" className="scroll-mt-20 space-y-3">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 id="matter-evidence-heading" className="flex items-baseline gap-2 text-base font-semibold tracking-tight text-foreground">
+            Matter evidence sets
+            {total !== null ? <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{total.toLocaleString()}</span> : null}
+          </h2>
           <EvidenceSearch action="/dashboard/platform/ai" query={result.success ? result.data.query : ''} label="Search matters" />
         </div>
 
         {!result.success ? (
-          <div className="mt-4 flex min-h-28 items-center gap-3 border-y border-destructive/30 px-4 py-6 text-sm text-destructive">
-            <LockKeyhole className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <p>{result.error || 'Matter evidence is unavailable in the current authorization scope.'}</p>
-          </div>
+          <ErrorBanner title="Matter evidence unavailable">
+            <span className="inline-flex items-center gap-2"><LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />{result.error || 'Not available in the current authorization scope.'}</span>
+          </ErrorBanner>
         ) : matters.length === 0 ? (
-          <div className="mt-4"><EmptyEvidence>No active matters are available in the current authorization scope.</EmptyEvidence></div>
+          <EmptyEvidence>No active matters in the current authorization scope.</EmptyEvidence>
         ) : (
-          <div className="mt-4 divide-y divide-border border-y border-border">
+          <RowList label="Authorized matters">
             {matters.map((matter) => (
-              <Link
-                key={matter.id}
-                href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`}
-                className="group grid min-w-0 gap-3 px-2 py-4 outline-none hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:items-center"
-              >
-                <span className="hidden h-10 w-10 items-center justify-center rounded-md border border-border bg-background text-muted-foreground sm:flex">
-                  <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">{matter.matterNumber}</span>
-                    <PracticeStatus status={matter.status} />
-                    <PracticeStatus status={matter.confidentiality} />
+              <li key={matter.id}>
+                <Link
+                  href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`}
+                  className="group grid min-w-0 gap-1 px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
+                >
+                  <span className="min-w-0">
+                    <TitleLine as="h3" status={matter.status} headingClassName="text-sm">{matter.title}</TitleLine>
+                    <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 pl-4 text-xs text-muted-foreground">
+                      <span className="font-mono">{matter.matterNumber}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="truncate">{matter.client?.displayName || 'Client unavailable'}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="truncate">{matter.responsibleAttorney?.name || 'Attorney unassigned'}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{statusLabel(matter.confidentiality)}</span>
+                    </span>
                   </span>
-                  <span className="mt-1 block truncate text-sm font-bold text-foreground">{matter.title}</span>
-                  <span className="mt-1 block truncate text-sm text-muted-foreground">
-                    {matter.client?.displayName || 'Client unavailable'} · {matter.responsibleAttorney?.name || 'Attorney unassigned'}
+                  <span className="hidden items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground group-hover:text-foreground sm:inline-flex">
+                    Inspect evidence
+                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
                   </span>
-                </span>
-                <span className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground">
-                  Inspect evidence
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
-                </span>
-              </Link>
+                </Link>
+              </li>
             ))}
-          </div>
+          </RowList>
         )}
         {result.success ? <EvidencePager label="Matter evidence" {...result.data.page} href={pageHref} /> : null}
       </section>
 
-      <section className="border-y border-border bg-muted/20 px-4 py-5">
-        <div className="flex items-start gap-3">
-          <CircleOff className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <div>
-            <h2 className="text-sm font-bold text-foreground">Execution status: unavailable · Model execution is not configured</h2>
-            
-          </div>
-        </div>
-      </section>
     </LegalAiPage>
   )
 }

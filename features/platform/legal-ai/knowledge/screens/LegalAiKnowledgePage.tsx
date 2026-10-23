@@ -1,7 +1,6 @@
-import { BookOpenCheck, DatabaseZap } from 'lucide-react'
-
+import { ErrorBanner, Meta, MetaGrid, Panel, StatusDot } from '@/features/platform/components/ui'
 import { getLegalAiKnowledge } from '@/features/platform/legal-ai/assistant/actions/getLegalAiWorkspace'
-import { EmptyEvidence, EvidencePager, EvidenceSearch, LegalAiBoundaryNotice, LegalAiPage } from '@/features/platform/legal-ai/assistant/components/LegalAiSurface'
+import { EvidencePager, EvidenceSearch, LegalAiBoundaryNotice, LegalAiNav, LegalAiPage } from '@/features/platform/legal-ai/assistant/components/LegalAiSurface'
 import { DocumentEvidenceList } from '@/features/platform/legal-ai/documents/components/DocumentEvidenceList'
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? ''
@@ -13,22 +12,18 @@ export async function LegalAiKnowledgePage({ searchParams }: { searchParams?: Pr
   const pageHref = (page: number) => `/dashboard/platform/ai/knowledge?${new URLSearchParams({ ...(result.success && result.data.query ? { q: result.data.query } : {}), page: String(page) }).toString()}`
 
   return (
-    <LegalAiPage title="Authorized knowledge" description="Active research, internal, and contract records visible to you. This is a document inventory, not a search index or a statement of current law.">
+    <LegalAiPage title="Authorized knowledge" description="Active research, internal and contract records visible to you. Document inventory, not a search index or statement of current law.">
+      <LegalAiNav current="/dashboard/platform/ai/knowledge" />
       <LegalAiBoundaryNotice compact />
-      <div className="grid gap-0 border-y border-border md:grid-cols-2">
-        <section className="border-b border-border px-4 py-5 md:border-b-0 md:border-r">
-          <BookOpenCheck className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h2 className="mt-3 text-sm font-bold text-foreground">Source inventory</h2>
-          
-        </section>
-        <section className="px-4 py-5">
-          <DatabaseZap className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h2 className="mt-3 text-sm font-bold text-foreground">Index status: unavailable</h2>
-          
-        </section>
-      </div>
+      <Panel bodyClassName="py-3">
+        <MetaGrid className="sm:grid-cols-3 lg:grid-cols-3">
+          <Meta label="Source inventory"><span className="inline-flex items-center gap-2"><StatusDot tone="emerald" />Authorized documents</span></Meta>
+          <Meta label="Semantic index"><span className="inline-flex items-center gap-2"><StatusDot tone="zinc" />Unavailable</span></Meta>
+          <Meta label="Search">Title only</Meta>
+        </MetaGrid>
+      </Panel>
       <EvidenceSearch action="/dashboard/platform/ai/knowledge" query={result.success ? result.data.query : ''} label="Search knowledge by title" />
-      {!result.success ? <EmptyEvidence>{result.error}</EmptyEvidence> : <><DocumentEvidenceList documents={documents} /><EvidencePager label="Knowledge" {...result.data.page} href={pageHref} /></>}
+      {!result.success ? <ErrorBanner title="Knowledge unavailable">{result.error}</ErrorBanner> : <div className="space-y-0"><DocumentEvidenceList documents={documents} /><EvidencePager label="Knowledge" {...result.data.page} href={pageHref} /></div>}
     </LegalAiPage>
   )
 }

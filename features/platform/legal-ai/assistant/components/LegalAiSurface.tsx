@@ -1,115 +1,112 @@
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 · audience: legal staff · use: inspect bounded matter evidence · tone: technical/austere · genre: modern-minimal · macrostructure: Workbench · theme: Quiet */
+/* Legal AI workbench: a supervised research desk. Evidence first, citation and
+ * review gates visible, model execution shown as an explicit state. */
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import {
-  ArrowRight,
-  BookOpenCheck,
-  Bot,
-  Braces,
-  FileSearch,
-  FlaskConical,
-  Library,
-  Scale,
-  ShieldCheck,
-} from 'lucide-react'
+import { BookOpenCheck, Bot, Braces, FileSearch, FlaskConical, Library, Scale, Search, ShieldCheck } from 'lucide-react'
 
 import { PracticePage } from '@/features/platform/components/PracticeSurface'
+import { Track, fieldClass, pillClass, trackItemClass } from '@/features/platform/components/ui'
 import { cn } from '@/lib/utils'
 
 export const legalAiDestinations = [
-  { title: 'Matter assistant', description: 'Prepare a matter-scoped evidence set before any future model request.', href: '/dashboard/platform/ai', icon: Bot },
-  { title: 'Review workbench', description: 'Inspect document, deadline, task, and audit evidence without generating conclusions.', href: '/dashboard/platform/ai/reviews', icon: FileSearch },
-  { title: 'Knowledge', description: 'Browse authorized research, internal guidance, and contract records.', href: '/dashboard/platform/ai/knowledge', icon: Library },
-  { title: 'Workflows', description: 'See bounded legal workflow definitions and their approval requirements.', href: '/dashboard/platform/ai/workflows', icon: Braces },
-  { title: 'Providers', description: 'Review the fail-closed model and connector boundary.', href: '/dashboard/platform/ai/providers', icon: ShieldCheck },
-  { title: 'Evaluation', description: 'Define evidence, citation, access, and refusal checks before enabling models.', href: '/dashboard/platform/ai/evaluation', icon: FlaskConical },
+  { title: 'Matter assistant', description: 'Matter-scoped evidence sets.', href: '/dashboard/platform/ai', icon: Bot },
+  { title: 'Review workbench', description: 'Document, deadline, task and audit evidence.', href: '/dashboard/platform/ai/reviews', icon: FileSearch },
+  { title: 'Knowledge', description: 'Authorized research, guidance and contract records.', href: '/dashboard/platform/ai/knowledge', icon: Library },
+  { title: 'Workflows', description: 'Workflow definitions and approval requirements.', href: '/dashboard/platform/ai/workflows', icon: Braces },
+  { title: 'Providers', description: 'Model and connector boundary.', href: '/dashboard/platform/ai/providers', icon: ShieldCheck },
+  { title: 'Evaluation', description: 'Evidence, citation, access and refusal gates.', href: '/dashboard/platform/ai/evaluation', icon: FlaskConical },
 ] as const
 
 export function LegalAiPage({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
     <PracticePage title={title} description={description}>
-      <div className="space-y-8">{children}</div>
+      <div className="min-w-0 space-y-6">{children}</div>
     </PracticePage>
   )
 }
 
 export function LegalAiBoundaryNotice({ compact = false }: { compact?: boolean }) {
   return (
-    <div role="note" className={cn('border-y border-border bg-muted/25 px-4 py-4', compact && 'py-3')}>
-      <div className="flex items-start gap-3">
-        <Scale className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <div className="text-sm leading-6 text-muted-foreground">
-          <p className="font-semibold text-foreground">Model execution unconfigured · does not provide legal advice or determine authority</p>
-        </div>
-      </div>
+    <div
+      role="note"
+      className={cn(
+        'flex min-w-0 items-center gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 text-xs font-medium text-foreground',
+        compact ? 'py-2' : 'py-2.5',
+      )}
+    >
+      <Scale className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+      <span className="min-w-0">Model execution not configured · Not legal advice · Does not determine authority · Human review required</span>
     </div>
   )
 }
 
-export function LegalAiNav() {
+/** Workbench sections as a recessed track. `current` marks the active section. */
+export function LegalAiNav({ current }: { current?: string } = {}) {
   return (
-    <nav aria-label="Legal AI workbench" className="border-y border-border">
-      <div className="grid min-w-0 sm:grid-cols-2 xl:grid-cols-3">
-        {legalAiDestinations.map((item, index) => {
+    <nav aria-label="Legal AI workbench" className="min-w-0">
+      <Track className="flex w-full sm:inline-flex sm:w-auto">
+        {legalAiDestinations.map((item) => {
           const Icon = item.icon
+          const active = current === item.href
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'group grid min-h-28 min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_auto] gap-3 border-border px-4 py-4 outline-none hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                index % 2 === 0 ? 'sm:border-r' : '',
-                index < 4 ? 'border-b' : '',
-                index % 3 !== 2 ? 'xl:border-r' : 'xl:border-r-0',
-                index < 3 ? 'xl:border-b' : 'xl:border-b-0',
-              )}
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
-                <Icon className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-bold text-foreground">{item.title}</span>
-                
-              </span>
-              <ArrowRight className="mt-1 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+            <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={trackItemClass(active)}>
+              <Icon className="size-3.5" aria-hidden="true" />
+              {item.title}
             </Link>
           )
         })}
-      </div>
+      </Track>
     </nav>
   )
 }
 
-
-
 export function EmptyEvidence({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-28 items-center gap-3 border-y border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-      <BookOpenCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
-      <p>{children}</p>
+    <div role="status" className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center">
+      <BookOpenCheck className="size-5 text-muted-foreground" aria-hidden="true" />
+      <p className="max-w-md text-sm font-medium text-foreground">{children}</p>
     </div>
   )
 }
 
 export function EvidencePager({ label, page, pageCount, total, href, canContinue }: { label: string; page: number; pageCount: number | null; total: number | null; canContinue?: boolean; href: (page: number) => string }) {
-  if (total === null || pageCount === null) return <nav aria-label={`${label} pages`} className="mt-3 flex flex-wrap items-center gap-4 text-xs"><p role="status">Full {label.toLowerCase()} inventory is unavailable; this is not an empty or complete result.</p><Link className="inline-flex min-h-11 items-center underline" href={href(page)}>Retry this page</Link>{page > 1 ? <Link className="inline-flex min-h-11 items-center underline" href={href(page - 1)}>Previous</Link> : null}{canContinue ? <Link className="inline-flex min-h-11 items-center underline" href={href(page + 1)}>Next page</Link> : null}</nav>
-  if (pageCount <= 1) return <p className="mt-2 text-xs text-muted-foreground">{total.toLocaleString()} authorized</p>
+  if (total === null || pageCount === null) {
+    return (
+      <nav aria-label={`${label} pages`} className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-full bg-amber-500" />
+          {label} inventory unavailable · not an empty or complete result
+        </p>
+        <Track>
+          <Link className={trackItemClass(true)} href={href(page)}>Retry</Link>
+          {page > 1 ? <Link className={trackItemClass(false)} href={href(page - 1)}>Previous</Link> : null}
+          {canContinue ? <Link className={trackItemClass(false)} href={href(page + 1)}>Next page</Link> : null}
+        </Track>
+      </nav>
+    )
+  }
+  if (pageCount <= 1) return <p className="mt-3 text-xs tabular-nums text-muted-foreground">{total.toLocaleString()} authorized</p>
   return (
     <nav aria-label={`${label} pages`} className="mt-3 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-muted-foreground">{total.toLocaleString()} authorized · page {page} of {pageCount}</p>
-      <div className="flex gap-2">
-        {page > 1 ? <Link href={href(page - 1)} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs font-semibold">Previous</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs text-muted-foreground">Previous</span>}
-        {page < pageCount ? <Link href={href(page + 1)} className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs font-semibold">Next</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-xs text-muted-foreground">Next</span>}
-      </div>
+      <p className="text-xs tabular-nums text-muted-foreground">{total.toLocaleString()} authorized · page {page} of {pageCount}</p>
+      <Track>
+        {page > 1 ? <Link href={href(page - 1)} className={trackItemClass(true)}>Previous</Link> : <span aria-disabled="true" className={cn(trackItemClass(false), 'opacity-50')}>Previous</span>}
+        {page < pageCount ? <Link href={href(page + 1)} className={trackItemClass(true)}>Next</Link> : <span aria-disabled="true" className={cn(trackItemClass(false), 'opacity-50')}>Next</span>}
+      </Track>
     </nav>
   )
 }
 
 export function EvidenceSearch({ action, query, label }: { action: string; query: string; label: string }) {
   return (
-    <form method="get" action={action} role="search" aria-label={label} className="flex max-w-xl gap-2">
-      <input name="q" type="search" defaultValue={query} maxLength={100} aria-label={label} placeholder="Search" className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-      <button type="submit" className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm font-semibold hover:bg-muted">Search</button>
+    <form method="get" action={action} role="search" aria-label={label} className="flex w-full min-w-0 items-center gap-2 sm:max-w-md">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <input name="q" type="search" defaultValue={query} maxLength={100} aria-label={label} placeholder="Search" className={cn(fieldClass, 'pl-9')} />
+      </div>
+      <Track>
+        <button type="submit" className={pillClass}>Search</button>
+      </Track>
     </form>
   )
 }

@@ -7,8 +7,7 @@ import { ArrowRight, FileText, MessageSquareText, ReceiptText } from 'lucide-rea
 
 import { keystoneContext } from '@/features/keystone/context'
 import { listPortalSharedResourcesPage, portalFirmBrand } from '@/features/keystone/lib/portal-auth'
-import { FirmBrand } from '@/features/portal/FirmBrand'
-import { signOutPortal } from '@/features/portal/actions'
+import { PortalHeader } from '../PortalHeader'
 import { PORTAL_SESSION_COOKIE } from '@/features/portal/constants'
 import { PortalReadError } from '@/features/keystone/lib/portal-read-error'
 import { PortalReadProblem } from '../PortalReadProblem'
@@ -52,59 +51,41 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
   }
 
   return (
-    <main style={portalThemeStyle(brand)} className="min-h-svh overflow-x-clip bg-background text-foreground">
-      <a
-        href="#portal-home-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        Skip to main content
-      </a>
-      <header className="border-b border-border">
-        <div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-          <FirmBrand brand={brand} />
-          <form action={signOutPortal}>
-            <button className="min-h-11 min-w-11 whitespace-nowrap px-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Sign out</button>
-          </form>
-        </div>
-      </header>
-      <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-        <h1 id="portal-home-content" tabIndex={-1} className="text-3xl font-bold tracking-[-0.035em] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:text-4xl">Shared with you</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {cursor ? 'Older shared items' : 'Most recent first'}
-        </p>
+    <main style={portalThemeStyle(brand)} className="storefront min-h-svh overflow-x-clip">
+      <a href="#portal-home-content" className="sf-skip-link">Skip to main content</a>
+      <PortalHeader brand={brand} />
+      <div className="sf-shell sf-page" style={{ maxWidth: '56rem' }}>
+        <header className="sf-page__head">
+          <p className="sf-label">{cursor ? 'Older items' : 'Most recent first'}</p>
+          <h1 id="portal-home-content" tabIndex={-1} className="sf-title outline-none">Shared with you</h1>
+        </header>
 
         {shares.length ? (
-          <div className="mt-10 divide-y divide-border border-y border-border">
+          <ul className="sf-rows">
             {shares.map((share) => {
               const Icon = icons[share.resourceType as keyof typeof icons] ?? FileText
               return (
-                <Link
-                  key={share.id}
-                  href={`/portal/share/${share.id}`}
-                  className="group grid min-h-24 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 py-4 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-5 sm:px-3"
-                >
-                  <span className="flex size-10 items-center justify-center rounded-md border border-border bg-muted/35 text-muted-foreground">
-                    <Icon className="size-4" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold">{labels[share.resourceType] ?? 'Shared item'}</span>
-                    <span className="mt-1 block truncate text-sm text-muted-foreground">{share.matterNumber} · {share.matterTitle}</span>
-                  </span>
-                  <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-                </Link>
+                <li key={share.id}>
+                  <Link href={`/portal/share/${share.id}`} className="sf-row grid-cols-[2.75rem_minmax(0,1fr)_auto]">
+                    <span className="row-span-2 grid size-10 place-items-center rounded-full bg-[var(--sf-tint)] text-[var(--color-accent)]"><Icon className="size-4" aria-hidden="true" /></span>
+                    <span className="sf-row__title col-start-2"><span>{labels[share.resourceType] ?? 'Shared item'}</span></span>
+                    <span className="sf-row__meta col-start-2 truncate" style={{ paddingLeft: 0 }}>{share.matterNumber} · {share.matterTitle}</span>
+                    <ArrowRight className="col-start-3 row-span-2 row-start-1 size-4 text-[var(--color-muted)]" aria-hidden="true" />
+                  </Link>
+                </li>
               )
             })}
-          </div>
+          </ul>
         ) : (
-          <div className="mt-10 border-y border-dashed border-border py-12 text-sm text-muted-foreground">
-            <p>{cursor ? 'No older shared items.' : 'Nothing has been shared with you yet.'}</p>
-            <p className="mt-3">Expecting something? <Link href="/contact#existing-clients" className="font-semibold text-foreground underline-offset-4 hover:underline">Contact your firm</Link>.</p>
+          <div className="sf-empty">
+            <p role="status" className="sf-h3">{cursor ? 'No older shared items' : 'Nothing shared yet'}</p>
+            <Link href="/contact#existing-clients" className="sf-link text-sm">Contact your firm</Link>
           </div>
         )}
-        <nav aria-label="Shared items pages" className="mt-6 flex flex-wrap gap-4 text-sm font-semibold">
-          {cursor ? <Link href="/portal" className="inline-flex min-h-11 items-center underline-offset-4 hover:underline">Most recent</Link> : null}
-          {nextCursor ? <Link href={`/portal?after=${encodeURIComponent(nextCursor)}`} className="inline-flex min-h-11 items-center underline-offset-4 hover:underline">Older shared items</Link> : null}
-        </nav>
+        {cursor || nextCursor ? <nav aria-label="Shared items pages" className="sf-track mt-6">
+          {cursor ? <Link href="/portal" className="sf-pill">Most recent</Link> : null}
+          {nextCursor ? <Link href={`/portal?after=${encodeURIComponent(nextCursor)}`} className="sf-pill sf-pill--raised">Older shared items</Link> : null}
+        </nav> : null}
       </div>
     </main>
   )

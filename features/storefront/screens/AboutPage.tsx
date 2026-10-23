@@ -13,17 +13,28 @@ export default async function AboutPage() {
   const who = settings.firmName || 'This site'
   const about = settings.publication.aboutStatement
   return <PublicPage>
-    <article className="sf-doc">
-      <header className="sf-doc__head">
-        <p className="sf-doc__meta">About</p>
-        <h1 className="sf-doc__title">{about && settings.firmName ? settings.firmName : 'Public information is not configured.'}</h1>
-      </header>
-      <div className="sf-prose">
-        {about ? about.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p>{who} has not published verified firm, attorney, or practice-area information through this site.</p>}
-        {settings.bookingEnabled
-          ? <p>Prospective clients can <Link href="/practice-areas" className="sf-link">request a consultation appointment</Link>. A request does not create an attorney-client relationship.</p>
-          : <p>This site does not accept prospective-client requests. Existing clients should use the verified contact details and secure channels in their engagement materials.</p>}
+    <div className="sf-shell sf-page">
+      <div className="sf-split">
+        <article className="grid gap-8">
+          <header className="grid gap-3"><p className="sf-label">About</p><h1 className="sf-title">{about && settings.firmName ? settings.firmName : 'Public information is not configured.'}</h1></header>
+          <div className="sf-prose sf-prose--lead">
+            {about ? about.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p>{who} has not published verified firm, attorney or practice-area information.</p>}
+          </div>
+        </article>
+        <aside className="sf-split__aside">
+          <div className="sf-card"><div className="sf-card__body grid gap-4">
+            {settings.bookingEnabled ? <>
+              <p className="sf-h3">Consultations</p>
+              <p className="sf-fine">A request does not create an attorney-client relationship.</p>
+              <div className="sf-track sf-track--block"><Link href="/practice-areas" className="sf-pill sf-pill--primary">Request a consultation</Link></div>
+            </> : <>
+              <p className="sf-h3">Existing clients</p>
+              <p className="sf-fine">This site does not accept prospective-client requests.</p>
+              <div className="sf-track sf-track--block"><Link href="/portal" className="sf-pill sf-pill--raised">Client portal</Link></div>
+            </>}
+          </div></div>
+        </aside>
       </div>
-    </article>
+    </div>
   </PublicPage>
 }

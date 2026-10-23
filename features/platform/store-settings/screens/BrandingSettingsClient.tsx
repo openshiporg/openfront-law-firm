@@ -1,22 +1,21 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState, type ChangeEvent } from 'react'
 import { Save } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { LogoPicker } from '@/features/platform/store-settings/LogoPicker'
 import { safeStoreLogo } from '@/features/shared/store-logo'
+import { ErrorBanner, Notice, Panel, StatusDot, Track, fieldClass, labelClass, pillPrimaryClass, textareaClass, trackItemClass } from '@/features/platform/components/ui'
 
 import {
   saveBranding,
   type BrandingSetup,
   type BrandingState,
 } from '../actions/branding'
-import { STOREFRONT_ACCENT_PRESETS, accentContrastOnPaper, accentIdFromHex, normalizeAccentHex } from '@/features/storefront/lib/accent'
+import { NEUTRAL_FIRM_NAME, STOREFRONT_ACCENT_PRESETS, accentContrastOnPaper, accentIdFromHex, normalizeAccentHex, resolveStorefrontAccent, storefrontThemeVariables } from '@/features/storefront/lib/accent'
+
+const optional = <span className="font-normal text-muted-foreground/80"> · optional</span>
 
 export function BrandingSettingsClient({ setup }: { setup: BrandingSetup }) {
   const firm = setup.firm
@@ -46,95 +45,140 @@ export function BrandingSettingsClient({ setup }: { setup: BrandingSetup }) {
     ...(currentHex ? [{ id: 'current', hex: currentHex, label: `Current (${currentHex})` }] : []),
   ]
 
+  // Live preview mirrors the uncontrolled fields; it never feeds the submission.
+  const [preview, setPreview] = useState(() => ({
+    name: value('name'),
+    displayName: value('displayName'),
+    tagline: value('tagline'),
+    accentId: selectedAccent,
+    icon: value('logoIcon'),
+    hue: value('logoColor'),
+  }))
+  const onFormChange = (event: ChangeEvent<HTMLFormElement>) => {
+    const target = event.target as unknown as HTMLInputElement
+    if (target.name === 'name' || target.name === 'displayName' || target.name === 'tagline' || target.name === 'accentId') {
+      const key = target.name
+      setPreview((current) => ({ ...current, [key]: target.value }))
+    }
+  }
+
   if (setup.status === 'error') {
     return (
-      <div role="alert" className="max-w-2xl rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm leading-6 text-destructive">
-        Store settings could not be loaded. Saved settings are unchanged. Reload the page to try again.
+      <div className="max-w-2xl">
+        <ErrorBanner title="Store settings unavailable">Saved settings are unchanged. Reload the page to try again.</ErrorBanner>
       </div>
     )
   }
 
+  const previewAccentHex = accentOptions.find((option) => option.id === preview.accentId)?.hex ?? null
+  const theme = storefrontThemeVariables({ accentHex: previewAccentHex ? resolveStorefrontAccent(previewAccentHex) : null, logoColor: preview.hue })
+  const previewName = preview.displayName.trim() || preview.name.trim() || NEUTRAL_FIRM_NAME
+
   return (
-    <form action={formAction} className="max-w-2xl space-y-6">
+    <form action={formAction} onChange={onFormChange} className="min-w-0">
       <input type="hidden" name="firmId" value={firm?.id || ''} />
 
-      {!firm ? (
-        <div
-          role="status"
-          className="rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground"
-        >
-          No active firm is configured.
-        </div>
-      ) : null}
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        <aside aria-label="Storefront preview" className="min-w-0 lg:sticky lg:top-20 lg:order-last">
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+              <p className="text-xs font-medium text-muted-foreground">Storefront preview</p>
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><StatusDot tone={firm ? 'emerald' : 'zinc'} />{firm ? 'Live firm' : 'No firm'}</span>
+            </div>
+            <div className="bg-[oklch(0.955_0.010_78)] px-5 py-6 text-[oklch(0.22_0.01_78)]">
+              <div className="flex min-w-0 items-center gap-3">
+                <span aria-hidden="true" className="block size-10 shrink-0 [&>svg]:size-full" style={{ filter: `hue-rotate(${theme['--sf-logo-hue']}deg)` }} dangerouslySetInnerHTML={{ __html: safeStoreLogo(preview.icon) }} />
+                <div className="min-w-0">
+                  <p className="truncate font-serif text-lg font-semibold leading-tight tracking-tight">{previewName}</p>
+                  {preview.tagline.trim() ? <p className="mt-0.5 line-clamp-2 text-xs leading-5 opacity-70">{preview.tagline}</p> : null}
+                </div>
+              </div>
+              <div className="mt-6 h-px w-full" style={{ backgroundColor: theme['--sf-accent'] }} />
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="inline-flex h-8 items-center rounded-full px-3.5 text-xs font-medium text-white" style={{ backgroundColor: theme['--sf-accent'] }}>Request consultation</span>
+                <span className="text-xs font-medium underline underline-offset-4" style={{ color: theme['--sf-accent'] }}>Practice areas</span>
+              </div>
+            </div>
+          </div>
+        </aside>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Label className="space-y-1.5">
-          <span className="text-sm font-medium">Firm name</span>
-          <Input name="name" defaultValue={value('name')} required maxLength={120} />
-        </Label>
-        <Label className="space-y-1.5">
-          <span className="text-sm font-medium">Display name <span className="font-normal text-muted-foreground">(optional)</span></span>
-          <Input name="displayName" defaultValue={value('displayName')} maxLength={120} />
-        </Label>
-        <Label className="space-y-1.5">
-          <span className="text-sm font-medium">Short name <span className="font-normal text-muted-foreground">(optional)</span></span>
-          <Input name="shortName" defaultValue={value('shortName')} maxLength={40} />
-        </Label>
-        <Label className="space-y-1.5">
-          <span className="text-sm font-medium">Support email <span className="font-normal text-muted-foreground">(optional)</span></span>
-          <Input name="supportEmail" type="email" defaultValue={value('supportEmail')} maxLength={320} />
-        </Label>
-      </div>
+        <div className="min-w-0 space-y-6">
+          {!firm ? <Notice>No active firm is configured.</Notice> : null}
 
-      <Label className="block space-y-1.5">
-        <span className="text-sm font-medium">Tagline <span className="font-normal text-muted-foreground">(optional)</span></span>
-        <Textarea name="tagline" defaultValue={value('tagline')} rows={2} maxLength={180} />
-      </Label>
-
-      <LogoPicker initialIcon={value('logoIcon')} initialColor={value('logoColor')} />
-
-      <div>
-        <p className="text-sm font-medium">Accent color</p>
-
-        <div className="mt-3 flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
-          {accentOptions.map((preset) => {
-            const active = selectedAccent === preset.id
-            return (
-              <label key={preset.id} className={cn(
-                'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-transparent px-2 text-sm focus-within:ring-2 focus-within:ring-ring has-checked:border-border has-checked:bg-background has-checked:font-medium has-checked:shadow-sm',
-              )}>
-                <input type="radio" name="accentId" value={preset.id} defaultChecked={active} className="size-11 shrink-0 accent-foreground" />
-                <span
-                  aria-hidden="true"
-                  className="h-4 w-4 rounded-full border border-black/10"
-                  style={{ backgroundColor: preset.hex || 'transparent' }}
-                />
-                {preset.label}
+          <Panel title="Firm identity">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className={labelClass}>
+                <span>Firm name</span>
+                <input className={fieldClass} name="name" defaultValue={value('name')} required maxLength={120} />
               </label>
-            )
-          })}
+              <label className={labelClass}>
+                <span>Display name{optional}</span>
+                <input className={fieldClass} name="displayName" defaultValue={value('displayName')} maxLength={120} />
+              </label>
+              <label className={labelClass}>
+                <span>Short name{optional}</span>
+                <input className={fieldClass} name="shortName" defaultValue={value('shortName')} maxLength={40} />
+              </label>
+              <label className={labelClass}>
+                <span>Support email{optional}</span>
+                <input className={fieldClass} name="supportEmail" type="email" defaultValue={value('supportEmail')} maxLength={320} />
+              </label>
+              <label className={cn(labelClass, 'sm:col-span-2')}>
+                <span>Tagline{optional}</span>
+                <textarea className={cn(textareaClass, 'min-h-16')} name="tagline" defaultValue={value('tagline')} rows={2} maxLength={180} />
+              </label>
+            </div>
+          </Panel>
+
+          <Panel>
+            <LogoPicker
+              initialIcon={value('logoIcon')}
+              initialColor={value('logoColor')}
+              onChange={({ icon, hue }) => setPreview((current) => (current.icon === icon && current.hue === hue ? current : { ...current, icon, hue }))}
+            />
+          </Panel>
+
+          <Panel title="Accent color" bodyClassName="space-y-3">
+            <div role="radiogroup" aria-label="Accent color" className="min-w-0">
+              <Track className="flex w-full sm:inline-flex sm:w-auto">
+                {accentOptions.map((preset) => {
+                  const active = preview.accentId === preset.id
+                  return (
+                    <label key={preset.id} className={cn(trackItemClass(active), 'cursor-pointer focus-within:ring-2 focus-within:ring-ring/50')}>
+                      <input type="radio" name="accentId" value={preset.id} defaultChecked={selectedAccent === preset.id} className="sr-only" />
+                      <span
+                        aria-hidden="true"
+                        className={cn('size-3 rounded-full ring-1 ring-black/10', !preset.hex && 'bg-[conic-gradient(from_0deg,#f87171,#facc15,#4ade80,#60a5fa,#c084fc,#f87171)]')}
+                        style={preset.hex ? { backgroundColor: preset.hex } : undefined}
+                      />
+                      {preset.label}
+                    </label>
+                  )
+                })}
+              </Track>
+            </div>
+            {currentHex && accentContrastOnPaper(currentHex) < 3 ? (
+              <Notice>{currentHex} is too light for the storefront paper; the logo hue is used until another accent is chosen.</Notice>
+            ) : null}
+          </Panel>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {currentHex && accentContrastOnPaper(currentHex) < 3
-            ? `${currentHex} is too light to read on the storefront paper, so the storefront uses the logo hue until you choose another accent.`
-            : 'Match logo hue derives the storefront accent and focus ring from the logo hue above.'}
-        </p>
       </div>
 
-      {state.message ? (
-        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {state.message}
-        </p>
-      ) : null}
-      {!state.message && state.saved ? (
-        <p role="status" className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
-          Store settings saved.
-        </p>
-      ) : null}
-
-      <Button type="submit" disabled={!firm}>
-        <Save className="size-4" aria-hidden="true" /> Save store settings
-      </Button>
+      <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:-mx-6 md:px-6">
+        <div className="min-w-0 flex-1 text-sm">
+          {state.message ? (
+            <p role="alert" className="text-destructive">{state.message}</p>
+          ) : null}
+          {!state.message && state.saved ? (
+            <p role="status" className="inline-flex items-center gap-2 text-foreground"><StatusDot tone="emerald" />Store settings saved.</p>
+          ) : null}
+        </div>
+        <Track>
+          <button type="submit" disabled={!firm} className={pillPrimaryClass}>
+            <Save className="size-4" aria-hidden="true" /> Save store settings
+          </button>
+        </Track>
+      </div>
     </form>
   )
 }

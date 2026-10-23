@@ -3,6 +3,23 @@ import { FormSelect } from '@/components/ui/form-select'
 import Link from 'next/link'
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
+import { cn } from '@/lib/utils'
+import {
+  EmptyState,
+  ErrorBanner,
+  Meta,
+  MetaGrid,
+  Notice,
+  Pager,
+  Panel,
+  RowList,
+  SectionHeader,
+  TitleLine,
+  Track,
+  fieldClass,
+  labelClass,
+  pillPrimaryClass,
+} from '@/features/platform/components/ui'
 import { PortalGrantForm, PortalPolicyForm } from './PortalPolicyForms'
 
 export type PortalDirectoryParams = { search?: string; status?: string; page?: number; matterId?: string; portalAccountId?: string }
@@ -42,7 +59,7 @@ const accountLabel = (account: AccountLabel | undefined, id: string) =>
 
 export async function PortalPolicyDirectory({ params = {} }: { params?: PortalDirectoryParams }) {
   const response = await keystoneClient<{ portalPolicyWorkspace: Workspace }>(query, { ...params, status: params.status || null, matterId: params.matterId || null, portalAccountId: params.portalAccountId || null })
-  if (!response.success) return <section id="portal-policy" className="border p-4" role="alert">The client access directory could not be loaded, so no access was granted. Invitations and revocations below still work.</section>
+  if (!response.success) return <section id="portal-policy" className="scroll-mt-20"><ErrorBanner title="Client access directory unavailable">No access was granted. Invitations and revocations still work.</ErrorBanner></section>
   const data = response.data.portalPolicyWorkspace
   const selectedId = params.portalAccountId?.trim().slice(0, 200) || ''
   const labels = await loadAccountLabels([...new Set([...data.accounts.map((item) => item.id), ...(selectedId ? [selectedId] : [])])])
@@ -57,33 +74,79 @@ export async function PortalPolicyDirectory({ params = {} }: { params?: PortalDi
     for (const [key, value] of Object.entries({ ...params, ...changes })) if (value) search.set(key, String(value))
     return `/dashboard/platform/portal?${search}#portal-policy`
   }
-  return <section id="portal-policy" className="space-y-6 border-y py-6">
-    <h2 className="text-lg font-semibold">Client matter access</h2>
-    <p>Current access policy: {data.policy ? `revision ${data.policy.revision} — clients can be given access to ${data.policy.statuses.map((status) => status.replaceAll('_', ' ')).join(', ')} matters` : 'not set, so no new access can be granted'}. Latest recorded choice: {data.latestChoice.replaceAll('_', ' ')} ({data.latestAdmission.replaceAll('_', ' ')}, revision {data.latestRevision}). Grants made before any policy existed are shown as legacy and were not approved by a later policy.</p>
-    <details><summary>Policy history (latest twelve revisions)</summary><ul>{data.policyHistory.map((policy) => <li key={policy.revision}>Revision {policy.revision}: {policy.mode}, {policy.statuses.join(', ')}, {policy.admission}</li>)}</ul></details>
-    {data.canConfigure ? <PortalPolicyForm revision={data.latestRevision} /> : <p>Recording policy requires current human firm-configuration authority.</p>}
-    {data.state !== 'ready' ? <p role="note">{data.state === 'matter_read_denied' ? 'Matter discovery requires actual Matter-read permission; portal management does not imply it.' : data.state === 'portal_read_denied' ? 'Portal-read authority is required for the directory. Firm configuration does not imply portal discovery.' : 'Admit an explicit conservative policy before discovering grantable targets.'}</p> : <>
-      <form method="get" className="flex flex-wrap items-end gap-3">
-        <label>Matter number search<input name="search" defaultValue={params.search} maxLength={100} className="block min-h-10 rounded-md border p-2" /></label>
-        <label>Grantable status<FormSelect name="status" defaultValue={params.status ?? ''} className="block min-h-10 rounded-md border p-2"><option value="">All admitted statuses</option>{data.policy?.statuses.map((status) => <option key={status}>{status}</option>)}</FormSelect></label>
-        <div className="min-w-64"><SearchableOptionSelect id="portal-directory-account" name="portalAccountId" label="Client account" emptyLabel="Choose…" kind="portalAccount" options={[...new Map([...data.accounts.map((item) => ({ value: item.id, label: accountLabel(labels.get(item.id), item.id) })), ...(selectedId && exactAccount ? [{ value: selectedId, label: accountLabel(exactAccount, selectedId) }] : [])].map((option) => [option.value, option])).values()]} /></div>
-        <button className="min-h-10 rounded-md border px-4">Search / select account</button>
+  const yesNo = (value: boolean) => value ? 'Yes' : 'No'
+  const selectionGrantable = Boolean(data.selection && data.policy?.statuses.includes(data.selection.status))
+  return <section id="portal-policy" aria-labelledby="portal-policy-title" className="min-w-0 scroll-mt-20 space-y-5">
+    <SectionHeader id="portal-policy-title" title="Client matter access" />
+    <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+      <MetaGrid>
+        <Meta label="Current policy">{data.policy ? <span className="tabular-nums">Revision {data.policy.revision}</span> : <span className="text-destructive">Not set; no new access can be granted</span>}</Meta>
+        <Meta label="Grantable statuses">{data.policy ? data.policy.statuses.map((status) => status.replaceAll('_', ' ')).join(', ') : '—'}</Meta>
+        <Meta label="Latest recorded choice">{data.latestChoice.replaceAll('_', ' ')}</Meta>
+        <Meta label="Admission"><span className="tabular-nums">{data.latestAdmission.replaceAll('_', ' ')} · rev. {data.latestRevision}</span></Meta>
+      </MetaGrid>
+      <Notice className="mt-4">Grants made before any policy existed show as legacy (revision 0).</Notice>
+      <details className="group mt-4 border-t border-border pt-3">
+        <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden"><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span> policy history · last 12</summary>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[28rem] text-sm tabular-nums">
+            <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th className="py-2 pr-3 font-medium">Revision</th><th className="py-2 pr-3 font-medium">Mode</th><th className="py-2 pr-3 font-medium">Statuses</th><th className="py-2 font-medium">Admission</th></tr></thead>
+            <tbody className="divide-y divide-border">{data.policyHistory.map((policy) => <tr key={policy.revision}><td className="py-2 pr-3 font-medium">{policy.revision}</td><td className="py-2 pr-3 text-muted-foreground">{policy.mode}</td><td className="py-2 pr-3 text-muted-foreground">{policy.statuses.join(', ')}</td><td className="py-2 text-muted-foreground">{policy.admission}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+    {data.canConfigure ? <PortalPolicyForm revision={data.latestRevision} /> : <Notice>Recording policy requires current human firm-configuration authority.</Notice>}
+    {data.state !== 'ready' ? <Notice>{data.state === 'matter_read_denied' ? 'Matter discovery requires Matter-read permission; portal management does not imply it.' : data.state === 'portal_read_denied' ? 'Directory requires portal-read authority; firm configuration does not imply it.' : 'Admit an explicit policy before discovering grantable targets.'}</Notice> : <>
+      <form method="get" className="grid min-w-0 gap-3 rounded-xl border border-border bg-card p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto] lg:items-end">
+        <label className={labelClass}>Matter number<input name="search" type="search" defaultValue={params.search} maxLength={100} className={fieldClass} /></label>
+        <label className={labelClass}>Grantable status<FormSelect name="status" defaultValue={params.status ?? ''} className={fieldClass}><option value="">All admitted statuses</option>{data.policy?.statuses.map((status) => <option key={status}>{status}</option>)}</FormSelect></label>
+        <div className="min-w-0"><SearchableOptionSelect id="portal-directory-account" name="portalAccountId" label="Client account" emptyLabel="Choose…" kind="portalAccount" options={[...new Map([...data.accounts.map((item) => ({ value: item.id, label: accountLabel(labels.get(item.id), item.id) })), ...(selectedId && exactAccount ? [{ value: selectedId, label: accountLabel(exactAccount, selectedId) }] : [])].map((option) => [option.value, option])).values()]} /></div>
+        <Track className="justify-self-start"><button className={pillPrimaryClass}>Search</button></Track>
       </form>
-      <p className="text-sm">{data.items.length} shown of {data.total} matters whose status the current policy allows, within your matter access. Search for any client account by email; the grant is checked again against the account, contact and policy when it is recorded.</p>
-      {!data.items.length ? <p>No authorized policy-status matches on this page.</p> : <ul className="divide-y">{data.items.map((matter) => <li key={matter.id} className="py-3"><Link className="underline" href={href({ matterId: matter.id })}>{matter.matterNumber}</Link> · {matter.status} · readable and policy-status eligible, not a completed grant</li>)}</ul>}
-      <nav aria-label="Portal Matter directory pages" className="flex gap-4">{data.page > 1 ? <Link href={href({ page: data.page - 1 })}>Previous</Link> : null}<span>Page {data.page}</span>{data.hasNext ? <Link href={href({ page: data.page + 1 })}>Next</Link> : null}</nav>
+      <div className="space-y-3">
+        <SectionHeader title="Eligible matters" count={data.total} />
+        {!data.items.length ? <EmptyState title="No policy-eligible matters on this page." /> : <RowList label="Policy-eligible matters">{data.items.map((matter) => <li key={matter.id} className={cn('flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3', params.matterId === matter.id && 'bg-muted/50')}>
+          <TitleLine as="p" status={matter.status} headingClassName="text-sm"><Link className="underline-offset-4 hover:underline" href={href({ matterId: matter.id })}>{matter.matterNumber}</Link></TitleLine>
+          <span className="text-xs text-muted-foreground">Eligible · not a grant</span>
+        </li>)}</RowList>}
+        <Pager label="Portal Matter directory pages" summary={`${data.items.length} shown of ${data.total} · page ${data.page}`} previous={data.page > 1 ? href({ page: data.page - 1 }) : null} next={data.hasNext ? href({ page: data.page + 1 }) : null} />
+      </div>
       {params.matterId && account && data.policy ? <>
-        <h3 className="font-semibold">Owned target readback</h3>
-        <p>{accountLabel(exactAccount ?? labels.get(account.id), account.id)} → {data.selection?.matterNumber} · {data.selection?.status} · {data.selection && data.policy.statuses.includes(data.selection.status) ? 'status allowed by the current policy' : 'readable but not currently grantable; revocation remains separate'}</p>
-        {data.grants.length ? <ul>{data.grants.map((grant) => <li key={grant.id} className="break-all py-2">Grant {grant.id}: {grant.status}, version {grant.version}, {grant.policyRevision ? `policy ${grant.policyRevision}` : 'legacy revision 0'}; documents {String(grant.canReadDocuments)}, uploads {String(grant.canUploadDocuments)}, invoices {String(grant.canReadInvoices)}, messages {String(grant.canReadMessages)}; expires {grant.expiresAt ?? 'not set'}.</li>)}</ul> : <p>No grant in current target scope.</p>}
-        {data.canManage ? <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title={<h3 className="text-sm font-semibold text-foreground">Selected target</h3>}>
+          <TitleLine as="p" status={data.selection?.status} headingClassName="text-sm">{data.selection?.matterNumber}</TitleLine>
+          <p className="mt-1 break-words text-sm text-muted-foreground">{accountLabel(exactAccount ?? labels.get(account.id), account.id)}</p>
+          <p className={cn('mt-1 text-xs', selectionGrantable ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-400')}>{selectionGrantable ? 'Status allowed by current policy' : 'Readable but not grantable; revocation is separate'}</p>
+        </Panel>
+        <div className="space-y-3">
+          <SectionHeader title="Grants" count={data.grants.length} />
+          {data.grants.length ? <RowList label="Grants">{data.grants.map((grant) => <li key={grant.id} className="min-w-0 space-y-3 px-4 py-3">
+            <TitleLine as="p" status={grant.status} headingClassName="text-sm tabular-nums">Version {grant.version} · {grant.policyRevision ? `policy ${grant.policyRevision}` : 'legacy rev. 0'}</TitleLine>
+            <MetaGrid className="grid-cols-2 sm:grid-cols-5 lg:grid-cols-5">
+              <Meta label="Documents">{yesNo(grant.canReadDocuments)}</Meta>
+              <Meta label="Uploads">{yesNo(grant.canUploadDocuments)}</Meta>
+              <Meta label="Invoices">{yesNo(grant.canReadInvoices)}</Meta>
+              <Meta label="Messages">{yesNo(grant.canReadMessages)}</Meta>
+              <Meta label="Expires">{grant.expiresAt ?? 'Not set'}</Meta>
+            </MetaGrid>
+            <p className="break-all font-mono text-xs text-muted-foreground">{grant.id}</p>
+          </li>)}</RowList> : <EmptyState title="No grant in current target scope." />}
+        </div>
+        {data.canManage ? <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           {data.selection && data.policy.statuses.includes(data.selection.status) ? <PortalGrantForm key={`grant-${latest?.id ?? 'new'}-${latest?.version ?? 0}`} accountLabel={accountLabel(exactAccount ?? labels.get(account.id), account.id)} matterLabel={data.selection?.matterNumber ?? params.matterId} operation="grant" intentKey={randomUUID()} policyRevision={data.policy.revision} expectedVersion={latest?.version ?? 0} portalAccountId={account.id} contactId={account.contactId} matterId={params.matterId} grantId={latest?.id ?? null} /> : null}
           {latest && ['active', 'expired'].includes(latest.status) ? <PortalGrantForm key={`revoke-${latest.id}-${latest.version}`} accountLabel={accountLabel(exactAccount ?? labels.get(account.id), account.id)} matterLabel={data.selection?.matterNumber ?? params.matterId} operation="revoke" intentKey={randomUUID()} policyRevision={data.policy.revision} expectedVersion={latest.version} portalAccountId={account.id} contactId={account.contactId} matterId={params.matterId} grantId={latest.id} /> : null}
-        </div> : <p>Current portal-management authority is required to execute.</p>}
-        <h3 className="font-semibold">Your durable intent history / recovery</h3>
-        <p className="text-sm">Your latest twelve completed access changes for this client and matter (the full record is in the audit log). If a request went unanswered, submit the same form again or reload this list; a change in your authority or the policy stops a repeat, and past records are kept.</p>
-        {data.history.length ? <ul>{data.history.map((item) => <li key={item.id} className="break-all py-2">{item.id}: {item.operation}, policy {item.policyRevision}, result version {item.resultVersion}, {item.completedAt}</li>)}</ul> : <p>No completed owned intent visible for this selection.</p>}
-      </> : <p>{selectedId && !account ? 'That client account is not active or its contact is not readable, so no grant can be recorded for it.' : 'Choose a matter and an active client account to review grants.'}</p>}
+        </div> : <Notice>Current portal-management authority is required to execute.</Notice>}
+        <div className="space-y-3">
+          <SectionHeader title="Your access changes" count={data.history.length} />
+          <Notice>Unanswered request: resubmit the same form or reload. Authority or policy changes stop a repeat. Last 12 shown; full record in the audit log.</Notice>
+          {data.history.length ? <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <table className="w-full min-w-[36rem] text-sm tabular-nums">
+              <thead className="border-b border-border bg-muted/40"><tr className="text-left text-xs text-muted-foreground"><th className="px-3 py-2 font-medium">Operation</th><th className="px-3 py-2 text-right font-medium">Policy</th><th className="px-3 py-2 text-right font-medium">Result ver.</th><th className="px-3 py-2 font-medium">Completed</th><th className="px-3 py-2 font-medium">Reference</th></tr></thead>
+              <tbody className="divide-y divide-border">{data.history.map((item) => <tr key={item.id}><td className="px-3 py-2 font-medium">{item.operation}</td><td className="px-3 py-2 text-right">{item.policyRevision}</td><td className="px-3 py-2 text-right">{item.resultVersion}</td><td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.completedAt}</td><td className="max-w-[14rem] truncate px-3 py-2 font-mono text-xs text-muted-foreground">{item.id}</td></tr>)}</tbody>
+            </table>
+          </div> : <EmptyState title="No completed changes for this selection." />}
+        </div>
+      </> : <Notice>{selectedId && !account ? 'That client account is not active or its contact is not readable; no grant can be recorded.' : 'Choose a matter and an active client account to review grants.'}</Notice>}
     </>}
   </section>
 }

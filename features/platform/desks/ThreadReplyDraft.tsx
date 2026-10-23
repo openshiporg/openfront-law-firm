@@ -3,23 +3,24 @@
 import { useActionState } from 'react'
 import Link from 'next/link'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+import { fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass } from '@/features/platform/components/ui'
 
 import { createDeskRecord, type DeskCreateState } from './actions/createDeskRecord'
 
 export function ThreadReplyDraft({ threadId, subject }: { threadId: string; subject: string }) {
   const [state, action, pending] = useActionState<DeskCreateState, FormData>(createDeskRecord, { ok: false, message: '' })
   return (
-    <form action={action} aria-labelledby="reply-draft-heading" className="grid gap-3 border-y border-border py-4">
-      <h2 id="reply-draft-heading" className="text-base font-bold text-foreground">Draft a reply</h2>
+    <form action={action} aria-labelledby="reply-draft-heading" className="grid min-w-0 gap-4 rounded-xl border border-border bg-card p-4 shadow-xs">
+      <h2 id="reply-draft-heading" className="text-sm font-semibold text-foreground">Reply draft</h2>
       <input type="hidden" name="kind" value="reply" />
       <input type="hidden" name="threadId" value={threadId} />
-      <div className="space-y-2"><Label htmlFor="reply-subject">Subject</Label><Input id="reply-subject" name="subject" required maxLength={300} defaultValue={subject.startsWith('Re:') ? subject : `Re: ${subject}`} className="min-h-11" /></div>
-      <div className="space-y-2"><Label htmlFor="reply-body">Message</Label><textarea id="reply-body" name="body" required maxLength={20000} rows={5} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50" /></div>
-      <Button type="submit" className="min-h-11 justify-self-start" disabled={pending}>{pending ? 'Saving…' : 'Save reply draft'}</Button>
-      {state.message ? <p role={state.ok ? 'status' : 'alert'} className={`text-sm ${state.ok ? 'text-foreground' : 'text-destructive'}`}>{state.message}{state.href ? <> <Link href={state.href} className="font-semibold underline">Open it</Link></> : null}</p> : null}
+      <label htmlFor="reply-subject" className={labelClass}>Subject<input id="reply-subject" name="subject" required maxLength={300} defaultValue={subject.startsWith('Re:') ? subject : `Re: ${subject}`} className={fieldClass} /></label>
+      <label htmlFor="reply-body" className={labelClass}>Message<textarea id="reply-body" name="body" required maxLength={20000} rows={5} className={textareaClass} /></label>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {state.message ? <p role={state.ok ? 'status' : 'alert'} className={cn('min-w-0 text-sm', state.ok ? 'text-foreground' : 'text-destructive')}>{state.message}{state.href ? <> <Link href={state.href} className="font-semibold underline underline-offset-4">Open</Link></> : null}</p> : <span />}
+        <div className={trackClass}><button type="submit" className={pillPrimaryClass} disabled={pending}>{pending ? 'Saving…' : 'Save draft'}</button></div>
+      </div>
     </form>
   )
 }
