@@ -2,7 +2,7 @@ import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 
 import { priceMinutes, resolveHourlyRate, type HourlyRateRule } from './ratePricing'
 
-export const RATE_RULE_LIMIT = 500
+export const RATE_RULE_LIMIT = 100
 
 const ruleFields = `
   id amountMinor currencyCode priority effectiveFrom effectiveTo

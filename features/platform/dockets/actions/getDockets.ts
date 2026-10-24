@@ -8,7 +8,7 @@ const docketFields = 'id docketNumber title status filedAt court { id name } mat
 
 export async function getCourts(): Promise<Result<CourtRow[]>> {
   const response = await keystoneClient<{ courts: CourtRow[] | null }>(`
-    query DocketCourts { courts(orderBy: [{ name: asc }, { id: asc }], take: 200) { id name courtType jurisdiction division status phone website filingUrl docketsCount } }
+    query DocketCourts { courts(orderBy: [{ name: asc }, { id: asc }], take: 100) { id name courtType jurisdiction division status phone website filingUrl docketsCount } }
   `)
   if (!response.success || !Array.isArray(response.data.courts)) return { success: false, error: 'Courts are unavailable to your role.' }
   return { success: true, data: response.data.courts }
@@ -42,7 +42,7 @@ export async function getDocketDetail(docketId: string): Promise<Result<{ docket
     query DocketDetail($id: ID!) {
       docket(where: { id: $id }) {
         ${docketFields} notes closedAt
-        entries(orderBy: [{ occurredAt: desc }, { id: asc }], take: 200) {
+        entries(orderBy: [{ occurredAt: desc }, { id: asc }], take: 100) {
           id title entryType status occurredAt filedAt enteredAt description sourceUrl isVerified verifiedAt verifiedBy { name }
           documentVersion { id fileName versionNumber }
         }

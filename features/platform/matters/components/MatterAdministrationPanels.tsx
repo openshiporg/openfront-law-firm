@@ -11,6 +11,7 @@ import { FormSelect } from '@/components/ui/form-select'
 
 import { changeConfidentiality, createEthicalWall, saveMatterTeamMember, setMatterWallMember, transitionMatterWall } from '../actions/matterAdministration'
 import { TEAM_ROLES, type EthicalWallEntry, type MatterTeamEntry } from '../lib/administrationTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const roleLabel = (role: string) => TEAM_ROLES.find(([value]) => value === role)?.[1] ?? statusLabel(role)
 const capabilities = (member: MatterTeamEntry) => [member.canEdit && 'Edit', member.canBill && 'Bill', member.canAccessRestricted && 'Restricted'].filter(Boolean).join(' · ') || 'Read only'
@@ -25,9 +26,10 @@ function RoleSelect({ id, defaultValue }: { id: string; defaultValue: string }) 
 
 function TeamForm({ matterId, member, onDone }: { matterId: string; member?: MatterTeamEntry; onDone: () => void }) {
   const [state, action, pending] = useCommand(saveMatterTeamMember, onDone)
+  const actionForm = useKeptForm(action, state)
   const key = member?.id ?? 'new'
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="matterId" value={matterId} />
       {member?.user ? <input type="hidden" name="userId" value={member.user.id} /> : <div className="sm:col-span-2"><SearchableOptionSelect id={`team-user-${key}`} name="userId" label="Member" emptyLabel="Choose a member" required kind="member" options={[]} /></div>}
       <RoleSelect id={`team-role-${key}`} defaultValue={member?.teamRole ?? 'attorney'} />
@@ -45,9 +47,10 @@ function TeamForm({ matterId, member, onDone }: { matterId: string; member?: Mat
 
 function RemoveMemberForm({ matterId, member, onDone }: { matterId: string; member: MatterTeamEntry; onDone: () => void }) {
   const [state, action, pending] = useCommand(saveMatterTeamMember, onDone)
+  const actionForm = useKeptForm(action, state)
   if (!member.user) return null
   return (
-    <form action={action} className="grid gap-3 border-t border-border pt-4">
+    <form {...actionForm} className="grid gap-3 border-t border-border pt-4">
       <input type="hidden" name="matterId" value={matterId} />
       <input type="hidden" name="userId" value={member.user.id} />
       <input type="hidden" name="teamRole" value={member.teamRole} />
@@ -93,8 +96,9 @@ export function MatterTeamPanel({ matterId, team }: { matterId: string; team: Ma
 
 function CreateWallForm({ matterId, onDone }: { matterId: string; onDone: () => void }) {
   const [state, action, pending] = useCommand(createEthicalWall, onDone)
+  const actionForm = useKeptForm(action, state)
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="matterId" value={matterId} />
       <TextField id="wall-name" name="name" label="Name" required minLength={2} maxLength={200} />
       <TextField id="wall-policy" name="policyReference" label="Policy reference" maxLength={200} />
@@ -106,9 +110,10 @@ function CreateWallForm({ matterId, onDone }: { matterId: string; onDone: () => 
 
 function WallTransitionForm({ matterId, wall }: { matterId: string; wall: EthicalWallEntry }) {
   const [state, action, pending] = useCommand(transitionMatterWall)
+  const actionForm = useKeptForm(action, state)
   const toStatus = wall.status === 'draft' ? 'active' : 'lifted'
   return (
-    <form action={action} className="grid gap-3">
+    <form {...actionForm} className="grid gap-3">
       <input type="hidden" name="matterId" value={matterId} />
       <input type="hidden" name="wallId" value={wall.id} />
       <input type="hidden" name="toStatus" value={toStatus} />
@@ -120,8 +125,9 @@ function WallTransitionForm({ matterId, wall }: { matterId: string; wall: Ethica
 
 function WallMemberForm({ matterId, wallId }: { matterId: string; wallId: string }) {
   const [state, action, pending] = useCommand(setMatterWallMember)
+  const actionForm = useKeptForm(action, state)
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="matterId" value={matterId} />
       <input type="hidden" name="wallId" value={wallId} />
       <div className="sm:col-span-2"><SearchableOptionSelect id={`wall-user-${wallId}`} name="userId" label="Member" emptyLabel="Choose a member" required kind="member" options={[]} /></div>
@@ -134,9 +140,10 @@ function WallMemberForm({ matterId, wallId }: { matterId: string; wallId: string
 
 function RevokeWallMemberForm({ matterId, wallId, member }: { matterId: string; wallId: string; member: EthicalWallEntry['members'][number] }) {
   const [state, action, pending] = useCommand(setMatterWallMember)
+  const actionForm = useKeptForm(action, state)
   if (!member.user) return null
   return (
-    <form action={action} className="grid gap-3 pt-3">
+    <form {...actionForm} className="grid gap-3 pt-3">
       <input type="hidden" name="matterId" value={matterId} />
       <input type="hidden" name="wallId" value={wallId} />
       <input type="hidden" name="userId" value={member.user.id} />
@@ -204,10 +211,11 @@ export function EthicalWallsPanel({ matterId, walls }: { matterId: string; walls
 
 export function ConfidentialityPanel({ matterId, confidentiality }: { matterId: string; confidentiality: string }) {
   const [state, action, pending] = useCommand(changeConfidentiality)
+  const actionForm = useKeptForm(action, state)
   const target = confidentiality === 'restricted' ? 'standard' : 'restricted'
   return (
     <Panel id="confidentiality" title={<div className="flex min-w-0 items-center gap-2"><StatusDot tone={confidentiality === 'restricted' ? 'amber' : 'emerald'} /><h2 className="text-sm font-semibold text-foreground">Confidentiality</h2><span className="text-xs text-muted-foreground">{statusLabel(confidentiality)}</span></div>}>
-      <form action={action} className="grid gap-4">
+      <form {...actionForm} className="grid gap-4">
         <input type="hidden" name="matterId" value={matterId} />
         <ChoiceTrack key={confidentiality} name="confidentiality" label="Level" defaultValue={target} options={[['standard', 'Standard'], ['restricted', 'Restricted']]} />
         <ReasonField id="confidentiality-reason" minLength={10} />

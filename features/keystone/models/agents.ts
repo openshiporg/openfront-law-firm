@@ -10,7 +10,7 @@ import {
 } from "@keystone-6/core/fields";
 
 import { permissions, rules } from "../access";
-import { denyAll, firmOwnedHooks } from "../tenancy";
+import { changedFields, denyAll, firmOwnedHooks } from "../tenancy";
 import {
   firmRelationship,
   immutableUpdateDeleteGraphql,
@@ -72,7 +72,7 @@ const grantAuthorityFields = new Set([
 function grantRequiresApproval(args: any, resolvedData: Record<string, unknown>) {
   return (
     (resolvedData.status === "active" && args.item?.status !== "active") ||
-    (args.item?.status === "active" && Object.keys(resolvedData).some((field) => grantAuthorityFields.has(field)))
+    (args.item?.status === "active" && changedFields(resolvedData).some((field) => grantAuthorityFields.has(field)))
   );
 }
 

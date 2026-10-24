@@ -55,7 +55,7 @@ const portalPiiAccess = {
 const basePortalShareHooks = firmOwnedHooks({ lifecycle: "portalShare", controlledStatus: true });
 
 function portalShareRelationId(args: any, field: string) {
-  if (Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, field)) {
+  if (args.resolvedData?.[field] !== undefined) {
     return relationshipConnectionIds(args.resolvedData[field])[0] ?? null;
   }
   return args.item?.[`${field}Id`] ?? null;
@@ -69,10 +69,10 @@ export async function validatePortalShare(args: any) {
   }
   if (args.item?.id) {
     const relations = ["matter", "portalAccount", "matterAccess", "contact", "grantedBy", "document", "documentVersion", "invoice", "communicationThread"];
-    const relationChanged = relations.some((name) => Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, name) &&
+    const relationChanged = relations.some((name) => args.resolvedData?.[name] !== undefined &&
       portalShareRelationId(args, name) !== (args.item[`${name}Id`] ?? null));
     const scalarChanged = ["resourceType", "grantVersion", "policyRevision", "grantedAt", "expiresAt"].some((name) => {
-      if (!Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, name)) return false;
+      if (!args.resolvedData?.[name] !== undefined) return false;
       const original = args.item[name]; const proposed = args.resolvedData[name];
       if (["grantedAt", "expiresAt"].includes(name)) {
         return (original ? new Date(original).getTime() : null) !== (proposed ? new Date(proposed).getTime() : null);
@@ -112,7 +112,7 @@ export async function validatePortalShare(args: any) {
     const field = fields[type.data];
     const resourceId = portalShareRelationId(args, field);
     const resource = await prisma[field].findFirst({ where: { id: resourceId, firmId }, select: portalShareHeaderSelect[field].select });
-    const effective = (name: string) => Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, name) ? args.resolvedData[name] : args.item?.[name];
+    const effective = (name: string) => args.resolvedData?.[name] !== undefined ? args.resolvedData[name] : args.item?.[name];
     const value = {
       id: args.item?.id ?? "new-share", firmId, matterId, portalAccountId, matterAccessId,
       status: effective("status") ?? "active",

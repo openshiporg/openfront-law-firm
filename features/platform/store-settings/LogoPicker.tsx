@@ -42,7 +42,7 @@ export function LogoPicker({ initialIcon, initialColor, onChange }: { initialIco
       <span data-store-logo="preview" className="block size-12 shrink-0 rounded-lg border border-border bg-background p-1.5 [&>svg]:size-full" role="img" aria-label="Current logo preview" style={hueFilter} dangerouslySetInnerHTML={{ __html: icon }} />
       <div className="min-w-0 text-sm">
         <p className="truncate font-medium text-foreground">{editing || !selected ? 'Custom SVG' : selected.name}</p>
-        <p className="text-xs text-muted-foreground">Hue {normalizeStoreLogoColor(hue)}°</p>
+        <p className="text-xs text-muted-foreground">{HUE_PRESETS.find(preset => String(preset.value) === normalizeStoreLogoColor(hue))?.name ?? 'Custom colour'}</p>
       </div>
     </div>
 

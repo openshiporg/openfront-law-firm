@@ -15,6 +15,7 @@ import {
   type PaymentActionState,
   type PaymentSetup,
 } from '../actions/payments'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: PaymentActionState = { ok: false, message: '' }
 
@@ -50,7 +51,8 @@ function useKeyedAction(action: (previous: PaymentActionState, formData: FormDat
     }
     return result
   }, initial)
-  return { state, run, pending, formKey, retrying: Boolean(key), reset: () => setKey(null) }
+  const form = useKeptForm(run, state)
+  return { state, run, form, pending, formKey, retrying: Boolean(key), reset: () => setKey(null) }
 }
 
 export function BillingPaymentForm({ setup }: { setup: PaymentSetup }) {
@@ -66,7 +68,7 @@ export function BillingPaymentForm({ setup }: { setup: PaymentSetup }) {
   return (
     <Panel id="record-payment" title="Record payment" bodyClassName="p-0">
       <div className="grid min-w-0 lg:grid-cols-2 lg:divide-x lg:divide-border">
-        <form key={record.formKey} action={record.run} className="min-w-0">
+        <form key={record.formKey} {...record.form} className="min-w-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
             <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Client payment</legend>
             <div className={cn(labelClass, 'sm:col-span-2')}>
@@ -110,7 +112,7 @@ export function BillingPaymentForm({ setup }: { setup: PaymentSetup }) {
           </footer>
         </form>
 
-        <form key={apply.formKey} action={apply.run} className="min-w-0 border-t border-border lg:border-t-0">
+        <form key={apply.formKey} {...apply.form} className="min-w-0 border-t border-border lg:border-t-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
             <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Apply unallocated payment</legend>
             <div className={cn(labelClass, 'sm:col-span-2')}>

@@ -17,6 +17,7 @@ import {
   type ContactMethodRow,
 } from '../lib/contactTypes'
 import { ActionResult, useRefreshOnSuccess } from './ContactForms'
+import { useKeptForm } from '../../components/useKeptForm'
 
 function Check({ name, label, defaultChecked }: { name: string; label: string; defaultChecked: boolean }) {
   return <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" name={name} defaultChecked={defaultChecked} className="size-4 accent-foreground" />{label}</label>
@@ -24,9 +25,10 @@ function Check({ name, label, defaultChecked }: { name: string; label: string; d
 
 function AddressForm({ contactId, address, onDone }: { contactId: string; address?: ContactAddressRow; onDone: () => void }) {
   const [state, action, pending] = useActionState(saveAddress, initialContactActionState)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state, onDone)
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="contactId" value={contactId} />
       <input type="hidden" name="addressId" value={address?.id ?? ''} />
       <label className={labelClass}>Type
@@ -52,7 +54,9 @@ function AddressForm({ contactId, address, onDone }: { contactId: string; addres
 
 function AddressActions({ contactId, address }: { contactId: string; address: ContactAddressRow }) {
   const [primaryState, primaryAction, primaryPending] = useActionState(setPrimaryAddress, initialContactActionState)
+  const primaryActionForm = useKeptForm(primaryAction, primaryState)
   const [removeState, removeAction, removePending] = useActionState(removeAddress, initialContactActionState)
+  const removeActionForm = useKeptForm(removeAction, removeState)
   useRefreshOnSuccess(primaryState)
   useRefreshOnSuccess(removeState)
   const failure = [primaryState, removeState].find((state) => state.message && !state.ok)
@@ -61,9 +65,9 @@ function AddressActions({ contactId, address }: { contactId: string; address: Co
       {failure ? <ActionResult state={failure} /> : <span />}
       <Track>
         {!address.isPrimary ? (
-          <form action={primaryAction}><input type="hidden" name="contactId" value={contactId} /><input type="hidden" name="addressId" value={address.id} /><button type="submit" disabled={primaryPending} className={pillClass}>Make primary</button></form>
+          <form {...primaryActionForm}><input type="hidden" name="contactId" value={contactId} /><input type="hidden" name="addressId" value={address.id} /><button type="submit" disabled={primaryPending} className={pillClass}>Make primary</button></form>
         ) : null}
-        <form action={removeAction}><input type="hidden" name="contactId" value={contactId} /><input type="hidden" name="addressId" value={address.id} /><button type="submit" disabled={removePending} className={pillDangerClass}>{removePending ? 'Removing…' : 'Remove'}</button></form>
+        <form {...removeActionForm}><input type="hidden" name="contactId" value={contactId} /><input type="hidden" name="addressId" value={address.id} /><button type="submit" disabled={removePending} className={pillDangerClass}>{removePending ? 'Removing…' : 'Remove'}</button></form>
       </Track>
     </div>
   )
@@ -111,9 +115,10 @@ export function AddressManager({ contactId, addresses }: { contactId: string; ad
 
 function MethodForm({ contactId, onDone }: { contactId: string; onDone: () => void }) {
   const [state, action, pending] = useActionState(addContactMethod, initialContactActionState)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state, onDone)
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="contactId" value={contactId} />
       <label className={labelClass}>Type
         <select name="methodType" defaultValue="email" className={fieldClass}>
@@ -136,6 +141,7 @@ function MethodForm({ contactId, onDone }: { contactId: string; onDone: () => vo
 
 function MethodRow({ contactId, method }: { contactId: string; method: ContactMethodRow }) {
   const [state, action, pending] = useActionState(changeContactMethod, initialContactActionState)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state)
   return (
     <li className="grid min-w-0 gap-2 px-4 py-3">
@@ -147,7 +153,7 @@ function MethodRow({ contactId, method }: { contactId: string; method: ContactMe
         </span>
         <span className="mt-0.5 block truncate pl-4 text-xs text-muted-foreground">{[METHOD_TYPE_LABELS[method.methodType], method.label, method.verifiedAt ? 'Verified' : null].filter(Boolean).join(' · ')}</span>
       </div>
-      <form action={action} className="flex flex-wrap items-center justify-between gap-2 pl-4">
+      <form {...actionForm} className="flex flex-wrap items-center justify-between gap-2 pl-4">
         <input type="hidden" name="contactId" value={contactId} />
         <input type="hidden" name="methodId" value={method.id} />
         {state.message && !state.ok ? <ActionResult state={state} /> : <span />}

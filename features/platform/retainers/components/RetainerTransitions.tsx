@@ -9,6 +9,7 @@ import { Notice, Panel, Track, fieldClass, labelClass, pillClass, pillDangerClas
 
 import { transitionRetainer, type RetainerActionState } from '../actions/retainers'
 import { RETAINER_TRANSITIONS, TRANSITION_LABELS } from '../lib/retainerOptions'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: RetainerActionState = { ok: false, message: '' }
 
@@ -27,6 +28,7 @@ export function RetainerTransitions({ retainerId, status, documentVersions, need
     if (result.ok) { setTarget(null); router.refresh() }
     return result
   }, initial)
+  const runForm = useKeptForm(run, state)
 
   if (!targets.length) return null
 
@@ -48,7 +50,7 @@ export function RetainerTransitions({ retainerId, status, documentVersions, need
         </Track>
 
         {target ? (
-          <form action={run} className="grid min-w-0 gap-4">
+          <form {...runForm} className="grid min-w-0 gap-4">
             <input type="hidden" name="retainerId" value={retainerId} />
             <input type="hidden" name="toStatus" value={target} />
             {target === 'accepted' ? (

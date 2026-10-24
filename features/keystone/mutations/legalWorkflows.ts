@@ -14,6 +14,8 @@ import {
 } from "./workflow-helpers";
 import { blockingConflictCheckStatuses } from "../lib/conflict-status";
 import { advanceIntakeAfterConflictClearance } from "./intakeWorkflows";
+import { accessibleMatterStorageWhere } from "../lib/matter-access";
+import { permissions } from "../access";
 
 const conflictTermTypes = new Set(["person", "organization", "alias", "matter", "other"]);
 const conflictMatchTypes = new Set(["exact_name", "alias", "fuzzy_name", "related_party", "matter_text", "manual"]);
@@ -47,6 +49,110 @@ async function assertConflictEvidenceSources(tx: any, firmId: string, userId: st
       await assertCurrentCommandActor(tx, context, "canReadPeople");
     }
   }
+}
+
+const CANDIDATES_PER_TERM = 25;
+
+const canReadPeople = (context: Context) => permissions.canReadPeople({ session: context.session as never });
+
+function normalizedName(value: string) {
+  return value.toLocaleLowerCase("en-US").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+/**
+ * Searches the firm's own records for each term on the check: contacts (by name), the
+ * matter parties those contacts appear as, and matter titles. Only matters the reviewer
+ * can access (ethical walls, restricted matters) are searched; contacts need people
+ * access. The check's own client, intake participants and matter parties are not candidates,
+ * and sources already linked to the check are skipped. Returns the number of candidates added.
+ */
+async function searchConflictCandidates(tx: any, firmId: string, userId: string, check: any, canReadPeople: boolean, onlyTermIds?: string[]) {
+  const terms = await tx.conflictSearchTerm.findMany({
+    where: { firmId, checkId: check.id, ...(onlyTermIds ? { id: { in: onlyTermIds } } : {}) },
+    select: { id: true, term: true, normalizedTerm: true, termType: true },
+    take: 100,
+  });
+  if (!terms.length) return 0;
+  const [existing, intake, ownMatter] = await Promise.all([
+    tx.conflictMatch.findMany({ where: { firmId, checkId: check.id }, select: { sourceType: true, sourceId: true }, take: 1000 }),
+    check.intakeId
+      ? tx.intake.findFirst({ where: { id: check.intakeId, firmId }, select: { primaryContactId: true, participants: { select: { contactId: true }, take: 200 } } })
+      : null,
+    check.matterId
+      ? tx.matter.findFirst({ where: { id: check.matterId, firmId }, select: { clientId: true, parties: { select: { contactId: true }, take: 200 } } })
+      : null,
+  ]);
+  const seen = new Set(existing.map((match: any) => `${match.sourceType}:${match.sourceId}`));
+  const ownContacts = new Set<string>([
+    intake?.primaryContactId, ...(intake?.participants ?? []).map((row: any) => row.contactId),
+    ownMatter?.clientId, ...(ownMatter?.parties ?? []).map((row: any) => row.contactId),
+  ].filter(Boolean));
+  const accessibleMatter = accessibleMatterStorageWhere(firmId, userId);
+  const nameFields = ["firstName", "middleName", "lastName", "organizationName", "preferredName"];
+  let added = 0;
+  const add = async (data: Record<string, unknown>) => {
+    const key = `${data.sourceType}:${data.sourceId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    await tx.conflictMatch.create({ data: { firmId, matterId: check.matterId, checkId: check.id, status: "potential", evidenceExcerpt: "", ...data } });
+    added++;
+  };
+  for (const term of terms) {
+    const tokens = normalizedName(term.term).split(" ").filter((token: string) => token.length > 1).slice(0, 6);
+    if (!tokens.length) continue;
+    const wanted = tokens.join(" ");
+    if (canReadPeople) {
+      const contacts = await tx.contact.findMany({
+        where: {
+          firmId,
+          status: { not: "archived" },
+          ...(ownContacts.size ? { id: { notIn: [...ownContacts] } } : {}),
+          AND: tokens.map((token: string) => ({ OR: nameFields.map((field) => ({ [field]: { contains: token, mode: "insensitive" } })) })),
+        },
+        select: { id: true, firstName: true, middleName: true, lastName: true, organizationName: true, preferredName: true },
+        orderBy: { id: "asc" },
+        take: CANDIDATES_PER_TERM,
+      });
+      for (const contact of contacts) {
+        const names = [
+          [contact.firstName, contact.lastName].join(" "),
+          [contact.firstName, contact.middleName, contact.lastName].join(" "),
+          contact.organizationName, contact.preferredName,
+        ].map(normalizedName);
+        await add({
+          matchType: names.includes(wanted) ? "exact_name" : "fuzzy_name",
+          matchedContactId: contact.id, sourceType: "contact", sourceId: contact.id, matchedValue: term.term,
+          score: names.includes(wanted) ? 100 : 70,
+        });
+      }
+      const contactIds = contacts.map((contact: any) => contact.id);
+      if (contactIds.length) {
+        const parties = await tx.matterParty.findMany({
+          where: { firmId, contactId: { in: contactIds }, OR: [{ status: null }, { status: "active" }], matter: accessibleMatter, ...(check.matterId ? { matterId: { not: check.matterId } } : {}) },
+          select: { id: true },
+          orderBy: { id: "asc" },
+          take: CANDIDATES_PER_TERM,
+        });
+        for (const party of parties) {
+          await add({ matchType: "related_party", matchedMatterPartyId: party.id, sourceType: "matter_party", sourceId: party.id, matchedValue: term.term, score: 80 });
+        }
+      }
+    }
+    const matters = await tx.matter.findMany({
+      where: {
+        ...accessibleMatter,
+        ...(check.matterId ? { id: { not: check.matterId } } : {}),
+        AND: tokens.map((token: string) => ({ title: { contains: token, mode: "insensitive" } })),
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: CANDIDATES_PER_TERM,
+    });
+    for (const matter of matters) {
+      await add({ matchType: "matter_text", matchedMatterId: matter.id, sourceType: "matter", sourceId: matter.id, matchedValue: term.term, score: 60 });
+    }
+  }
+  return added;
 }
 
 export async function requestConflictCheck(
@@ -145,13 +251,15 @@ export async function addConflictSearchTerm(
     if (args.sourceContactId && !await tx.contact.findFirst({ where: { id: args.sourceContactId, firmId }, select: { id: true } })) {
       throw new Error("Conflict source contact was not found in the active firm.");
     }
-    return tx.conflictSearchTerm.create({
+    const created = await tx.conflictSearchTerm.create({
       data: {
         firmId, matterId: check.matterId, checkId: check.id, term, normalizedTerm,
         termType: args.termType, sourceContactId: args.sourceContactId ?? null,
         includeAliases: args.includeAliases !== false,
       },
     });
+    await searchConflictCandidates(tx, firmId, userId, check, canReadPeople(context), [created.id]);
+    return created;
   });
 }
 
@@ -250,11 +358,12 @@ export async function transitionConflictCheck(
       }
     }
     const now = new Date();
+    if (args.toStatus === "running") await searchConflictCandidates(tx, firmId, userId, check, canReadPeople(context));
     const updated = await tx.conflictCheck.update({
       where: { id: check.id },
       data: {
         status: args.toStatus,
-        ...(args.toStatus === "running" ? { startedAt: now } : {}),
+        ...(args.toStatus === "running" ? { startedAt: now, searchVersion: "firm-records-v1" } : {}),
         ...(args.toStatus === "review_required" ? { summary } : {}),
         ...(args.toStatus === "failed" ? { failureReason: summary, completedAt: now } : {}),
         ...(args.toStatus === "cancelled" ? { completedAt: now } : {}),

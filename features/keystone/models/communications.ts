@@ -9,7 +9,7 @@ import {
 } from "@keystone-6/core/fields";
 
 import { permissions, rules } from "../access";
-import { denyAll, firmOwnedHooks } from "../tenancy";
+import { changedFields, denyAll, firmOwnedHooks } from "../tenancy";
 import { firmRelationship, readOnlyRelationship, requiredRelationship } from "./fields";
 import { trackingFields } from "./trackingFields";
 
@@ -121,7 +121,7 @@ const communicationMessageHooks = {
     create: baseCommunicationMessageHooks.validate.create,
     update: async (args: any) => {
       await baseCommunicationMessageHooks.validate.update(args);
-      if (args.item.status !== "draft" && Object.keys(args.resolvedData).length) {
+      if (args.item.status !== "draft" && changedFields(args.resolvedData).length) {
         args.addValidationError("A queued communication envelope is immutable.");
       }
     },

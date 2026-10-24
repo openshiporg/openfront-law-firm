@@ -6,6 +6,45 @@ import { activeFirmId, permissions, type PermissionKey } from "../access";
 import { communicationDispatchState, webhookDispatchState } from "../../shared/dispatch-outcome";
 import { practiceOverview, type PracticeOverviewQueueItem } from "./practiceOverview";
 
+const trustAccountTypeLabels: Record<string, string> = {
+  trust: "Trust",
+  pooled_trust: "IOLTA / pooled trust",
+  dedicated_client: "Dedicated client trust",
+  other: "Other safeguarded funds",
+};
+
+const eventVerbs: Record<string, string> = { create: "created", update: "updated", delete: "deleted" };
+
+/** "timeEntry.approved" → "Time entry approved", "record.create" → "Record created". */
+function readableEvent(key: unknown) {
+  const words = String(key ?? "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[._\s]+/)
+    .filter(Boolean)
+    .map((word) => eventVerbs[word.toLowerCase()] ?? word.toLowerCase());
+  const text = words.join(" ");
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "Activity";
+}
+
+function grantAccessLabel(record: any) {
+  const sees = [
+    record.canReadDocuments ? "documents" : null,
+    record.canReadInvoices ? "invoices" : null,
+    record.canReadMessages ? "messages" : null,
+  ].filter(Boolean);
+  const upload = record.canUploadDocuments ? "can upload" : null;
+  return [sees.length ? `Sees ${sees.join(", ")}` : "Sees nothing yet", upload].filter(Boolean).join(" · ");
+}
+
+function ledgerMoney(amountMinor: unknown, currencyCode: string) {
+  try {
+    const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode || "USD" });
+    return formatter.format(Number(amountMinor ?? 0) / 10 ** (formatter.resolvedOptions().maximumFractionDigits ?? 2));
+  } catch {
+    return `${Number(amountMinor ?? 0)} ${currencyCode}`;
+  }
+}
+
 const CATEGORIES = new Set([
   "intake", "matters", "contacts", "work", "documents", "communications",
   "time-expenses", "billing", "accounting", "portal", "governance", "reports",
@@ -174,8 +213,8 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
     {
       key: "payments", title: "Payments and refunds", description: "Receipts and provider state that still require capture, settlement, allocation, or review.",
       model: "Payment", permissions: ["canReadPayments", "canManagePayments", "canReadBilling"], where: { status: { in: ["pending", "authorized", "captured"] } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      query: "id paymentNumber status createdAt", kind: "Payment",
-      map: (record) => ({ id: record.id, title: record.paymentNumber, subtitle: "Payment awaiting capture, settlement or allocation", status: record.status, at: iso(record.createdAt) }),
+      query: "id paymentNumber status createdAt amountMinor currencyCode payer { displayName }", kind: "Payment",
+      map: (record) => ({ id: record.id, title: record.paymentNumber, subtitle: `${ledgerMoney(record.amountMinor, record.currencyCode)} · ${record.payer?.displayName ?? "Payer unavailable"}`, status: record.status, at: iso(record.createdAt) }),
     },
   ],
   accounting: [
@@ -183,13 +222,13 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       key: "accounts", title: "Trust account control", description: "Trust accounts and operating state; balances are derived from append-only entries.",
       model: "TrustAccount", permissions: ["canReadTrust", "canManageTrust"], orderBy: { updatedAt: "desc" },
       query: "id name accountType status currencyCode bankAccountLastFour updatedAt ledgerAccountsCount reconciliationsCount", kind: "Trust account",
-      map: (record) => ({ id: record.id, title: record.name, subtitle: `${record.accountType} · ${record.currencyCode} · ••••${record.bankAccountLastFour || "----"}`, status: record.status, at: iso(record.updatedAt) }),
+      map: (record) => ({ id: record.id, title: record.name, subtitle: `${trustAccountTypeLabels[record.accountType] ?? "Trust"} · ${record.currencyCode} · ••••${record.bankAccountLastFour || "----"}`, status: record.status, at: iso(record.updatedAt) }),
     },
     {
       key: "ledgers", title: "Client and matter ledgers", description: "Active subledgers available for exact client-liability postings.",
       model: "TrustLedgerAccount", permissions: ["canReadTrust", "canManageTrust"], where: { status: { in: ["active", "frozen"] } }, orderBy: { updatedAt: "desc" },
-      query: "id ledgerNumber status currencyCode updatedAt trustAccount { id name } client { displayName } matter { matterNumber }", kind: "Client ledger",
-      map: (record) => ({ id: record.id, title: `${record.ledgerNumber} · ${record.client?.displayName ?? "Client"}`, subtitle: `${record.trustAccount?.name ?? "Trust account"} · ${record.currencyCode} · ${record.matter?.matterNumber ?? "client-level"}`, status: record.status, at: iso(record.updatedAt) }),
+      query: "id ledgerNumber status currencyCode balanceMinor updatedAt trustAccount { id name } client { displayName } matter { matterNumber }", kind: "Client ledger",
+      map: (record) => ({ id: record.id, title: `${record.ledgerNumber} · ${record.client?.displayName ?? "Client"}`, subtitle: `Balance ${ledgerMoney(record.balanceMinor, record.currencyCode)} · ${record.trustAccount?.name ?? "Trust account"} · ${record.matter?.matterNumber ?? "Client-level"}`, status: record.status, at: iso(record.updatedAt) }),
     },
     {
       key: "reconciliation", title: "Reconciliation queue", description: "Open periods and differences requiring independent review.",
@@ -209,13 +248,13 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       key: "grants", title: "Matter grants", description: "Exact matter capabilities available to active portal accounts.",
       model: "PortalMatterAccess", permissions: ["canReadPortal", "canManagePortal"], where: { status: { equals: "active" } }, orderBy: { updatedAt: "desc" },
       query: "id status expiresAt updatedAt portalAccount { email contact { displayName } } matter { matterNumber title } canReadDocuments canUploadDocuments canReadInvoices canReadMessages", kind: "Matter grant",
-      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} · exact capabilities`, status: record.status, at: iso(record.expiresAt ?? record.updatedAt) }),
+      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} · ${grantAccessLabel(record)}`, status: record.status, at: iso(record.expiresAt ?? record.updatedAt) }),
     },
     {
       key: "shares", title: "Active resource shares", description: "Exact documents, invoices, versions, and conversations currently shared with clients.",
       model: "PortalShare", permissions: ["canReadPortal", "canManagePortal"], where: { status: { equals: "active" } }, orderBy: { grantedAt: "desc" },
-      query: "id status resourceType grantedAt expiresAt portalAccount { email contact { displayName } } matter { matterNumber title }", kind: "Portal share",
-      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} · ${record.resourceType.replaceAll("_", " ")}`, status: record.status, at: iso(record.expiresAt ?? record.grantedAt) }),
+      query: "id status resourceType grantedAt expiresAt createdAt portalAccount { email contact { displayName } } matter { matterNumber title }", kind: "Portal share",
+      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} · ${({ document: "Document", invoice: "Invoice", communication_thread: "Conversation" } as Record<string, string>)[record.resourceType] ?? "Shared item"}`, status: record.status, at: iso(record.expiresAt ?? record.grantedAt ?? record.createdAt) }),
     },
     {
       key: "eligible-contacts", title: "Eligible contacts", description: "Current contacts available for a portal invitation.",
@@ -279,7 +318,7 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       key: "exports", title: "Export evidence", description: "Recent audited transfer and integration events available to bounded export tooling.",
       model: "AuditEvent", permissions: ["canViewAudit"], where: { category: { in: ["integration", "legal_workflow", "financial"] } }, orderBy: { occurredAt: "desc" },
       query: "id eventType category outcome occurredAt matter { matterNumber } actorUser { name }", kind: "Audit evidence",
-      map: (record) => ({ id: record.id, title: record.eventType, subtitle: `${record.category} · ${record.matter?.matterNumber ?? "Firm-level"} · ${record.actorUser?.name ?? "system"}`, status: record.outcome, at: iso(record.occurredAt) }),
+      map: (record) => ({ id: record.id, title: readableEvent(record.eventType), subtitle: `${readableEvent(record.category)} · ${record.matter?.matterNumber ?? "Firm-level"} · ${record.actorUser?.name ?? "System"}`, status: record.outcome, at: iso(record.occurredAt) }),
     },
   ],
   integrations: [

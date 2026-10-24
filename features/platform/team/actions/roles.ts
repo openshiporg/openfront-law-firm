@@ -129,7 +129,7 @@ export async function createRole(previous: RoleActionState, formData: FormData):
     if (!name) throw new InputError('Name is required.')
     if (name.length > 80) throw new InputError('Name must be 80 characters or fewer.')
     const granted = new Set(grantedFrom(formData))
-    const existing = await keystoneClient<{ roles: Array<{ name: string }> }>(`query RoleNames { roles(take: 500) { name } }`)
+    const existing = await keystoneClient<{ roles: Array<{ name: string }> }>(`query RoleNames { roles(take: 100) { name } }`)
     if (!existing.success) throw new InputError('Roles could not be loaded. Role management access is required.')
     if (existing.data.roles.some((role) => role.name.trim().toLowerCase() === name.toLowerCase())) throw new InputError(`A role named ${name} already exists.`)
     const data = { name, status: 'active', ...Object.fromEntries(ROLE_PERMISSION_KEYS.map((key) => [key, granted.has(key)])) }

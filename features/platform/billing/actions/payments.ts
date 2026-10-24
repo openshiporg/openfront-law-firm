@@ -72,7 +72,7 @@ export async function getPaymentSetup(): Promise<{ success: true; data: PaymentS
       }
       payments(where: { status: { in: [captured, settled] }, paymentType: { equals: operating } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 100) {
         id paymentNumber amountMinor refundedMinor currencyCode payer { displayName }
-        allocations(take: 200) { amountMinor allocationType }
+        allocations(take: 100) { amountMinor allocationType }
       }
     }
   `)
@@ -192,7 +192,7 @@ export async function allocateExistingPayment(_previous: PaymentActionState, for
         query AllocationPayment($id: ID!) {
           payment(where: { id: $id }) {
             id paymentNumber status paymentType amountMinor refundedMinor currencyCode payer { displayName }
-            allocations(take: 200) { amountMinor allocationType }
+            allocations(take: 100) { amountMinor allocationType }
           }
         }
       `, { id: paymentId }),

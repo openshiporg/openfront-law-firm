@@ -14,6 +14,7 @@ import {
   openTrustLedger,
   type TrustSetupState,
 } from '../actions/openTrustRecords'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: TrustSetupState = { ok: false, message: '' }
 
@@ -33,7 +34,9 @@ export function TrustSetupForm({ accounts, suggestedLedgerNumber }: { accounts: 
       return result
     }
   const [accountState, accountAction, accountPending] = useActionState(refreshing(openTrustAccount), initial)
+  const accountActionForm = useKeptForm(accountAction, accountState)
   const [ledgerState, ledgerAction, ledgerPending] = useActionState(refreshing(openTrustLedger), initial)
+  const ledgerActionForm = useKeptForm(ledgerAction, ledgerState)
   const [rowState, setRowState] = useState<TrustSetupState>(initial)
   const [rowPending, startRow] = useTransition()
   const active = accounts.filter((account) => account.status === 'active')
@@ -67,7 +70,7 @@ export function TrustSetupForm({ accounts, suggestedLedgerNumber }: { accounts: 
       ) : null}
 
       <div className="grid min-w-0 xl:grid-cols-2 xl:divide-x xl:divide-border">
-        <form action={accountAction} className="min-w-0">
+        <form {...accountActionForm} className="min-w-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
             <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Open trust account</legend>
             <label className={cn(labelClass, 'sm:col-span-2')}>Account name<input name="name" required minLength={2} maxLength={200} autoComplete="off" className={fieldClass} /></label>
@@ -93,7 +96,7 @@ export function TrustSetupForm({ accounts, suggestedLedgerNumber }: { accounts: 
           </footer>
         </form>
 
-        <form action={ledgerAction} className="min-w-0 border-t border-border xl:border-t-0">
+        <form {...ledgerActionForm} className="min-w-0 border-t border-border xl:border-t-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
             <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Open client ledger</legend>
             <div className={cn(labelClass, 'sm:col-span-2')}>

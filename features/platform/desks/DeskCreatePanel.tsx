@@ -10,6 +10,7 @@ import { fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass, tr
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 
 import { createDeskRecord, type DeskCreateState } from './actions/createDeskRecord'
+import { useKeptForm } from '../components/useKeptForm'
 
 type DeskKind = 'matters' | 'work' | 'documents' | 'communications' | 'time-expenses'
 type CreateKind = 'task' | 'deadline' | 'document' | 'message' | 'expense' | 'time' | 'party'
@@ -65,8 +66,9 @@ export function DeskCreatePanel({ desk, timeZone, matter }: { desk: DeskKind; ti
 
 function CreateForm({ kind, timeZone, matter }: { kind: CreateKind; timeZone: string; matter?: { id: string; label: string } }) {
   const [state, action, pending] = useActionState<DeskCreateState, FormData>(createDeskRecord, { ok: false, message: '' })
+  const actionForm = useKeptForm(action, state)
   return (
-    <form action={action} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
       <input type="hidden" name="kind" value={kind} />
       {matter ? <input type="hidden" name="matterId" value={matter.id} /> : <div className="sm:col-span-2"><SearchableOptionSelect id={`${kind}-matter`} name="matterId" label="Matter" emptyLabel="Choose a matter" required kind="matter" options={[]} /></div>}
       {kind === 'task' ? <>

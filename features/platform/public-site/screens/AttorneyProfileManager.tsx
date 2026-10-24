@@ -8,16 +8,18 @@ import { cn } from '@/lib/utils'
 import { ErrorBanner, Panel, StatusDot, Track, fieldClass, labelClass, pillPrimaryClass, textareaClass, trackItemClass } from '@/features/platform/components/ui'
 import { saveAttorneyProfile, type AttorneyProfileRow, type AttorneyProfileSetup } from '../actions/attorneyProfiles'
 import type { PublicSiteState } from '../actions/publicSite'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: PublicSiteState = { ok: false, message: '', revision: 0 }
 
 function ProfileForm({ profile, areas, onDone }: { profile?: AttorneyProfileRow; areas: Array<{ id: string; name: string }>; onDone: () => void }) {
   const [state, action, pending] = useActionState(saveAttorneyProfile, initial)
+  const actionForm = useKeptForm(action, state)
   const router = useRouter()
   useEffect(() => { if (state.ok && state.revision) { router.refresh(); onDone() } }, [state, router, onDone])
   const selected = new Set(profile?.practiceAreas.map((area) => area.id) ?? [])
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="id" value={profile?.id ?? ''} />
       <label className={labelClass}>Name<input name="name" required maxLength={200} defaultValue={profile?.name ?? ''} className={fieldClass} /></label>
       <label className={labelClass}>Title<input name="title" maxLength={120} defaultValue={profile?.title ?? ''} placeholder="Partner" className={fieldClass} /></label>

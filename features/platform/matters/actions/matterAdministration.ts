@@ -17,7 +17,7 @@ async function loadMatter(matterId: string): Promise<MatterFacts> {
     query MatterAdminFacts($id: ID!) {
       matter(where: { id: $id }) {
         id status confidentiality
-        teamMembers(where: { status: { equals: active } }, take: 200) { id status canAccessRestricted user { id } }
+        teamMembers(where: { status: { equals: active } }, take: 100) { id status canAccessRestricted user { id } }
       }
     }
   `, { id: matterId })

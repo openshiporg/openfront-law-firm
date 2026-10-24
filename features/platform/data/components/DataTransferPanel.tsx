@@ -23,6 +23,7 @@ import {
 } from '@/features/platform/operations/actions/runDataTransfer'
 import { createSpreadsheetImportConnection, type ImportConnectionState } from '../actions/importConnection'
 import { CSV_TEMPLATE, csvToContactRows } from '../lib/contactCsv'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initialState: DataTransferState = { ok: false, message: '' }
 
@@ -121,13 +122,16 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
     setPreviewSource(rows)
     return result.ok ? { ...result, message: '' } : result
   }, initialState)
+  const previewActionForm = useKeptForm(previewAction, preview)
   const [apply, applyAction, applyPending] = useActionState(async (previous: DataTransferState, formData: FormData) => {
     const result = await runDataTransfer(previous, formData)
     if (!result.ok || !result.result || !('importedCount' in result.result)) return result
     const imported = result.result as ImportResult
     return { ...result, message: imported.replayed ? 'These contacts were already imported.' : `Imported ${imported.importedCount.toLocaleString()} ${imported.importedCount === 1 ? 'contact' : 'contacts'}.` }
   }, initialState)
+  const applyActionForm = useKeptForm(applyAction, apply)
   const [connectionState, connectionAction, connectionPending] = useActionState(createSpreadsheetImportConnection, { ok: false, message: '' } as ImportConnectionState)
+  const connectionActionForm = useKeptForm(connectionAction, connectionState)
   const [exportState, exportAction, exportPending] = useActionState(async (previous: DataTransferState, formData: FormData) => {
     const scope = String(formData.get('scope') ?? '')
     const limit = String(formData.get('limit') ?? '')
@@ -138,6 +142,7 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
     formData.set('idempotencyKey', intent.key)
     return runDataTransfer(previous, formData)
   }, initialState)
+  const exportActionForm = useKeptForm(exportAction, exportState)
   const readyToApply = Boolean(previewed && previewed.rows === rowsJson && connectionId)
   const importKey = previewed && connectionId ? `contact-import-${previewed.digest.slice(0, 48)}-${connectionId.slice(0, 40)}` : ''
   const previewResult = preview.ok && preview.result && 'rows' in preview.result ? preview.result as unknown as PreviewResult : null
@@ -162,7 +167,7 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
         <div className={card}>
           <h3 className={cardHead}><FileCheck2 className="size-4 text-muted-foreground" aria-hidden="true" />Import contacts</h3>
-          <form action={previewAction} className="space-y-3 p-4">
+          <form {...previewActionForm} className="space-y-3 p-4">
             <input type="hidden" name="operation" value="preview" />
             <input type="hidden" name="rows" value={rowsJson} />
             <div className="flex items-center gap-2 text-xs font-medium text-foreground"><span className={step}>1</span>Choose a CSV file</div>
@@ -195,13 +200,13 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
           <div className="space-y-3 border-t border-border p-4">
             <div className="flex items-center gap-2 text-xs font-medium text-foreground"><span className={step}>2</span>Import</div>
             {!connections.length ? (
-              <form action={connectionAction} className="space-y-2">
+              <form {...connectionActionForm} className="space-y-2">
                 <p className="text-xs text-muted-foreground">Set up spreadsheet import once. It remembers imported rows so they aren’t imported twice.</p>
                 <Track><button disabled={connectionPending} className={pillClass}>{connectionPending ? 'Setting up…' : 'Set up spreadsheet import'}</button></Track>
                 {connectionState.message ? <p role="status" className={cn('text-xs', connectionState.ok ? 'text-foreground' : 'text-destructive')}>{connectionState.message}</p> : null}
               </form>
             ) : null}
-            <form action={applyAction} className="space-y-3">
+            <form {...applyActionForm} className="space-y-3">
               <input type="hidden" name="operation" value="apply" />
               <input type="hidden" name="rows" value={previewed?.rows ?? ''} />
               <input type="hidden" name="idempotencyKey" value={importKey} />
@@ -225,7 +230,7 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
           </div>
         </div>
 
-        <form action={exportAction} className={card}>
+        <form {...exportActionForm} className={card}>
           <input type="hidden" name="operation" value="export" />
           <h3 className={cardHead}><Download className="size-4 text-muted-foreground" aria-hidden="true" />Export</h3>
           <div className="space-y-3 p-4">

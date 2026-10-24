@@ -89,7 +89,7 @@ export async function activateTrustAccount(trustAccountId: string): Promise<Trus
 // highest one the viewer can read; staff may replace it.
 export async function suggestLedgerNumber() {
   const response = await keystoneClient<{ trustLedgerAccounts: Array<{ ledgerNumber: string }> }>(`
-    query LedgerNumberSequence { trustLedgerAccounts(where: { ledgerNumber: { startsWith: "TL-" } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 500) { ledgerNumber } }
+    query LedgerNumberSequence { trustLedgerAccounts(where: { ledgerNumber: { startsWith: "TL-" } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 100) { ledgerNumber } }
   `)
   let highest = 0
   if (response.success) {

@@ -36,7 +36,7 @@ export type BillingRatesSetup = {
 }
 
 const BILLING_PATHS = ['/dashboard/platform/billing', '/dashboard/platform/time-expenses']
-const UNPRICED_PAGE = 200
+const UNPRICED_PAGE = 100
 
 function revalidateBilling() {
   for (const path of BILLING_PATHS) revalidatePath(path)
@@ -130,8 +130,8 @@ export async function addRateRule(_previous: RateActionState, formData: FormData
     const practiceAreaId = field(formData, 'practiceAreaId')
     if (!rateCardId || rateCardId.length > 200) return { ok: false, message: 'Choose a rate card.' }
     if (userId.length > 200 || practiceAreaId.length > 200) return { ok: false, message: 'Choose a valid timekeeper or practice area.' }
-    const card = await keystoneClient<{ rateCard: { id: string; name: string; status: string; currencyCode: string } | null }>(`
-      query RateCardForRule($id: ID!) { rateCard(where: { id: $id }) { id name status currencyCode } }
+    const card = await keystoneClient<{ rateCard: { id: string; name: string; status: string; currencyCode: string; matter: { id: string } | null } | null }>(`
+      query RateCardForRule($id: ID!) { rateCard(where: { id: $id }) { id name status currencyCode matter { id } } }
     `, { id: rateCardId })
     if (!card.success) return { ok: false, message: card.error }
     if (!card.data.rateCard || card.data.rateCard.status === 'retired') return { ok: false, message: 'Choose an active or draft rate card.' }
@@ -147,6 +147,8 @@ export async function addRateRule(_previous: RateActionState, formData: FormData
         amountMinor,
         currencyCode,
         unitLabel: 'hour',
+        // A matter card's rules share its matter scope.
+        ...(card.data.rateCard.matter ? { matter: { connect: { id: card.data.rateCard.matter.id } } } : {}),
         ...(userId ? { user: { connect: { id: userId } } } : {}),
         ...(practiceAreaId ? { practiceArea: { connect: { id: practiceAreaId } } } : {}),
       },

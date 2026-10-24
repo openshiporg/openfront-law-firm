@@ -1,10 +1,11 @@
-import { list } from "@keystone-6/core";
+import { graphql, list } from "@keystone-6/core";
 import {
   integer,
   relationship,
   select,
   text,
   timestamp,
+  virtual,
 } from "@keystone-6/core/fields";
 
 import { permissions, rules } from "../access";
@@ -148,6 +149,21 @@ export const TrustLedgerAccount = list({
     freezeReason: text({ access: immutableTrustIdentityAccess, ui: { displayMode: "textarea" } }),
     entries: readOnlyRelationship("TrustLedgerEntry.ledgerAccount", true),
     snapshots: readOnlyRelationship("TrustBalanceSnapshot.ledgerAccount", true),
+    // Live client balance from posted entries on this ledger: liability credits less debits.
+    balanceMinor: virtual({
+      field: graphql.field({
+        type: graphql.Int,
+        async resolve(item: any, _args, context) {
+          const sums = await context.prisma.trustLedgerEntry.groupBy({
+            by: ["direction"],
+            where: { ledgerAccountId: item.id, accountingBucket: "client_liability" },
+            _sum: { amountMinor: true },
+          });
+          const total = (direction: string) => Number(sums.find((row: any) => row.direction === direction)?._sum.amountMinor ?? 0);
+          return total("credit") - total("debit");
+        },
+      }),
+    }),
     ...trackingFields,
   },
 });

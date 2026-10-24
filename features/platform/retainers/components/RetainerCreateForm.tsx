@@ -17,6 +17,7 @@ import {
   type RetainerMatterContext,
 } from '../actions/retainers'
 import { CONTINGENCY_FEES, FEE_STRUCTURES } from '../lib/retainerOptions'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: RetainerActionState = { ok: false, message: '' }
 
@@ -33,12 +34,18 @@ export function RetainerCreateForm({ setup, preselectedMatterId, cancelHref }: {
   const [rateCardId, setRateCardId] = useState('')
   const [ledgerId, setLedgerId] = useState('')
 
-  useEffect(() => {
+  // Choosing a matter clears what belonged to the previous one; its context then loads.
+  function chooseMatter(next: string) {
+    setMatterId(next)
     setContext(null)
     setContextError('')
     setRateCardId('')
     setLedgerId('')
-    if (!matterId) { setClientId(''); return }
+    if (!next) setClientId('')
+  }
+
+  useEffect(() => {
+    if (!matterId) return
     startContext(async () => {
       const result = await getRetainerMatterContext(matterId)
       if (!result.success) { setContextError(result.error); setClientId(''); return }
@@ -53,6 +60,7 @@ export function RetainerCreateForm({ setup, preselectedMatterId, cancelHref }: {
     else if (result.ok) router.refresh()
     return result
   }, initial)
+  const runForm = useKeptForm(run, state)
 
   const currency = currencyCode.trim().toUpperCase()
   const digits = currencyFractionDigits(currency) ?? 2
@@ -63,11 +71,11 @@ export function RetainerCreateForm({ setup, preselectedMatterId, cancelHref }: {
 
   return (
     <Panel id="new-retainer" title="New retainer agreement" bodyClassName="p-0">
-      <form action={run} className="min-w-0">
+      <form {...runForm} className="min-w-0">
         <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3" disabled={pending}>
           <div className={cn(labelClass, 'sm:col-span-2')}>
             <label htmlFor="retainer-matter">Matter</label>
-            <FormSelect id="retainer-matter" name="matterId" required value={matterId} onValueChange={setMatterId} className={cn(fieldClass, 'text-foreground')}>
+            <FormSelect id="retainer-matter" name="matterId" required value={matterId} onValueChange={chooseMatter} className={cn(fieldClass, 'text-foreground')}>
               <option value="" disabled>{setup.matters.length ? 'Select matter' : 'No open matter'}</option>
               {setup.matters.map((matter) => <option key={matter.id} value={matter.id}>{`${matter.matterNumber}${matter.title ? ` · ${matter.title}` : ''}`}</option>)}
             </FormSelect>

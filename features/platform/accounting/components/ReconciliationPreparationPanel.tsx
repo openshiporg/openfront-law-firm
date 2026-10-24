@@ -11,18 +11,20 @@ import {
   prepareReconciliation,
   type ReconciliationPreparationState,
 } from '../actions/prepareReconciliation'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initialState: ReconciliationPreparationState = { ok: false, message: '' }
 
 export function ReconciliationPreparationPanel({ accounts, accountTotal }: { accounts: PracticeOption[]; accountTotal?: number }) {
   const [state, action, pending] = useActionState(prepareReconciliation, initialState)
+  const actionForm = useKeptForm(action, state)
   const [currencyCode, setCurrencyCode] = useState('USD')
   const digits = currencyFractionDigits(currencyCode) ?? 2
   const amountPattern = digits ? `-?\\d+(\\.\\d{1,${digits}})?` : '-?\\d+'
   const amountClass = cn(fieldClass, 'text-right font-mono tabular-nums')
   return (
     <Panel title={<h2 id="reconciliation-preparation-title" className="min-w-0 truncate text-sm font-semibold text-foreground">Trust reconciliation</h2>} bodyClassName="p-0">
-      <form action={action} aria-labelledby="reconciliation-preparation-title" className="min-w-0">
+      <form {...actionForm} aria-labelledby="reconciliation-preparation-title" className="min-w-0">
         <div className="space-y-5 p-4">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <div className="min-w-0 sm:col-span-2 xl:col-span-1">

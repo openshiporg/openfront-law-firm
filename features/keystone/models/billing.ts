@@ -10,7 +10,7 @@ import {
 
 import { activeFirmId, permissions, rules } from "../access";
 import { prismaWithoutGraphQLErrorConversion } from "../lib/transactions";
-import { denyAll, firmOwnedHooks, relationshipConnectionIds } from "../tenancy";
+import { changedFields, denyAll, firmOwnedHooks, relationshipConnectionIds } from "../tenancy";
 import { validateMatterTeamCapability } from "../lib/team-capability";
 import {
   firmRelationship,
@@ -122,7 +122,7 @@ const invoiceHooks = {
       validateInvoiceTotals(args);
       if (
         ["issued", "partially_paid", "paid", "overdue", "void"].includes(args.item.status) &&
-        Object.keys(args.resolvedData).some((field) => invoiceSnapshotFields.has(field))
+        changedFields(args.resolvedData).some((field) => invoiceSnapshotFields.has(field))
       ) {
         args.addValidationError("Issued invoice snapshot fields cannot be changed.");
       }
@@ -287,7 +287,7 @@ function approvedSourceHooks(
         await validateMatterTeamCapability(args, "canBill");
         if (
           immutableStatuses.has(args.item?.status) &&
-          Object.keys(args.resolvedData).some((field) => immutableFields.has(field))
+          changedFields(args.resolvedData).some((field) => immutableFields.has(field))
         ) {
           args.addValidationError("Approved or finalized billing sources are immutable; write off the source and create a corrected record with renewed approval.");
         }

@@ -17,6 +17,7 @@ import {
   textareaClass,
 } from '@/features/platform/components/ui'
 import { policyPortal } from '../actions/policyPortal'
+import { useKeptForm } from '../../components/useKeptForm'
 
 function Submit({ label, danger = false }: { label: string; danger?: boolean }) {
   const { pending } = useFormStatus()
@@ -37,12 +38,13 @@ function Message({ ok, message }: { ok: boolean; message: string }) {
 
 export function PortalPolicyForm({ revision }: { revision: number }) {
   const [state, action] = useActionState(policyPortal, { ok: false, message: '' })
+  const actionForm = useKeptForm(action, state)
   return <details className="group rounded-xl border border-border bg-card shadow-xs" open={revision === 0}>
     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
       {revision === 0 ? 'Set sharing rules' : 'Change sharing rules'}
       <span className="text-xs font-medium text-muted-foreground"><span className="group-open:hidden">Open</span><span className="hidden group-open:inline">Close</span></span>
     </summary>
-    <form action={action} className="min-w-0 space-y-4 border-t border-border p-4">
+    <form {...actionForm} className="min-w-0 space-y-4 border-t border-border p-4">
       <input type="hidden" name="operation" value="policy" /><input type="hidden" name="expectedRevision" value={revision} />
       <label className={labelClass}>Who can share a matter<FormSelect className={fieldClass} name="mode">
         <option value="read_intersection">Staff who can open the matter and are on its team</option>
@@ -66,10 +68,11 @@ export function PortalGrantForm({ operation, intentKey, policyRevision, expected
   operation: 'grant' | 'revoke'; intentKey: string; policyRevision: number; expectedVersion: number; portalAccountId: string; contactId: string; matterId: string; grantId: string | null; accountLabel: string; matterLabel: string
 }) {
   const [state, action] = useActionState(policyPortal, { ok: false, message: '' })
+  const actionForm = useKeptForm(action, state)
   // The operation reference stays fixed while this form is open so a retry replays the
   // same intent; a new intent is started only by an explicit choice.
   const [operationKey, setOperationKey] = useState(intentKey)
-  return <form action={action} className={formClass}>
+  return <form {...actionForm} className={formClass}>
     <h3 className="text-sm font-semibold text-foreground">{operation === 'grant' ? (grantId ? 'Change access' : 'Give access') : 'Remove access'}</h3>
     <MetaGrid className="sm:grid-cols-2 lg:grid-cols-2">
       <Meta label="Client">{accountLabel}</Meta>

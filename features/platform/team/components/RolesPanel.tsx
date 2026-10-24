@@ -9,6 +9,7 @@ import { ErrorBanner, Panel, StatusDot, Track, fieldClass, labelClass, pillDange
 
 import { createRole, saveRolePermissions, setRoleStatus } from '../actions/roles'
 import { PERMISSION_GROUPS, initialRoleActionState, type RoleActionState, type RoleDirectory, type RoleRow } from '../lib/rolePermissions'
+import { useKeptForm } from '../../components/useKeptForm'
 
 function Result({ state }: { state: RoleActionState }) {
   if (!state.message) return <span />
@@ -51,13 +52,15 @@ function PermissionToggles({ granted, disabled }: { granted: readonly string[]; 
 
 function RoleEditor({ role, canManage, isOwn, onDone }: { role: RoleRow; canManage: boolean; isOwn: boolean; onDone: () => void }) {
   const [state, action, pending] = useActionState(saveRolePermissions, initialRoleActionState)
+  const actionForm = useKeptForm(action, state)
   const [statusState, statusAction, statusPending] = useActionState(setRoleStatus, initialRoleActionState)
+  const statusActionForm = useKeptForm(statusAction, statusState)
   useRefreshOnSuccess(state)
   useRefreshOnSuccess(statusState, onDone)
   const archived = role.status === 'archived'
   return (
     <div className="grid gap-4">
-      <form action={action} className="grid gap-4">
+      <form {...actionForm} className="grid gap-4">
         <input type="hidden" name="roleId" value={role.id} />
         <input type="hidden" name="status" value={role.status} />
         <PermissionToggles granted={role.granted} disabled={!canManage || archived} />
@@ -72,7 +75,7 @@ function RoleEditor({ role, canManage, isOwn, onDone }: { role: RoleRow; canMana
         ) : null}
       </form>
       {canManage && !isOwn ? (
-        <form action={statusAction} className="grid gap-3 border-t border-border pt-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <form {...statusActionForm} className="grid gap-3 border-t border-border pt-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <input type="hidden" name="roleId" value={role.id} />
           <input type="hidden" name="status" value={archived ? 'active' : 'archived'} />
           {role.granted.map((key) => <input key={key} type="hidden" name="permission" value={key} />)}
@@ -87,9 +90,10 @@ function RoleEditor({ role, canManage, isOwn, onDone }: { role: RoleRow; canMana
 
 function NewRoleForm({ onDone }: { onDone: () => void }) {
   const [state, action, pending] = useActionState(createRole, initialRoleActionState)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state, onDone)
   return (
-    <form action={action} className="grid gap-4">
+    <form {...actionForm} className="grid gap-4">
       <label className={labelClass}>Name<input name="name" required maxLength={80} className={fieldClass} /></label>
       <PermissionToggles granted={['canAccessDashboard']} />
       <div className="flex flex-wrap items-center justify-between gap-3">

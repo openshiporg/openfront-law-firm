@@ -7,6 +7,7 @@ import { Download, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EmptyState, Notice, Panel, StatusDot, Track, fieldClass, labelClass, pillClass, pillPrimaryClass } from '@/features/platform/components/ui'
 import { uploadDocumentVersion, type DocumentVersionRow, type VersionUploadState } from '../actions/documentVersions'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: VersionUploadState = { ok: false, message: '', revision: 0 }
 
@@ -17,12 +18,13 @@ function size(bytes: number | null) {
 
 export function DocumentVersionPanel({ documentId, storage, currentVersionId, versions }: { documentId: string; storage: boolean; currentVersionId: string | null; versions: DocumentVersionRow[] }) {
   const [state, action, pending] = useActionState(uploadDocumentVersion, initial)
+  const actionForm = useKeptForm(action, state)
   const router = useRouter()
   useEffect(() => { if (state.ok && state.revision) router.refresh() }, [state, router])
   return (
     <Panel title={<h2 className="flex items-baseline gap-2 text-sm font-semibold">Files<span className="font-mono text-xs font-normal text-muted-foreground">{versions.length}</span></h2>} bodyClassName="p-0">
       {storage ? (
-        <form key={state.ok ? state.revision : 'form'} action={action} className="grid gap-3 border-b border-border p-4">
+        <form key={state.ok ? state.revision : 'form'} {...actionForm} className="grid gap-3 border-b border-border p-4">
           <input type="hidden" name="documentId" value={documentId} />
           <label className={labelClass}>Upload a new version<input type="file" name="file" required className={cn(fieldClass, 'py-1.5 file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm')} /></label>
           <label className={labelClass}>Notes<input name="notes" maxLength={2000} className={fieldClass} /></label>

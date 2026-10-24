@@ -94,9 +94,12 @@
 .sf-header__actions { display: none; margin-left: auto; align-items: center; gap: 0.5rem; }
 .sf-header__mobile { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
 @media (min-width: 60rem) {
-  .sf-header__nav { display: flex; margin-left: 1.5rem; }
+  .sf-header__nav { display: flex; margin-left: 1.5rem; min-width: 0; }
   .sf-header__actions { display: flex; }
   .sf-header__mobile { display: none; }
+  /* With room to spare, the firm name stays on one line instead of yielding to the nav. */
+  .sf-header__bar > .sf-firm { flex: 0 0 auto; }
+  .sf-header__bar > .sf-firm .sf-firm__name { white-space: nowrap; }
 }
 
 .sf-firm {
@@ -586,6 +589,8 @@ textarea.sf-field { padding-block: 0.75rem; min-height: 6.5rem; resize: vertical
   border-top: 1px solid var(--color-rule);
 }
 @media (min-width: 60rem) { .sf-dock { display: none; } }
+/* The in-page action the dock repeats; below 60rem the dock carries it instead. */
+@media (max-width: 59.99rem) { .sf-docked { display: none; } }
 
 /* Portal (signed-in client area) */
 .sf-portal-card { width: 100%; max-width: 28rem; }

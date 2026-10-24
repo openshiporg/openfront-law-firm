@@ -17,6 +17,7 @@ import {
   type BillingRatesSetup,
   type RateActionState,
 } from '../actions/rates'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: RateActionState = { ok: false, message: '' }
 
@@ -34,7 +35,9 @@ export function BillingRatesForm({ setup }: { setup: BillingRatesSetup }) {
       return result
     }
   const [cardState, cardAction, cardPending] = useActionState(refreshing(createRateCard), initial)
+  const cardActionForm = useKeptForm(cardAction, cardState)
   const [ruleState, ruleAction, rulePending] = useActionState(refreshing(addRateRule), initial)
+  const ruleActionForm = useKeptForm(ruleAction, ruleState)
   const [rowState, setRowState] = useState<RateActionState>(initial)
   const [rowPending, startRow] = useTransition()
   const usableCards = setup.cards.filter((card) => card.status !== 'retired')
@@ -94,7 +97,7 @@ export function BillingRatesForm({ setup }: { setup: BillingRatesSetup }) {
         {rowState.message ? <div className="border-b border-border px-4 py-3"><Message state={rowState} /></div> : null}
 
         <div className="grid min-w-0 lg:grid-cols-2 lg:divide-x lg:divide-border">
-          <form action={cardAction} className="min-w-0">
+          <form {...cardActionForm} className="min-w-0">
             <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
               <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">New rate card</legend>
               <label className={cn(labelClass, 'sm:col-span-2')}>Name<input name="name" required minLength={2} maxLength={200} className={fieldClass} autoComplete="off" /></label>
@@ -110,7 +113,7 @@ export function BillingRatesForm({ setup }: { setup: BillingRatesSetup }) {
             </footer>
           </form>
 
-          <form action={ruleAction} className="min-w-0 border-t border-border lg:border-t-0">
+          <form {...ruleActionForm} className="min-w-0 border-t border-border lg:border-t-0">
             <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
               <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Hourly rate</legend>
               <div className={cn(labelClass, 'sm:col-span-2')}>

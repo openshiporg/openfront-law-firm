@@ -10,7 +10,7 @@ import {
 
 import { activeFirmId, permissions, rules } from "../access";
 import { prismaWithoutGraphQLErrorConversion } from "../lib/transactions";
-import { denyAll, firmOwnedHooks, relationshipConnectionIds } from "../tenancy";
+import { changedFields, denyAll, firmOwnedHooks, relationshipConnectionIds } from "../tenancy";
 import {
   firmRelationship,
   readOnlyRelationship,
@@ -78,7 +78,7 @@ const controlledSignerFieldAccess = {
 };
 
 export async function validateDocumentCurrentVersion(args: any) {
-  if (!Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, "currentVersion")) return;
+  if (!args.resolvedData?.["currentVersion"] !== undefined) return;
   const versionId = relationshipConnectionIds(args.resolvedData.currentVersion)[0];
   if (!versionId) {
     if (args.item?.status === "active") args.addValidationError("An active document must retain an exact current version.");
@@ -242,7 +242,7 @@ const signatureRequestHooks = {
     create: baseSignatureRequestHooks.validate.create,
     update: async (args: any) => {
       await baseSignatureRequestHooks.validate.update(args);
-      if (args.item.status !== "draft" && Object.keys(args.resolvedData).length) {
+      if (args.item.status !== "draft" && changedFields(args.resolvedData).length) {
         args.addValidationError("A signature request is immutable after provider handoff.");
       }
     },

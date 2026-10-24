@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Panel, Track, fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass } from '@/features/platform/components/ui'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 import { startIntake, type IntakeSetup, type IntakeStartState } from '../actions/startIntake'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const contactTypes = [['person', 'Person'], ['organization', 'Organization']] as const
 
@@ -15,6 +16,7 @@ export function IntakeStartPanel({ setup }: { setup: IntakeSetup }) {
   const [contactType, setContactType] = useState('person')
   const router = useRouter()
   const [state, action, pending] = useActionState<IntakeStartState, FormData>(startIntake, { ok: false, message: '' })
+  const actionForm = useKeptForm(action, state)
   const [officeId, setOfficeId] = useState(setup.officesCount === 1 ? setup.offices[0]?.id ?? '' : '')
   const [areaId, setAreaId] = useState(setup.practiceAreasCount === 1 ? setup.practiceAreas[0]?.id ?? '' : '')
   useEffect(() => {
@@ -22,7 +24,7 @@ export function IntakeStartPanel({ setup }: { setup: IntakeSetup }) {
   }, [state, router])
   return (
     <Panel title={<h2 id="new-intake-heading" className="min-w-0 truncate text-sm font-semibold text-foreground">New intake</h2>} bodyClassName="p-0">
-      <form action={action} aria-labelledby="new-intake-heading" className="min-w-0">
+      <form {...actionForm} aria-labelledby="new-intake-heading" className="min-w-0">
         <div className="space-y-5 p-4">
           <fieldset className="min-w-0">
             <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Contact type</legend>

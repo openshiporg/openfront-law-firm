@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState, useId } from 'react'
+import { useActionState, useId, useState } from 'react'
 import { customerAuthenticate, bookConsultation } from './actions/customer-account'
 import { FIRST_CONTACT_ACKNOWLEDGMENT } from './lib/first-contact'
 import { type AvailabilitySlot, type Service } from './lib/consultation-presentation'
@@ -39,6 +39,24 @@ function groupSlots(slots: AvailabilitySlot[], timezone: string) {
   return [...groups.entries()]
 }
 
+/** Pick a day, then one of that day's times. The chosen time survives switching days. */
+function SlotPicker({ days, timezone, initial }: { days: ReturnType<typeof groupSlots>; timezone: string; initial: string }) {
+  const [startsAt, setStartsAt] = useState(initial)
+  const [activeDay, setActiveDay] = useState(() => days.find(([, times]) => times.some(slot => slot.value === initial))?.[0] ?? days[0][0])
+  const times = days.find(([day]) => day === activeDay)?.[1] ?? days[0][1]
+  const chosen = days.flatMap(([day, list]) => list.map(slot => ({ day, ...slot }))).find(slot => slot.value === startsAt)
+  return <div className="sf-slots">
+    <input type="hidden" name="startsAt" value={startsAt} />
+    <div role="radiogroup" aria-label="Day" className="sf-track sf-slots__track">
+      {days.map(([day]) => <label key={day} className="sf-seg"><input type="radio" name="slotDay" value={day} checked={day === activeDay} onChange={() => setActiveDay(day)} /><span className="sf-pill">{day}</span></label>)}
+    </div>
+    <div role="radiogroup" aria-label={`Times on ${activeDay}`} className="sf-track sf-slots__track">
+      {times.map(slot => <label key={slot.value} className="sf-seg"><input type="radio" name="slotTime" value={slot.value} checked={slot.value === startsAt} onChange={() => setStartsAt(slot.value)} /><span className="sf-pill sf-num">{slot.label}</span></label>)}
+    </div>
+    <p className="sf-fine">{chosen ? `${chosen.day}, ${chosen.label} · ` : ''}Times in {timezone}</p>
+  </div>
+}
+
 /**
  * One first-contact contract: the firm's notice is shown before any input, the
  * minimum conflict/fit fields follow, and the acknowledged notice version is
@@ -61,15 +79,7 @@ export function ConsultationBookingForm({ service, slots, requestKey, timezone, 
 
     <fieldset className="grid gap-4">
       <legend className="sf-h3 mb-4">1. Time</legend>
-      {days.length ? <div className="sf-slots">
-        {days.map(([day, times]) => <div key={day} className="sf-slots__day">
-          <p className="text-sm font-medium">{day}</p>
-          <div className="sf-track sf-slots__track">
-            {times.map(slot => <label key={slot.value} className="sf-seg"><input type="radio" name="startsAt" value={slot.value} required defaultChecked={value('startsAt') === slot.value} /><span className="sf-pill sf-num">{slot.label}</span></label>)}
-          </div>
-        </div>)}
-        <p className="sf-fine">Times in {timezone}</p>
-      </div> : <p role="status" className="sf-notice sf-notice--plain">No open times in the next two weeks.</p>}
+      {days.length ? <SlotPicker days={days} timezone={timezone} initial={value('startsAt')} /> : <p role="status" className="sf-notice sf-notice--plain">No open times in the next two weeks.</p>}
     </fieldset>
 
     <fieldset className="grid gap-5">

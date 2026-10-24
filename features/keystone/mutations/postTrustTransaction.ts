@@ -453,6 +453,8 @@ export async function postTrustTransaction(
       include: { entries: true },
     });
     if (!posted) throw new Error("Trust posting could not be reloaded after creation.");
+    // A posting that touches exactly one matter's ledgers is audited against that matter.
+    const postedMatterIds = [...new Set(posted.entries.map((entry: any) => entry.matterId).filter(Boolean))];
     await tx.auditEvent.create({
       data: {
         firmId,
@@ -462,6 +464,7 @@ export async function postTrustTransaction(
         outcome: "succeeded",
         ...workflowActor(context, session.itemId),
         trustTransactionId: posted.id,
+        matterId: postedMatterIds.length === 1 ? String(postedMatterIds[0]) : null,
         occurredAt: new Date(),
         metadata: {
           postingDigest,

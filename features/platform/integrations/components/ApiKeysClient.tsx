@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { EmptyState, Notice, Panel, StatusDot, Track, fieldClass, labelClass, pillClass, pillDangerClass, pillPrimaryClass, statusLabel, statusTone, textareaClass, trackItemClass } from '@/features/platform/components/ui'
 import { issueApiKeyAction, revokeApiKeyAction } from '../actions/integrationAccess'
 import type { ApiKeyRow, IntegrationActionState, IssueApiKeyState } from '../actions/integrationAccessTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 type Revealed = { name: string; prefix: string | null; secret: string }
 
@@ -26,6 +27,7 @@ function keyStatus(key: ApiKeyRow) {
 
 function IssueForm({ scopes, onIssued }: { scopes: string[]; onIssued: (revealed: Revealed) => void }) {
   const [state, action, pending] = useActionState<IssueApiKeyState, FormData>(issueApiKeyAction, { ok: false, message: '', revision: 0 })
+  const actionForm = useKeptForm(action, state)
   const router = useRouter()
   const handled = useRef(0)
   const [expiry, setExpiry] = useState('')
@@ -36,7 +38,7 @@ function IssueForm({ scopes, onIssued }: { scopes: string[]; onIssued: (revealed
     router.refresh()
   }, [state, router, onIssued])
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="expiresAt" value={expiry ? new Date(`${expiry}T23:59:59`).toISOString() : ''} />
       <label className={labelClass}>Name<input name="name" required maxLength={120} className={fieldClass} /></label>
       <label className={labelClass}>Expires<input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className={fieldClass} /></label>
@@ -76,6 +78,7 @@ function SecretReveal({ revealed, onDone }: { revealed: Revealed; onDone: () => 
 
 function RevokeForm({ apiKey, onDone }: { apiKey: ApiKeyRow; onDone: () => void }) {
   const [state, action, pending] = useActionState<IntegrationActionState, FormData>(revokeApiKeyAction, { ok: false, message: '', revision: 0 })
+  const actionForm = useKeptForm(action, state)
   const router = useRouter()
   const handled = useRef(0)
   useEffect(() => {
@@ -85,7 +88,7 @@ function RevokeForm({ apiKey, onDone }: { apiKey: ApiKeyRow; onDone: () => void 
     onDone()
   }, [state, router, onDone])
   return (
-    <form action={action} className="grid gap-3">
+    <form {...actionForm} className="grid gap-3">
       <input type="hidden" name="id" value={apiKey.id} />
       <label className={labelClass}>Reason for revoking {apiKey.name}<textarea name="reason" required minLength={3} maxLength={1000} rows={2} className={textareaClass} /></label>
       <div className="flex flex-wrap items-center justify-between gap-3">

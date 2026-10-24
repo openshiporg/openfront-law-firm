@@ -49,6 +49,7 @@ export async function bookConsultation(previous: BookingState, form: FormData): 
     summary: String(form.get('summary') || ''),
   }
   const revision = previous.revision + 1
+  if (!values.startsAt) return { error: 'Choose a time.', values, revision }
   if (form.get('acknowledgment') !== 'yes') return { error: 'Read the notice and confirm the acknowledgment before submitting.', values, revision }
   const response = await keystoneClient<{ bookClientConsultation: { id: string } }>(
     `mutation($serviceId: ID!, $startsAt: String!, $requestKey: String!, $summary: String, $jurisdiction: String!, $opposingParties: String!, $keyDeadline: String, $acknowledgmentVersion: String!) {

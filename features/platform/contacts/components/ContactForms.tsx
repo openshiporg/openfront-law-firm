@@ -21,6 +21,7 @@ import {
   type ContactStatus,
   type ContactType,
 } from '../lib/contactTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 export function ActionResult({ state }: { state: ContactActionState }) {
   if (!state.message) return <span />
@@ -92,6 +93,7 @@ function StatusSelect({ value, onChange }: { value: ContactStatus; onChange: (va
 
 function NewContactForm({ onCreated }: { onCreated: (id: string) => void }) {
   const [state, action, pending] = useActionState(createContact, initialContactActionState)
+  const actionForm = useKeptForm(action, state)
   const [type, setType] = useState<ContactType>('person')
   const [status, setStatus] = useState<ContactStatus>('prospective_client')
   const handled = useRef(0)
@@ -102,7 +104,7 @@ function NewContactForm({ onCreated }: { onCreated: (id: string) => void }) {
     }
   }, [state, onCreated])
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="status" value={status} />
       <IdentityFields type={type} onTypeChange={setType} />
       <StatusSelect value={status} onChange={setStatus} />
@@ -133,11 +135,12 @@ export function NewContactSheet() {
 
 export function ContactIdentityForm({ contact }: { contact: ContactIdentity }) {
   const [state, action, pending] = useActionState(updateContactIdentity, initialContactActionState)
+  const actionForm = useKeptForm(action, state)
   const [type, setType] = useState<ContactType>(contact.contactType)
   useRefreshOnSuccess(state)
   return (
     <Panel title="Identity">
-      <form action={action} className="grid gap-4 sm:grid-cols-2">
+      <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
         <input type="hidden" name="contactId" value={contact.id} />
         <IdentityFields contact={contact} type={type} onTypeChange={setType} />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 sm:col-span-2">
@@ -152,10 +155,11 @@ export function ContactIdentityForm({ contact }: { contact: ContactIdentity }) {
 /** Status pills; choosing one saves it immediately. */
 export function ContactStatusTrack({ contactId, status }: { contactId: string; status: ContactStatus }) {
   const [state, action, pending] = useActionState(changeContactStatus, initialContactActionState)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state)
   return (
     <Panel title="Status">
-      <form action={action} className="grid gap-3">
+      <form {...actionForm} className="grid gap-3">
         <input type="hidden" name="contactId" value={contactId} />
         <div role="group" aria-label="Contact status" className={cn(trackClass, 'flex-wrap rounded-2xl')}>
           {CONTACT_STATUSES.map((value) => (

@@ -14,7 +14,7 @@ export async function getRoleDirectory(): Promise<RoleDirectory> {
   }>(`
     query RoleDirectory {
       authenticatedItem { ... on User { id } }
-      roles(orderBy: [{ name: asc }, { id: asc }], take: 200) {
+      roles(orderBy: [{ name: asc }, { id: asc }], take: 100) {
         id name status
         memberCount: membershipsCount(where: { status: { in: [active, invited, suspended] } })
         ${ROLE_PERMISSION_KEYS.join(' ')}

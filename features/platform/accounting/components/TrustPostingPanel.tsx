@@ -12,6 +12,7 @@ import {
   runTrustPosting,
   type TrustPostingState,
 } from '@/features/platform/operations/actions/runTrustPosting'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initialState: TrustPostingState = { ok: false, message: '' }
 
@@ -28,13 +29,14 @@ export function TrustPostingPanel({ accounts, ledgers, accountTotal, ledgerTotal
     if (result.ok) setOperationKey(null)
     return result
   }, initialState)
+  const actionForm = useKeptForm(action, state)
   const [currencyCode, setCurrencyCode] = useState('USD')
   const digits = currencyFractionDigits(currencyCode) ?? 2
   const unavailable = !accounts.length || !ledgers.length
 
   return (
     <Panel title={<h2 id="trust-posting-title" className="min-w-0 truncate text-sm font-semibold text-foreground">Trust posting</h2>} bodyClassName="p-0">
-      <form action={action} aria-labelledby="trust-posting-title" className="min-w-0">
+      <form {...actionForm} aria-labelledby="trust-posting-title" className="min-w-0">
         <div className="space-y-5 p-4">
           {unavailable ? <Notice>Requires an active trust account and client ledger.</Notice> : null}
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">

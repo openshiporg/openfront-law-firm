@@ -221,7 +221,7 @@ var conflictPermissions = ["canReadIntake", "canRunConflictChecks", "canResolveC
 function optionalAccessibleRelation(relation, matterFilter2) {
   return { OR: [{ [relation]: null }, { [relation]: matterFilter2 }] };
 }
-function conflictMatchSourceFilter(userId, canReadPeople) {
+function conflictMatchSourceFilter(userId, canReadPeople2) {
   const matter = accessibleMatterFilter(userId);
   return {
     AND: [
@@ -229,7 +229,7 @@ function conflictMatchSourceFilter(userId, canReadPeople) {
       { check: { OR: [{ matter: null }, { matter }] } },
       optionalAccessibleRelation("matchedMatter", matter),
       { OR: [{ matchedMatterParty: null }, { matchedMatterParty: { matter } }] },
-      ...canReadPeople ? [] : [{ matchedContact: null }],
+      ...canReadPeople2 ? [] : [{ matchedContact: null }],
       {
         OR: [
           { matchedMatter: { id: { notIn: [] } } },
@@ -240,13 +240,13 @@ function conflictMatchSourceFilter(userId, canReadPeople) {
     ]
   };
 }
-function conflictTermSourceFilter(userId, canReadPeople) {
+function conflictTermSourceFilter(userId, canReadPeople2) {
   const matter = accessibleMatterFilter(userId);
   return {
     AND: [
       optionalAccessibleRelation("matter", matter),
       { check: { OR: [{ matter: null }, { matter }] } },
-      ...canReadPeople ? [] : [{ sourceContact: null }]
+      ...canReadPeople2 ? [] : [{ sourceContact: null }]
     ]
   };
 }
@@ -254,10 +254,10 @@ function conflictRecordFilter(args) {
   const { session } = args;
   const firmId = activeFirmId(session);
   if (!firmId || !session?.itemId || !hasAnyPermission(args, conflictPermissions)) return false;
-  const canReadPeople = hasPermission(args, "canReadPeople");
+  const canReadPeople2 = hasPermission(args, "canReadPeople");
   const matter = accessibleMatterFilter(session.itemId);
-  const conflictMatch = conflictMatchSourceFilter(session.itemId, canReadPeople);
-  const conflictTerm = conflictTermSourceFilter(session.itemId, canReadPeople);
+  const conflictMatch = conflictMatchSourceFilter(session.itemId, canReadPeople2);
+  const conflictTerm = conflictTermSourceFilter(session.itemId, canReadPeople2);
   return {
     AND: [
       { firm: { id: { equals: firmId } } },
@@ -282,12 +282,12 @@ function conflictChildRecordFilter(args, child) {
   const firmId = activeFirmId(session);
   if (!firmId || !session?.itemId || !hasAnyPermission(args, conflictPermissions)) return false;
   const matter = accessibleMatterFilter(session.itemId);
-  const canReadPeople = hasPermission(args, "canReadPeople");
-  const scope = child === "term" ? conflictTermSourceFilter(session.itemId, canReadPeople) : child === "match" ? conflictMatchSourceFilter(session.itemId, canReadPeople) : {
+  const canReadPeople2 = hasPermission(args, "canReadPeople");
+  const scope = child === "term" ? conflictTermSourceFilter(session.itemId, canReadPeople2) : child === "match" ? conflictMatchSourceFilter(session.itemId, canReadPeople2) : {
     AND: [
       optionalAccessibleRelation("matter", matter),
       { check: { OR: [{ matter: null }, { matter }] } },
-      { OR: [{ match: null }, { match: conflictMatchSourceFilter(session.itemId, canReadPeople) }] }
+      { OR: [{ match: null }, { match: conflictMatchSourceFilter(session.itemId, canReadPeople2) }] }
     ]
   };
   return { AND: [{ firm: { id: { equals: firmId } } }, scope] };
@@ -968,7 +968,7 @@ async function validateConnectedRelationships(args) {
     }
   }
   const sourceHasMatter = sourceModel.fields.some((field) => field.name === "matterId");
-  const matterWasSupplied = Object.prototype.hasOwnProperty.call(resolvedData, "matter");
+  const matterWasSupplied = changedFields(resolvedData).includes("matter");
   const suppliedMatterId = connectedId(resolvedData.matter);
   const storedMatterId = typeof item?.matterId === "string" ? item.matterId : null;
   const ownerMatterId = suppliedMatterId ?? storedMatterId;
@@ -981,7 +981,7 @@ async function validateConnectedRelationships(args) {
     await validateMatterAccess({ matterId: ownerMatterId, firmId, context, addValidationError });
   }
   for (const relation of sourceModel.fields.filter((field) => field.kind === "object")) {
-    if (!Object.prototype.hasOwnProperty.call(resolvedData, relation.name)) continue;
+    if (resolvedData[relation.name] === void 0) continue;
     const ids = relationshipConnectionIds(resolvedData[relation.name]);
     if (ids.length === 0) continue;
     if (relation.type === "Firm") {
@@ -1030,6 +1030,9 @@ async function validateConnectedRelationships(args) {
       }
     }
   }
+}
+function changedFields(resolvedData) {
+  return Object.keys(resolvedData ?? {}).filter((field) => resolvedData?.[field] !== void 0);
 }
 function activeFirmRelationshipHooks(options = {}) {
   const validate = async (args) => {
@@ -3465,7 +3468,7 @@ var deadlineHooks = {
         "ruleReference",
         "parentDeadline"
       ]);
-      if (args.item.isVerified && Object.keys(args.resolvedData).some((field) => verifiedSnapshotFields.has(field))) {
+      if (args.item.isVerified && changedFields(args.resolvedData).some((field) => verifiedSnapshotFields.has(field))) {
         args.addValidationError("A verified deadline snapshot cannot be changed; create a corrected deadline with new verification evidence.");
       }
     }
@@ -3687,7 +3690,7 @@ var communicationMessageHooks = {
     create: baseCommunicationMessageHooks.validate.create,
     update: async (args) => {
       await baseCommunicationMessageHooks.validate.update(args);
-      if (args.item.status !== "draft" && Object.keys(args.resolvedData).length) {
+      if (args.item.status !== "draft" && changedFields(args.resolvedData).length) {
         args.addValidationError("A queued communication envelope is immutable.");
       }
     }
@@ -3865,7 +3868,7 @@ var controlledSignerFieldAccess = {
   update: denyAll
 };
 async function validateDocumentCurrentVersion(args) {
-  if (!Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, "currentVersion")) return;
+  if (!args.resolvedData?.["currentVersion"] !== void 0) return;
   const versionId = relationshipConnectionIds(args.resolvedData.currentVersion)[0];
   if (!versionId) {
     if (args.item?.status === "active") args.addValidationError("An active document must retain an exact current version.");
@@ -4025,7 +4028,7 @@ var signatureRequestHooks = {
     create: baseSignatureRequestHooks.validate.create,
     update: async (args) => {
       await baseSignatureRequestHooks.validate.update(args);
-      if (args.item.status !== "draft" && Object.keys(args.resolvedData).length) {
+      if (args.item.status !== "draft" && changedFields(args.resolvedData).length) {
         args.addValidationError("A signature request is immutable after provider handoff.");
       }
     }
@@ -4268,7 +4271,7 @@ var invoiceHooks = {
     update: async (args) => {
       await baseInvoiceHooks.validate.update(args);
       validateInvoiceTotals(args);
-      if (["issued", "partially_paid", "paid", "overdue", "void"].includes(args.item.status) && Object.keys(args.resolvedData).some((field) => invoiceSnapshotFields.has(field))) {
+      if (["issued", "partially_paid", "paid", "overdue", "void"].includes(args.item.status) && changedFields(args.resolvedData).some((field) => invoiceSnapshotFields.has(field))) {
         args.addValidationError("Issued invoice snapshot fields cannot be changed.");
       }
       if (args.resolvedData.status === "issued" && args.item.status !== "issued") {
@@ -4416,7 +4419,7 @@ function approvedSourceHooks(lifecycle, immutableStatuses, immutableFields) {
       update: async (args) => {
         await base.validate.update(args);
         await validateMatterTeamCapability(args, "canBill");
-        if (immutableStatuses.has(args.item?.status) && Object.keys(args.resolvedData).some((field) => immutableFields.has(field))) {
+        if (immutableStatuses.has(args.item?.status) && changedFields(args.resolvedData).some((field) => immutableFields.has(field))) {
           args.addValidationError("Approved or finalized billing sources are immutable; write off the source and create a corrected record with renewed approval.");
         }
       }
@@ -4794,6 +4797,21 @@ var TrustLedgerAccount = (0, import_core13.list)({
     freezeReason: (0, import_fields27.text)({ access: immutableTrustIdentityAccess, ui: { displayMode: "textarea" } }),
     entries: readOnlyRelationship("TrustLedgerEntry.ledgerAccount", true),
     snapshots: readOnlyRelationship("TrustBalanceSnapshot.ledgerAccount", true),
+    // Live client balance from posted entries on this ledger: liability credits less debits.
+    balanceMinor: (0, import_fields27.virtual)({
+      field: import_core13.graphql.field({
+        type: import_core13.graphql.Int,
+        async resolve(item, _args, context) {
+          const sums = await context.prisma.trustLedgerEntry.groupBy({
+            by: ["direction"],
+            where: { ledgerAccountId: item.id, accountingBucket: "client_liability" },
+            _sum: { amountMinor: true }
+          });
+          const total = (direction) => Number(sums.find((row) => row.direction === direction)?._sum.amountMinor ?? 0);
+          return total("credit") - total("debit");
+        }
+      })
+    }),
     ...trackingFields
   }
 });
@@ -5865,7 +5883,7 @@ var portalPiiAccess = {
 };
 var basePortalShareHooks = firmOwnedHooks({ lifecycle: "portalShare", controlledStatus: true });
 function portalShareRelationId(args, field) {
-  if (Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, field)) {
+  if (args.resolvedData?.[field] !== void 0) {
     return relationshipConnectionIds(args.resolvedData[field])[0] ?? null;
   }
   return args.item?.[`${field}Id`] ?? null;
@@ -5879,9 +5897,9 @@ async function validatePortalShare(args) {
   }
   if (args.item?.id) {
     const relations = ["matter", "portalAccount", "matterAccess", "contact", "grantedBy", "document", "documentVersion", "invoice", "communicationThread"];
-    const relationChanged = relations.some((name) => Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, name) && portalShareRelationId(args, name) !== (args.item[`${name}Id`] ?? null));
+    const relationChanged = relations.some((name) => args.resolvedData?.[name] !== void 0 && portalShareRelationId(args, name) !== (args.item[`${name}Id`] ?? null));
     const scalarChanged = ["resourceType", "grantVersion", "policyRevision", "grantedAt", "expiresAt"].some((name) => {
-      if (!Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, name)) return false;
+      if (!args.resolvedData?.[name] !== void 0) return false;
       const original = args.item[name];
       const proposed = args.resolvedData[name];
       if (["grantedAt", "expiresAt"].includes(name)) {
@@ -5930,7 +5948,7 @@ async function validatePortalShare(args) {
     const field = fields[type.data];
     const resourceId = portalShareRelationId(args, field);
     const resource2 = await prisma[field].findFirst({ where: { id: resourceId, firmId }, select: portalShareHeaderSelect[field].select });
-    const effective = (name) => Object.prototype.hasOwnProperty.call(args.resolvedData ?? {}, name) ? args.resolvedData[name] : args.item?.[name];
+    const effective = (name) => args.resolvedData?.[name] !== void 0 ? args.resolvedData[name] : args.item?.[name];
     const value = {
       id: args.item?.id ?? "new-share",
       firmId,
@@ -6518,7 +6536,7 @@ var retentionPolicyHooks = {
     ...baseRetentionPolicyHooks.validate,
     update: async (args) => {
       await baseRetentionPolicyHooks.validate.update(args);
-      if (args.item?.status !== "draft" && Object.keys(args.resolvedData).some((field) => immutableActivePolicyFields.has(field))) {
+      if (args.item?.status !== "draft" && changedFields(args.resolvedData).some((field) => immutableActivePolicyFields.has(field))) {
         args.addValidationError("Active or retired retention policy terms are immutable; create a new policy version.");
       }
     }
@@ -6945,7 +6963,7 @@ var grantAuthorityFields = /* @__PURE__ */ new Set([
   "expiresAt"
 ]);
 function grantRequiresApproval(args, resolvedData) {
-  return resolvedData.status === "active" && args.item?.status !== "active" || args.item?.status === "active" && Object.keys(resolvedData).some((field) => grantAuthorityFields.has(field));
+  return resolvedData.status === "active" && args.item?.status !== "active" || args.item?.status === "active" && changedFields(resolvedData).some((field) => grantAuthorityFields.has(field));
 }
 function bindGrantApproval(args, resolvedData) {
   if (!grantRequiresApproval(args, resolvedData)) return resolvedData;
@@ -9001,6 +9019,101 @@ async function assertConflictEvidenceSources(tx, firmId, userId, matches, contex
     }
   }
 }
+var CANDIDATES_PER_TERM = 25;
+var canReadPeople = (context) => permissions.canReadPeople({ session: context.session });
+function normalizedName(value) {
+  return value.toLocaleLowerCase("en-US").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+async function searchConflictCandidates(tx, firmId, userId, check, canReadPeople2, onlyTermIds) {
+  const terms = await tx.conflictSearchTerm.findMany({
+    where: { firmId, checkId: check.id, ...onlyTermIds ? { id: { in: onlyTermIds } } : {} },
+    select: { id: true, term: true, normalizedTerm: true, termType: true },
+    take: 100
+  });
+  if (!terms.length) return 0;
+  const [existing, intake, ownMatter] = await Promise.all([
+    tx.conflictMatch.findMany({ where: { firmId, checkId: check.id }, select: { sourceType: true, sourceId: true }, take: 1e3 }),
+    check.intakeId ? tx.intake.findFirst({ where: { id: check.intakeId, firmId }, select: { primaryContactId: true, participants: { select: { contactId: true }, take: 200 } } }) : null,
+    check.matterId ? tx.matter.findFirst({ where: { id: check.matterId, firmId }, select: { clientId: true, parties: { select: { contactId: true }, take: 200 } } }) : null
+  ]);
+  const seen = new Set(existing.map((match) => `${match.sourceType}:${match.sourceId}`));
+  const ownContacts = new Set([
+    intake?.primaryContactId,
+    ...(intake?.participants ?? []).map((row) => row.contactId),
+    ownMatter?.clientId,
+    ...(ownMatter?.parties ?? []).map((row) => row.contactId)
+  ].filter(Boolean));
+  const accessibleMatter = accessibleMatterStorageWhere(firmId, userId);
+  const nameFields = ["firstName", "middleName", "lastName", "organizationName", "preferredName"];
+  let added = 0;
+  const add = async (data) => {
+    const key = `${data.sourceType}:${data.sourceId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    await tx.conflictMatch.create({ data: { firmId, matterId: check.matterId, checkId: check.id, status: "potential", evidenceExcerpt: "", ...data } });
+    added++;
+  };
+  for (const term of terms) {
+    const tokens = normalizedName(term.term).split(" ").filter((token) => token.length > 1).slice(0, 6);
+    if (!tokens.length) continue;
+    const wanted = tokens.join(" ");
+    if (canReadPeople2) {
+      const contacts = await tx.contact.findMany({
+        where: {
+          firmId,
+          status: { not: "archived" },
+          ...ownContacts.size ? { id: { notIn: [...ownContacts] } } : {},
+          AND: tokens.map((token) => ({ OR: nameFields.map((field) => ({ [field]: { contains: token, mode: "insensitive" } })) }))
+        },
+        select: { id: true, firstName: true, middleName: true, lastName: true, organizationName: true, preferredName: true },
+        orderBy: { id: "asc" },
+        take: CANDIDATES_PER_TERM
+      });
+      for (const contact of contacts) {
+        const names = [
+          [contact.firstName, contact.lastName].join(" "),
+          [contact.firstName, contact.middleName, contact.lastName].join(" "),
+          contact.organizationName,
+          contact.preferredName
+        ].map(normalizedName);
+        await add({
+          matchType: names.includes(wanted) ? "exact_name" : "fuzzy_name",
+          matchedContactId: contact.id,
+          sourceType: "contact",
+          sourceId: contact.id,
+          matchedValue: term.term,
+          score: names.includes(wanted) ? 100 : 70
+        });
+      }
+      const contactIds = contacts.map((contact) => contact.id);
+      if (contactIds.length) {
+        const parties = await tx.matterParty.findMany({
+          where: { firmId, contactId: { in: contactIds }, OR: [{ status: null }, { status: "active" }], matter: accessibleMatter, ...check.matterId ? { matterId: { not: check.matterId } } : {} },
+          select: { id: true },
+          orderBy: { id: "asc" },
+          take: CANDIDATES_PER_TERM
+        });
+        for (const party of parties) {
+          await add({ matchType: "related_party", matchedMatterPartyId: party.id, sourceType: "matter_party", sourceId: party.id, matchedValue: term.term, score: 80 });
+        }
+      }
+    }
+    const matters = await tx.matter.findMany({
+      where: {
+        ...accessibleMatter,
+        ...check.matterId ? { id: { not: check.matterId } } : {},
+        AND: tokens.map((token) => ({ title: { contains: token, mode: "insensitive" } }))
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: CANDIDATES_PER_TERM
+    });
+    for (const matter of matters) {
+      await add({ matchType: "matter_text", matchedMatterId: matter.id, sourceType: "matter", sourceId: matter.id, matchedValue: term.term, score: 60 });
+    }
+  }
+  return added;
+}
 async function requestConflictCheck(_root, args, context) {
   const { firmId, userId } = requirePermission(context, "canRunConflictChecks", { humanOnly: true });
   const checkNumber = String(args.checkNumber).trim();
@@ -9075,7 +9188,7 @@ async function addConflictSearchTerm(_root, args, context) {
     if (args.sourceContactId && !await tx.contact.findFirst({ where: { id: args.sourceContactId, firmId }, select: { id: true } })) {
       throw new Error("Conflict source contact was not found in the active firm.");
     }
-    return tx.conflictSearchTerm.create({
+    const created = await tx.conflictSearchTerm.create({
       data: {
         firmId,
         matterId: check.matterId,
@@ -9087,6 +9200,8 @@ async function addConflictSearchTerm(_root, args, context) {
         includeAliases: args.includeAliases !== false
       }
     });
+    await searchConflictCandidates(tx, firmId, userId, check, canReadPeople(context), [created.id]);
+    return created;
   });
 }
 async function addConflictMatch(_root, args, context) {
@@ -9164,11 +9279,12 @@ async function transitionConflictCheck(_root, args, context) {
       }
     }
     const now = /* @__PURE__ */ new Date();
+    if (args.toStatus === "running") await searchConflictCandidates(tx, firmId, userId, check, canReadPeople(context));
     const updated = await tx.conflictCheck.update({
       where: { id: check.id },
       data: {
         status: args.toStatus,
-        ...args.toStatus === "running" ? { startedAt: now } : {},
+        ...args.toStatus === "running" ? { startedAt: now, searchVersion: "firm-records-v1" } : {},
         ...args.toStatus === "review_required" ? { summary } : {},
         ...args.toStatus === "failed" ? { failureReason: summary, completedAt: now } : {},
         ...args.toStatus === "cancelled" ? { completedAt: now } : {}
@@ -16214,12 +16330,22 @@ async function assembleDraftInvoice(_root, args, context) {
     }
     const matter = await tx.matter.findFirst({ where: { id: args.matterId, firmId, clientId: args.clientId }, select: { id: true } });
     if (!matter) throw new Error("Invoice client must match the selected active-firm matter.");
-    const [timeEntries, expenses] = await Promise.all([
+    const [approvedTime, expenses] = await Promise.all([
       tx.timeEntry.findMany({ where: { id: { in: timeEntryIds }, firmId, matterId: args.matterId, status: "approved", isBillable: true, invoiceLine: null } }),
       tx.expense.findMany({ where: { id: { in: expenseIds }, firmId, matterId: args.matterId, status: "approved", isBillable: true, invoiceLine: null } })
     ]);
-    if (timeEntries.length !== timeEntryIds.length || expenses.length !== expenseIds.length) {
+    if (approvedTime.length !== timeEntryIds.length || expenses.length !== expenseIds.length) {
       throw new Error("Every invoice source must be approved, billable, unbilled, and scoped to the selected matter.");
+    }
+    const timeEntries = [];
+    for (const entry of approvedTime) {
+      if (entry.amountMinor !== null && entry.amountMinor !== void 0) {
+        timeEntries.push(entry);
+        continue;
+      }
+      const price = await priceUnpricedTime(tx, entry);
+      if (!("amountMinor" in price)) throw new Error(`Time entry "${String(entry.description).slice(0, 60)}" has no applicable rate.`);
+      timeEntries.push(await tx.timeEntry.update({ where: { id: entry.id }, data: price }));
     }
     const currencies = new Set([...timeEntries, ...expenses].map((item) => item.currencyCode));
     if (currencies.size !== 1) throw new Error("Invoice sources must use one currency.");
@@ -16868,7 +16994,21 @@ async function bookClientConsultation(_root, args, context) {
     const check = await tx.conflictCheck.create({ data: { firmId: firm.id, intakeId: intake.id, checkNumber: `CHK-${suffix}`, status: "requested", requestedById: receiver.userId, searchScope: "contacts_and_matters", searchVersion: "v1" } });
     await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: user.name, normalizedTerm: user.name.toLowerCase(), termType: "person", sourceContactId: contact.id } });
     if (hasNamedOpposingParty(firstContact.opposingParties)) {
-      await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: firstContact.opposingParties, normalizedTerm: firstContact.opposingParties.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim(), termType: "other", includeAliases: false } });
+      let names;
+      try {
+        names = parseAdversePartyNames(firstContact.opposingParties, [user.name]);
+      } catch {
+        names = [];
+      }
+      for (const name of names.slice(0, 25)) {
+        const identity = adversePartyContact(name);
+        const adverse = await tx.contact.create({ data: { firmId: firm.id, ...identity, status: "opposing", primaryEmail: "", primaryPhone: "", conflictSearchAliases: [] } });
+        await tx.intakeParticipant.create({ data: { firmId: firm.id, intakeId: intake.id, contactId: adverse.id, participantRole: "adverse_party", status: "active" } });
+        await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: name, normalizedTerm: normalizeConflictTerm(name), termType: identity.contactType, sourceContactId: adverse.id, includeAliases: true } });
+      }
+      if (!names.length) {
+        await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: firstContact.opposingParties.slice(0, 500), normalizedTerm: normalizeConflictTerm(firstContact.opposingParties).slice(0, 500), termType: "other", includeAliases: false } });
+      }
     }
     const row = await tx.consultation.create({ data: { firmId: firm.id, intakeId: intake.id, accountId: user.id, requestKey: args.requestKey, requestDigest: fingerprint, serviceTitle: service.name, serviceSnapshot: snapshot, feeMinor: service.consultationFeeMinor, currencyCode: firm.defaultCurrency, startsAt: start, endsAt: end, status: "requested", timezone: receiver.timezone, hostId: receiver.userId, officeId: receiver.officeId, participants: { connect: { id: contact.id } } } });
     await recordAuditEvent(tx, { firmId: firm.id, actorUserId: user.id, actorType: "customer", eventType: "consultation.requested", category: "legal_workflow", intakeId: intake.id, metadata: { consultationId: row.id, requestDigest: fingerprint, isLocalFixture: mode === "fixture", acknowledgmentVersion: acknowledgment.version } });
@@ -16907,11 +17047,11 @@ async function customerConsultation(_root, args, context) {
 }
 
 // features/keystone/mutations/index.ts
-var graphql3 = String.raw;
+var graphql4 = String.raw;
 function extendGraphqlSchema(baseSchema) {
   return (0, import_schema.mergeSchemas)({
     schemas: [baseSchema],
-    typeDefs: graphql3`
+    typeDefs: graphql4`
       input TrustLedgerPostingEntryInput {
         ledgerAccountId: ID
         accountingBucket: String!

@@ -35,7 +35,7 @@ export function parseAdversePartyNames(summary: string | null, exclude: string[]
   return names
 }
 
-function adversePartyContact(name: string) {
+export function adversePartyContact(name: string) {
   if (organizationSuffix.test(name)) return { contactType: 'organization' as const, firstName: '', lastName: '', organizationName: name }
   const parts = name.split(' ')
   const lastName = parts.length > 1 ? parts.pop() as string : ''

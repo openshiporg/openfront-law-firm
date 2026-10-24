@@ -24,6 +24,7 @@ import {
 import { formatInstant } from '@/features/platform/lib/datetime'
 import { loadConflictCheckDetail, manageConflictReview, searchConflictSources, type ConflictReviewSetup, type ConflictReviewSource, type ConflictReviewState } from '../actions/manageConflictReview'
 import { shouldShowDispositionForm } from '../lib/conflictReviewState'
+import { useKeptForm } from '../../components/useKeptForm'
 
 export function ConflictReviewPanel({ setup, pageHrefs, timeZone }: { setup: ConflictReviewSetup; pageHrefs?: { previous: string | null; next: string | null }; timeZone: string }) {
   return (
@@ -47,6 +48,7 @@ export function ConflictReviewPanel({ setup, pageHrefs, timeZone }: { setup: Con
 function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup['conflictChecks'][number]; setup: ConflictReviewSetup; timeZone: string }) {
   const router = useRouter()
   const [state, action, pending] = useActionState<ConflictReviewState, FormData>(manageConflictReview, { ok: false, message: '' })
+  const actionForm = useKeptForm(action, state)
   const [outcome, setOutcome] = useState('')
   const [extraTerms, setExtraTerms] = useState<ConflictReviewSetup['conflictChecks'][number]['terms']>([])
   const [extraMatches, setExtraMatches] = useState<ConflictReviewSetup['conflictChecks'][number]['matches']>([])
@@ -56,13 +58,28 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
   const [loading, startLoading] = useTransition()
   // A successful command changes server state: reload this check from the server so the
   // card shows its new status at once. Loaded continuation pages are dropped with it.
+  // The command's own result (new status, added term) shows immediately; the server
+  // copy replaces it when the refresh lands.
+  const [statusOverride, setStatusOverride] = useState<string | null>(null)
+  const [appliedState, setAppliedState] = useState(state)
+  if (appliedState !== state) {
+    setAppliedState(state)
+    if (state.ok) {
+      setStatusOverride(state.status ?? null)
+      setExtraTerms(state.term ? [state.term] : [])
+      setExtraMatches([])
+    }
+  }
+  const [serverStatus, setServerStatus] = useState(check.status)
+  if (serverStatus !== check.status) {
+    setServerStatus(check.status)
+    setStatusOverride(null)
+  }
   useEffect(() => {
-    if (!state.ok) return
-    setExtraTerms([])
-    setExtraMatches([])
-    router.refresh()
+    if (state.ok) router.refresh()
   }, [state, router])
-  const terms = [...check.terms, ...extraTerms]
+  const status = statusOverride ?? check.status
+  const terms = [...new Map([...check.terms, ...extraTerms].map((term) => [term.id, term])).values()]
   const matches = [...check.matches, ...extraMatches]
 
   function loadMore(part: 'terms' | 'matches') {
@@ -88,16 +105,23 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
     <article id={`conflict-${check.id}`} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <StatusDot tone={statusTone(check.status)} />
+          <StatusDot tone={statusTone(status)} />
           <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{heading}</h3>
-          <span className="shrink-0 whitespace-nowrap text-xs font-medium text-muted-foreground">{statusLabel(check.status)}</span>
+          <span className="shrink-0 whitespace-nowrap text-xs font-medium text-muted-foreground">{statusLabel(status)}</span>
         </div>
         <span className="font-mono text-xs text-muted-foreground">{check.checkNumber}</span>
       </header>
 
-      {setup.canRun && check.status !== 'review_required' ? (
+      {detailError || state.message ? (
+        <div className="space-y-1 border-b border-border px-4 py-3 text-sm">
+          {detailError ? <p role="alert" className="text-destructive">{detailError}</p> : null}
+          {state.message ? <p role={state.ok ? 'status' : 'alert'} className={state.ok ? 'text-foreground' : 'text-destructive'}>{state.message}</p> : null}
+        </div>
+      ) : null}
+
+      {setup.canRun && status !== 'review_required' ? (
         <div className="grid min-w-0 gap-4 border-b border-border bg-muted/30 px-4 py-4 xl:grid-cols-2">
-          <form action={action} className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-end">
+          <form {...actionForm} className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-end">
             <input type="hidden" name="operation" value="term" /><input type="hidden" name="checkId" value={check.id} />
             <Field id={`term-${check.id}`} name="term" label="Search term" />
             <Select id={`term-type-${check.id}`} name="termType" label="Type" options={[['person', 'Person'], ['organization', 'Organization'], ['alias', 'Alias'], ['matter', 'Matter'], ['other', 'Other']]} />
@@ -113,7 +137,7 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
             </div>
             {sources ? (
               sources.length ? (
-                <form action={action} className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <form {...actionForm} className="grid min-w-0 gap-3 sm:grid-cols-2">
                   <input type="hidden" name="operation" value="match" /><input type="hidden" name="checkId" value={check.id} />
                   <Select id={`source-${check.id}`} name="source" label="Source" options={sources.map(source => [`${source.kind}:${source.id}`, `${source.kind} · ${source.label}`])} />
                   <Select id={`match-type-${check.id}`} name="matchType" label="Match kind" options={[["manual", "Manual"], ["exact_name", "Exact name"], ["alias", "Alias"], ["fuzzy_name", "Similar name"], ["related_party", "Related party"]]} />
@@ -147,7 +171,7 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
               {matches.map((match) => {
                 const latestDisposition = match.latestDisposition?.[0]
                 const source = match.matchedContact ? { label: match.matchedContact.displayName, href: `/dashboard/contacts/${match.matchedContact.id}` } : match.matchedMatter ? { label: `${match.matchedMatter.matterNumber} · ${match.matchedMatter.title}`, href: `/dashboard/platform/matters/${match.matchedMatter.id}` } : match.matchedMatterParty ? { label: 'Linked matter party', href: `/dashboard/matter-parties/${match.matchedMatterParty.id}` } : null
-                const canContinueReview = setup.canResolve && !!source && shouldShowDispositionForm(check.status, match)
+                const canContinueReview = setup.canResolve && !!source && shouldShowDispositionForm(status, match)
                 return (
                   <li key={match.id} className="min-w-0 space-y-2 py-3 text-sm">
                     <div className="flex min-w-0 items-center gap-2">
@@ -162,7 +186,7 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
                           : <>Disposition unavailable under current source access · {match.dispositionsCount} recorded</>
                         : <>No disposition · {match.status.replaceAll('_', ' ')}</>}
                     </p>
-                    {canContinueReview ? <DispositionForm checkId={check.id} match={match} action={action} pending={pending} /> : null}
+                    {canContinueReview ? <DispositionForm checkId={check.id} match={match} form={actionForm} pending={pending} /> : null}
                   </li>
                 )
               })}
@@ -172,21 +196,21 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
         </div>
       </div>
 
-      {setup.canRun && check.status === 'requested' ? (
-        <form action={action} className="border-t border-border px-4 py-3">
+      {setup.canRun && status === 'requested' ? (
+        <form {...actionForm} className="border-t border-border px-4 py-3">
           <input type="hidden" name="operation" value="transition" /><input type="hidden" name="checkId" value={check.id} /><input type="hidden" name="toStatus" value="running" />
           <Track><button type="submit" className={pillPrimaryClass} disabled={pending}>Start manual review</button></Track>
         </form>
       ) : null}
-      {setup.canRun && check.status === 'running' ? (
-        <form action={action} className="grid gap-3 border-t border-border px-4 py-4">
+      {setup.canRun && status === 'running' ? (
+        <form {...actionForm} className="grid gap-3 border-t border-border px-4 py-4">
           <input type="hidden" name="operation" value="transition" /><input type="hidden" name="checkId" value={check.id} /><input type="hidden" name="toStatus" value="review_required" />
-          <Field id={`completed-${check.id}`} name="summary" label="Review summary" minLength={10} />
+          <Field id={`completed-${check.id}`} name="summary" label="Review summary" />
           <Track className="justify-self-start"><button type="submit" className={pillPrimaryClass} disabled={pending}>Send to final review</button></Track>
         </form>
       ) : null}
-      {setup.canResolve && check.status === 'review_required' ? (
-        <form action={action} className="grid gap-3 border-t border-border px-4 py-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-end">
+      {setup.canResolve && status === 'review_required' ? (
+        <form {...actionForm} className="grid gap-3 border-t border-border px-4 py-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-end">
           <input type="hidden" name="operation" value="finalize" /><input type="hidden" name="checkId" value={check.id} />
           <fieldset className="min-w-0">
             <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Outcome</legend>
@@ -199,16 +223,9 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
               ))}
             </div>
           </fieldset>
-          <Field id={`summary-${check.id}`} name="summary" label="Final summary" minLength={10} />
+          <Field id={`summary-${check.id}`} name="summary" label="Final summary" />
           <Track className="justify-self-start sm:col-span-2"><button type="submit" className={pillPrimaryClass} disabled={pending || !outcome}>Record final review</button></Track>
         </form>
-      ) : null}
-
-      {detailError || state.message ? (
-        <div className="space-y-1 border-t border-border px-4 py-3 text-sm">
-          {detailError ? <p role="alert" className="text-destructive">{detailError}</p> : null}
-          {state.message ? <p role={state.ok ? 'status' : 'alert'} className={state.ok ? 'text-foreground' : 'text-destructive'}>{state.message}</p> : null}
-        </div>
       ) : null}
     </article>
   )
@@ -222,13 +239,13 @@ function ColumnHeading({ label, count }: { label: string; count: number }) {
   )
 }
 
-function DispositionForm({ checkId, match, action, pending }: { checkId: string; match: ConflictReviewSetup['conflictChecks'][number]['matches'][number]; action: (payload: FormData) => void; pending: boolean }) {
+function DispositionForm({ checkId, match, form, pending }: { checkId: string; match: ConflictReviewSetup['conflictChecks'][number]['matches'][number]; form: ReturnType<typeof useKeptForm>; pending: boolean }) {
   return (
-    <form action={action} className="grid min-w-0 gap-3 rounded-lg border border-border bg-background p-3">
+    <form {...form} className="grid min-w-0 gap-3 rounded-lg border border-border bg-background p-3">
       <input type="hidden" name="operation" value="disposition" /><input type="hidden" name="checkId" value={checkId} /><input type="hidden" name="matchId" value={match.id} />
       <p className="truncate text-xs font-semibold text-foreground">{match.dispositionsCount > 0 ? 'Follow-up decision' : 'First decision'}</p>
       <Select id={`outcome-${match.id}`} name="outcome" label="Disposition" options={[['clear', 'Clear'], ['conflict', 'Conflict'], ['needs_more_information', 'Needs more information'], ['approved_exception', 'Approved exception']]} />
-      <Field id={`rationale-${match.id}`} name="rationale" label="Rationale" minLength={10} />
+      <Field id={`rationale-${match.id}`} name="rationale" label="Rationale" />
       <Track className="justify-self-start"><button type="submit" className={pillClass} disabled={pending}>Record disposition</button></Track>
     </form>
   )
@@ -245,8 +262,8 @@ function formatDispositionOutcome(outcome: string) {
   return dispositionLabels[outcome] ?? 'Disposition recorded'
 }
 
-function Field({ id, name, label, minLength }: { id: string; name: string; label: string; minLength?: number }) {
-  return <label htmlFor={id} className={labelClass}>{label}<input id={id} name={name} className={fieldClass} required minLength={minLength} /></label>
+function Field({ id, name, label }: { id: string; name: string; label: string }) {
+  return <label htmlFor={id} className={labelClass}>{label}<input id={id} name={name} className={fieldClass} required /></label>
 }
 
 function Select({ id, name, label, options }: { id: string; name: string; label: string; options: string[][] }) {

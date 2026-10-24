@@ -13,6 +13,7 @@ import { ErrorBanner, Notice, Panel, StatusDot, Track, fieldClass, labelClass, p
 import { LogoPicker } from "@/features/platform/store-settings/LogoPicker";
 import { LOGO_ICONS } from "@/features/platform/store-settings/lib/untitled-logo-registry";
 import { STOREFRONT_ACCENT_PRESETS } from "@/features/storefront/lib/accent";
+import { useKeptForm } from '../../components/useKeptForm'
 
 const seedLogo = LOGO_ICONS.find((icon) => icon.id === seed.logoIcon) ?? LOGO_ICONS[0];
 
@@ -127,6 +128,7 @@ function Field({
  */
 export function FirmSetupForm({ offlineSampleAvailable: preflight, inDialog = false }: { offlineSampleAvailable?: boolean; inDialog?: boolean }) {
   const [state, action] = useOnboardingApi(initialState);
+  const actionForm = useKeptForm(action, state)
   const listId = useId();
   // Server pages pass the preflight; the dialog asks the same viewer query after mount.
   const [checked, setChecked] = useState<boolean | null>(null);
@@ -165,7 +167,7 @@ export function FirmSetupForm({ offlineSampleAvailable: preflight, inDialog = fa
           </Track>
         </header>
 
-        <form action={action} className="mt-6 space-y-6">
+        <form {...actionForm} className="mt-6 space-y-6">
           <Panel id="setup-firm" title="Firm">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="firmName" label="Legal firm name" defaultValue={state.values.firmName} autoComplete="organization" required maxLength={200} />

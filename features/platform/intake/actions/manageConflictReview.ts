@@ -22,7 +22,14 @@ export type ConflictReviewSetup = {
     matchesCount: number
   }>
 }
-export type ConflictReviewState = { ok: boolean; message: string }
+export type ConflictReviewState = {
+  ok: boolean
+  message: string
+  /** The check's status after a transition or final review, so the card can show it at once. */
+  status?: string
+  /** The term just added, shown on the card before the page refresh lands. */
+  term?: { id: string; term: string; termType: string }
+}
 
 const CHECK_PAGE_SIZE = 10 // literal in ConflictReviewSetup below
 const DETAIL_PAGE_SIZE = 50 // literal in ConflictReviewSetup below
@@ -92,12 +99,18 @@ export async function manageConflictReview(_previous: ConflictReviewState, formD
   const operation = String(formData.get('operation') ?? '')
   const checkId = String(formData.get('checkId') ?? '').trim()
   if (!checkId) return { ok: false, message: 'Conflict check is required.' }
-  let response: KeystoneResponse<unknown>
+  let response: KeystoneResponse<{
+    transitionConflictCheck?: { check?: { status?: string } | null } | null
+    finalizeConflictCheck?: { check?: { status?: string } | null } | null
+    addConflictSearchTerm?: { id?: string } | null
+  }>
   let message = 'Review updated'
+  let addedTerm: { term: string; termType: string } | null = null
   if (operation === 'term') {
     const term = String(formData.get('term') ?? '').trim(), termType = String(formData.get('termType') ?? 'other')
     if (!term) return { ok: false, message: 'Search term is required.' }
     message = 'Term added'
+    addedTerm = { term, termType }
     response = await keystoneClient(`mutation AddManualConflictTerm($checkId: ID!, $term: String!, $normalized: String!, $termType: String!) { addConflictSearchTerm(checkId: $checkId, term: $term, normalizedTerm: $normalized, termType: $termType, includeAliases: true) { id } }`, { checkId, term, normalized: normalize(term), termType })
   } else if (operation === 'match') {
     const [kind, id, ...extra] = String(formData.get('source') ?? '').split(':')
@@ -130,5 +143,8 @@ export async function manageConflictReview(_previous: ConflictReviewState, formD
   }
   revalidatePath('/dashboard/platform/intake')
   revalidatePath('/dashboard')
-  return { ok: true, message }
+  const data = response.data
+  const status = data?.transitionConflictCheck?.check?.status ?? data?.finalizeConflictCheck?.check?.status
+  const addedId = data?.addConflictSearchTerm?.id
+  return { ok: true, message, ...(status ? { status } : {}), ...(addedId && addedTerm ? { term: { id: String(addedId), ...addedTerm } } : {}) }
 }

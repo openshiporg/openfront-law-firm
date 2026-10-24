@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { EmptyState, Pager, StatusDot, Track, fieldClass, labelClass, pillClass, pillPrimaryClass } from '@/features/platform/components/ui'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 import { convertIntake, type IntakeSetup, type IntakeStartState } from '../actions/startIntake'
+import { useKeptForm } from '../../components/useKeptForm'
 
 type OpenedMatter = { id: string; matterNumber: string }
 
@@ -46,16 +47,21 @@ export function IntakeConversionPanel({ setup, pageHrefs }: { setup: IntakeSetup
 
 function ConversionForm({ intake, setup, onOpened }: { intake: IntakeSetup['decisionIntakes'][number]; setup: IntakeSetup; onOpened: (matter: OpenedMatter) => void }) {
   const router = useRouter()
-  const [state, action, pending] = useActionState<IntakeStartState, FormData>(convertIntake, { ok: false, message: '' })
+  // The action's response already carries the refreshed page, which drops this card, so
+  // the panel is told about the new matter from inside the action, not from an effect here.
+  const [state, action, pending] = useActionState<IntakeStartState, FormData>(async (previous, formData) => {
+    const result = await convertIntake(previous, formData)
+    if (result.ok && result.matterId && result.matterNumber) onOpened({ id: result.matterId, matterNumber: result.matterNumber })
+    return result
+  }, { ok: false, message: '' })
+  const actionForm = useKeptForm(action, state)
   const [officeId, setOfficeId] = useState(setup.officesCount === 1 ? setup.offices[0]?.id ?? '' : '')
   const [areaId, setAreaId] = useState(intake.practiceArea?.id ?? (setup.practiceAreasCount === 1 ? setup.practiceAreas[0]?.id ?? '' : ''))
   useEffect(() => {
-    if (!state.ok || !state.matterId || !state.matterNumber) return
-    onOpened({ id: state.matterId, matterNumber: state.matterNumber })
-    router.refresh()
-  }, [state, onOpened, router])
+    if (state.ok) router.refresh()
+  }, [state, router])
   return (
-    <form action={action} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+    <form {...actionForm} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       <input type="hidden" name="intakeId" value={intake.id} />
       <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3">
         <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{intake.title}</h3>

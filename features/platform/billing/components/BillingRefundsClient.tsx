@@ -10,6 +10,7 @@ import { formatInstant } from '@/features/platform/lib/datetime'
 import { currencyFractionDigits, formatMoneyLabel, minorUnitsToDecimal } from '@/features/platform/lib/money'
 
 import { requestPaymentRefund, reviewPaymentRefund, type RefundActionState, type RefundRow, type RefundSetup } from '../actions/refunds'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: RefundActionState = { ok: false, message: '' }
 
@@ -50,9 +51,10 @@ function RequestRefundForm({ payments, onDone }: { payments: RefundSetup['paymen
     }
     return result
   }, initial)
+  const runForm = useKeptForm(run, state)
 
   return (
-    <form key={formKey} action={run} className="min-w-0 rounded-xl border border-border">
+    <form key={formKey} {...runForm} className="min-w-0 rounded-xl border border-border">
       <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
         <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Request refund</legend>
         <div className={cn(labelClass, 'sm:col-span-2')}>
@@ -108,6 +110,7 @@ function ReviewControls({ refund, viewerId }: { refund: RefundRow; viewerId: str
     if (result.ok) { setDecision(null); router.refresh() }
     return result
   }, initial)
+  const runForm = useKeptForm(run, state)
 
   return (
     <div className="grid min-w-0 gap-3">
@@ -117,7 +120,7 @@ function ReviewControls({ refund, viewerId }: { refund: RefundRow; viewerId: str
       </Track>
       {ownRequest ? <p className="text-xs text-muted-foreground">You requested this refund; another reviewer must approve it.</p> : null}
       {decision ? (
-        <form action={run} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
+        <form {...runForm} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
           <input type="hidden" name="refundId" value={refund.id} />
           <input type="hidden" name="decision" value={decision} />
           <label className={cn(labelClass, 'flex-1')}>

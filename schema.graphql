@@ -5819,6 +5819,7 @@ type TrustLedgerAccount {
   entriesCount(where: TrustLedgerEntryWhereInput! = {}): Int
   snapshots(where: TrustBalanceSnapshotWhereInput! = {}, orderBy: [TrustBalanceSnapshotOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: TrustBalanceSnapshotWhereUniqueInput): [TrustBalanceSnapshot!]
   snapshotsCount(where: TrustBalanceSnapshotWhereInput! = {}): Int
+  balanceMinor: Int
   createdAt: DateTime
   updatedAt: DateTime
 }

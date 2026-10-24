@@ -6,6 +6,8 @@ import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 import { formatInstant } from '@/features/platform/lib/datetime'
 
+import { loadActiveHourlyRules, priceEntries } from '../lib/loadRateRules'
+
 export type BillingMatterOption = {
   id: string
   matterNumber: string
@@ -88,7 +90,7 @@ async function suggestInvoiceNumber() {
   const prefix = `INV-${year}-`
   const response = await keystoneClient<{ invoices: Array<{ invoiceNumber: string }> }>(`
     query InvoiceNumberSequence($prefix: String!) {
-      invoices(where: { invoiceNumber: { startsWith: $prefix } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 500) { invoiceNumber }
+      invoices(where: { invoiceNumber: { startsWith: $prefix } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 100) { invoiceNumber }
     }
   `, { prefix })
   let highest = 0
@@ -169,7 +171,7 @@ export async function assembleInvoice(
   const timeEntryIds = selected.filter((value) => value.startsWith('time:')).map((value) => value.slice(5))
   const expenseIds = selected.filter((value) => value.startsWith('expense:')).map((value) => value.slice(8))
   if (!matterId || !invoiceNumber) return { ok: false, message: 'Matter and invoice number are required.' }
-  if (!selected.length || selected.length > 200) return { ok: false, message: 'Select between 1 and 200 approved sources.' }
+  if (!selected.length || selected.length > 100) return { ok: false, message: 'Select between 1 and 100 approved sources.' }
   if (invoiceNumber.length > 120 || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(invoiceNumber)) {
     return { ok: false, message: 'Invoice number must be 120 characters or fewer and use letters, numbers, dot, slash, underscore, or hyphen.' }
   }
@@ -191,13 +193,28 @@ export async function assembleInvoice(
     invoicesCount: number
   }>(`
     query InvoiceAssemblyPrecheck($ids: [ID!], $invoiceNumber: String!) {
-      timeEntries(where: { id: { in: $ids } }, take: 200) { id description workDate durationMinutes amountMinor }
+      timeEntries(where: { id: { in: $ids } }, take: 100) { id description workDate durationMinutes amountMinor }
       invoicesCount(where: { invoiceNumber: { equals: $invoiceNumber, mode: insensitive } })
     }
   `, { ids: timeEntryIds, invoiceNumber })
   if (!precheck.success) return { ok: false, message: precheck.error }
   if (precheck.data.invoicesCount > 0) return { ok: false, message: `Invoice number ${invoiceNumber} is already used.` }
-  const unpriced = precheck.data.timeEntries.filter((entry) => entry.amountMinor === null)
+  // Approved time with no amount is priced during assembly; only time no active rate
+  // covers blocks the draft.
+  const missing = precheck.data.timeEntries.filter((entry) => entry.amountMinor === null)
+  let unpriced = missing
+  if (missing.length) {
+    const [rules, sources] = await Promise.all([
+      loadActiveHourlyRules(),
+      keystoneClient<{ timeEntries: Array<{ id: string; durationMinutes: number; workDate: string; user: { id: string } | null; matter: { id: string; practiceArea: { id: string } | null } | null }> }>(`
+        query UnpricedAssemblySources($ids: [ID!]) { timeEntries(where: { id: { in: $ids } }, take: 100) { id durationMinutes workDate user { id } matter { id practiceArea { id } } } }
+      `, { ids: missing.map((entry) => entry.id) }),
+    ])
+    if (rules.success && sources.success) {
+      const priced = priceEntries(rules.data.rateRules, sources.data.timeEntries)
+      unpriced = missing.filter((entry) => !priced.has(entry.id))
+    }
+  }
   if (unpriced.length) {
     const timeZone = await getFirmTimeZone()
     const named = unpriced.slice(0, 5).map((entry) => `"${entry.description.slice(0, 60)}" (${formatInstant(entry.workDate, timeZone, { includeTime: false })}, ${entry.durationMinutes} min)`).join(', ')

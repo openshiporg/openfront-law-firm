@@ -151,7 +151,9 @@ async function validateConnectedRelationships(args: any) {
   }
 
   const sourceHasMatter = sourceModel.fields.some((field) => field.name === "matterId");
-  const matterWasSupplied = Object.prototype.hasOwnProperty.call(resolvedData, "matter");
+  // Keystone lists every field in resolvedData, with undefined for fields the operation
+  // did not touch, so only a defined value means the matter scope is being changed.
+  const matterWasSupplied = changedFields(resolvedData).includes("matter");
   const suppliedMatterId = connectedId(resolvedData.matter);
   const storedMatterId = typeof item?.matterId === "string" ? item.matterId : null;
   const ownerMatterId = suppliedMatterId ?? storedMatterId;
@@ -166,7 +168,7 @@ async function validateConnectedRelationships(args: any) {
   }
 
   for (const relation of sourceModel.fields.filter((field) => field.kind === "object")) {
-    if (!Object.prototype.hasOwnProperty.call(resolvedData, relation.name)) continue;
+    if (resolvedData[relation.name] === undefined) continue;
     const ids = relationshipConnectionIds(resolvedData[relation.name]);
     if (ids.length === 0) continue;
 
@@ -223,6 +225,11 @@ async function validateConnectedRelationships(args: any) {
       }
     }
   }
+}
+
+/** Fields an update actually sets: Keystone lists every field in resolvedData, untouched ones as undefined. */
+export function changedFields(resolvedData: Record<string, unknown> | undefined | null) {
+  return Object.keys(resolvedData ?? {}).filter((field) => resolvedData?.[field] !== undefined);
 }
 
 export function activeFirmRelationshipHooks(

@@ -9,6 +9,7 @@ import { Panel, Track, fieldClass, labelClass, trackItemClass } from '@/features
 
 import { scheduleConsultationCommand } from '../actions/scheduleConsultation'
 import { SCHEDULABLE_STATUSES, type ConsultationSchedule } from '../lib/scheduleTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const DURATIONS = [15, 30, 45, 60, 90, 120]
 
@@ -28,6 +29,7 @@ export function ConsultationSchedulePanel({ consultation, timeZone }: { consulta
   const [hostId, setHostId] = useState(consultation.host?.id ?? '')
   const [officeId, setOfficeId] = useState(consultation.office?.id ?? '')
   const [state, action, pending] = useCommand(scheduleConsultationCommand, () => setOpen(false))
+  const actionForm = useKeptForm(action, state)
   if (!schedulable) return null
   const rescheduling = consultation.status === 'scheduled'
   const { date, time } = wallParts(consultation.startsAt, timeZone)
@@ -42,7 +44,7 @@ export function ConsultationSchedulePanel({ consultation, timeZone }: { consulta
       bodyClassName={open ? 'p-4' : 'p-0'}
     >
       {open ? (
-        <form action={action} className="grid gap-4 sm:grid-cols-2">
+        <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
           <input type="hidden" name="consultationId" value={consultation.id} />
           <TextField id="schedule-date" name="date" label={`Date (${timeZone})`} type="date" required defaultValue={date} />
           <TextField id="schedule-time" name="time" label="Start time" type="time" required defaultValue={time} />

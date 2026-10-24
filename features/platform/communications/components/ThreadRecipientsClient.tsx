@@ -10,6 +10,7 @@ import { EmptyState, Panel, StatusDot, Track, fieldClass, labelClass, pillDanger
 import { addParticipantAction, getContactEmailMethods, removeParticipantAction } from '../actions/recipients'
 import type { ContactEmailMethod, ParticipantRow, ThreadRecipientSetup } from '../actions/recipientTypes'
 import { ActionMessage, useRecipientAction } from './useRecipientAction'
+import { useKeptForm } from '../../components/useKeptForm'
 
 type RecipientType = 'staff' | 'contact' | 'portal'
 const TYPES: Array<[RecipientType, string]> = [['staff', 'Staff'], ['contact', 'Contact'], ['portal', 'Portal account']]
@@ -25,6 +26,7 @@ export function participantRole(participant: ParticipantRow) {
 
 function AddForm({ threadId, onDone }: { threadId: string; onDone: () => void }) {
   const [state, action, pending] = useRecipientAction(addParticipantAction, onDone)
+  const actionForm = useKeptForm(action, state)
   const [type, setType] = useState<RecipientType>('staff')
   const [methods, setMethods] = useState<ContactEmailMethod[] | null>(null)
   const [loading, startLoading] = useTransition()
@@ -34,7 +36,7 @@ function AddForm({ threadId, onDone }: { threadId: string; onDone: () => void })
     startLoading(async () => setMethods(await getContactEmailMethods(contactId)))
   }
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="threadId" value={threadId} />
       <input type="hidden" name="type" value={type} />
       <div className="grid gap-1.5 sm:col-span-2">
@@ -75,8 +77,9 @@ function AddForm({ threadId, onDone }: { threadId: string; onDone: () => void })
 
 function RemoveForm({ threadId, participant, onDone }: { threadId: string; participant: ParticipantRow; onDone: () => void }) {
   const [state, action, pending] = useRecipientAction(removeParticipantAction, onDone)
+  const actionForm = useKeptForm(action, state)
   return (
-    <form action={action} className="grid gap-3">
+    <form {...actionForm} className="grid gap-3">
       <input type="hidden" name="threadId" value={threadId} />
       <input type="hidden" name="participantId" value={participant.id} />
       <label className={labelClass}>Reason for removing {participantName(participant)}<textarea name="reason" required minLength={5} maxLength={2000} rows={2} className={textareaClass} /></label>

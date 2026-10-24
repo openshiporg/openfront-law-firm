@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { fieldClass, labelClass, pillClass, pillPrimaryClass, trackClass, trackItemClass } from '@/features/platform/components/ui'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 import { saveTimerEntry, type TimerSaveState } from '@/features/platform/time-expenses/actions/saveTimerEntry'
+import { useKeptForm } from '../components/useKeptForm'
 
 // Only elapsed-capture metadata survives navigation. Legal descriptions and
 // matter identities NEVER enter origin-wide storage; they stay mounted, under
@@ -66,11 +67,13 @@ export function LocalTimerClient({ scopeKey }: { scopeKey: string }) {
     }
     return result
   }, initialSave)
+  const saveActionForm = useKeptForm(saveAction, saveState)
 
   useEffect(() => {
     try {
       // Presence only: never parse or restore unbound confidential content into
       // the current identity. Discard is explicit, with an honest loss notice.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is readable only after mount
       setLegacyPresent(window.localStorage.getItem('openfront-law-firm:timer-draft') !== null)
       const previous = window.localStorage.getItem(`${PREFIX}last-scope`)
       if (previous?.startsWith(PREFIX) && previous !== `${PREFIX}last-scope` && previous !== storageKey) { window.localStorage.removeItem(previous); memories.delete(previous) }
@@ -115,7 +118,7 @@ export function LocalTimerClient({ scopeKey }: { scopeKey: string }) {
     </div>
     <p role="status" className="sr-only">{announcement}</p>
     <p className="text-xs text-muted-foreground">Elapsed time is kept on this device for one day. Matter and description are not.</p>
-    <form action={saveAction}>
+    <form {...saveActionForm}>
       <fieldset disabled={saving} className="grid min-w-0 gap-4 sm:grid-cols-2">
         <input type="hidden" name="captureId" value={draft.captureId} />
         <input type="hidden" name="startedAt" value={draft.firstStartedAt ?? ''} />

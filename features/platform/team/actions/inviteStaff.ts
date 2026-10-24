@@ -48,7 +48,7 @@ export async function getTeamSetup(requestedPage = 1, query = '') {
   const response = await keystoneClient<Omit<TeamSetup, 'membershipsCount' | 'memberPage' | 'memberPageCount' | 'memberQuery' | 'missingStandardRoles'> & { allRoleNames: Array<{ name: string }> }>(`
     query TeamSetup($where: FirmMembershipWhereInput!, $skip: Int!) {
       roles(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 100) { id name status }
-      allRoleNames: roles(take: 500) { name }
+      allRoleNames: roles(take: 100) { name }
       rolesCount(where: { status: { equals: active } })
       offices(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 100) { id name code status }
       officesCount(where: { status: { equals: active } })
@@ -187,7 +187,7 @@ export type StandardRolesState = { message: string | null; success: string | nul
 // hook apply). Existing roles with the same name, active or archived, are left alone.
 export async function addStandardRoles(_previous: StandardRolesState, _formData: FormData): Promise<StandardRolesState> {
   const existing = await keystoneClient<{ roles: Array<{ name: string }> }>(`
-    query FirmRoleNames { roles(take: 500) { name } }
+    query FirmRoleNames { roles(take: 100) { name } }
   `)
   if (!existing.success) return { message: 'Roles could not be loaded. Adding roles requires role-management access.', success: null }
   const names = new Set(existing.data.roles.map((role) => role.name.trim().toLowerCase()))

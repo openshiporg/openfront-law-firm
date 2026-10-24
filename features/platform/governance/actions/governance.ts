@@ -45,18 +45,20 @@ function revalidateGovernance() {
 export async function getGovernanceSetup(): Promise<{ success: true; data: GovernanceSetup } | { success: false; error: string }> {
   const response = await keystoneClient<GovernanceSetup>(`
     query GovernanceSetup {
-      policies: retentionPolicies(orderBy: [{ name: asc }, { id: asc }], take: 200) {
+      policies: retentionPolicies(orderBy: [{ name: asc }, { id: asc }], take: 100) {
         id name code status recordClass trigger retentionDays description jurisdictionReference
         practiceArea { id name } holdsCount documentsCount
       }
-      practiceAreas(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 200) { id name }
+      practiceAreas(where: { status: { equals: active } }, orderBy: [{ name: asc }], take: 100) { id name }
     }
   `)
   if (!response.success) return { success: false, error: 'Retention policies could not be loaded. Check retention permission.' }
   return { success: true, data: { policies: response.data.policies ?? [], practiceAreas: response.data.practiceAreas ?? [] } }
 }
 
-const targetQueries: Record<HoldTargetKind, { query: string; where: (q: string) => Record<string, unknown>; map: (row: any) => HoldTargetOption }> = {
+type HoldTargetRow = { id: string; matterNumber?: string | null; title?: string | null; status?: string | null; matter?: { matterNumber?: string | null } | null; displayName?: string | null; primaryEmail?: string | null }
+
+const targetQueries: Record<HoldTargetKind, { query: string; where: (q: string) => Record<string, unknown>; map: (row: HoldTargetRow) => HoldTargetOption }> = {
   matter: {
     query: `query HoldMatters($where: MatterWhereInput!) { rows: matters(where: $where, orderBy: [{ matterNumber: asc }, { id: asc }], take: 25) { id matterNumber title status } }`,
     where: (q) => (q ? { OR: [{ matterNumber: { contains: q, mode: 'insensitive' } }, { title: { contains: q, mode: 'insensitive' } }] } : {}),
@@ -80,7 +82,7 @@ export async function searchHoldTargets(kind: HoldTargetKind, query: string): Pr
   const definition = Object.hasOwn(targetQueries, kind) ? targetQueries[kind] : null
   if (!definition) return { success: false, error: 'Unsupported target.' }
   const q = String(query ?? '').trim().slice(0, 100)
-  const response = await keystoneClient<{ rows: any[] }>(definition.query, { where: definition.where(q) })
+  const response = await keystoneClient<{ rows: HoldTargetRow[] }>(definition.query, { where: definition.where(q) })
   if (!response.success) return { success: false, error: 'Search failed. Check your access.' }
   return { success: true, data: (response.data.rows ?? []).map(definition.map).filter((option) => option.value) }
 }

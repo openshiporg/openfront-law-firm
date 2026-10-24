@@ -12,6 +12,7 @@ import { EmptyState, Panel, StatusDot, Track, fieldClass, labelClass, statusLabe
 
 import { addDocketDeadline, changeDocketStatus, createDocket, recordEntry, saveCourt, verifyEntry } from '../actions/docketCommands'
 import { COURT_TYPES, DEADLINE_TYPES, DOCKET_TRANSITIONS, ENTRY_OUTCOMES, ENTRY_TYPES, type CourtRow, type DocketEntryRow, type DocumentVersionOption } from '../lib/docketTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 function SelectField({ id, name, label, defaultValue, options, required, emptyLabel, className }: { id: string; name: string; label: string; defaultValue?: string; options: ReadonlyArray<readonly [string, string]>; required?: boolean; emptyLabel?: string; className?: string }) {
   return (
@@ -26,9 +27,10 @@ function SelectField({ id, name, label, defaultValue, options, required, emptyLa
 
 function CourtForm({ court, onDone }: { court?: CourtRow; onDone: () => void }) {
   const [state, action, pending] = useCommand(saveCourt, onDone)
+  const actionForm = useKeptForm(action, state)
   const key = court?.id ?? 'new'
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="id" value={court?.id ?? ''} />
       <TextField id={`court-name-${key}`} name="name" label="Name" required minLength={2} maxLength={200} defaultValue={court?.name} className="sm:col-span-2" />
       <SelectField id={`court-type-${key}`} name="courtType" label="Type" defaultValue={court?.courtType ?? 'state'} options={COURT_TYPES} />
@@ -74,6 +76,7 @@ export function CourtsPanel({ courts }: { courts: CourtRow[] }) {
 export function CreateDocketPanel({ courts, timeZone }: { courts: CourtRow[]; timeZone: string }) {
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useCommand(createDocket, () => setOpen(false))
+  const actionForm = useKeptForm(action, state)
   const activeCourts = courts.filter((court) => court.status !== 'inactive').map((court) => [court.id, `${court.name} · ${court.jurisdiction}`] as const)
   return (
     <section aria-labelledby="new-docket-heading" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -82,7 +85,7 @@ export function CreateDocketPanel({ courts, timeZone }: { courts: CourtRow[]; ti
         <Track><button type="button" onClick={() => setOpen(!open)} aria-pressed={open} className={trackItemClass(open)}><Plus className="size-3.5" aria-hidden="true" />Docket</button></Track>
       </header>
       {open ? (activeCourts.length ? (
-        <form action={action} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
+        <form {...actionForm} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
           <input type="hidden" name="timezone" value={timeZone} />
           <div className="sm:col-span-2"><SearchableOptionSelect id="docket-matter" name="matterId" label="Matter" emptyLabel="Choose a matter" required kind="matter" options={[]} /></div>
           <TextField id="docket-number" name="docketNumber" label="Docket number" required maxLength={120} />
@@ -99,13 +102,14 @@ export function CreateDocketPanel({ courts, timeZone }: { courts: CourtRow[]; ti
 export function DocketStatusControl({ docketId, status }: { docketId: string; status: string }) {
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useCommand(changeDocketStatus, () => setOpen(false))
+  const actionForm = useKeptForm(action, state)
   const targets = DOCKET_TRANSITIONS[status] ?? []
   if (!targets.length) return null
   return (
     <div className="relative">
       <Track><button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={trackItemClass(true)}>Change status</button></Track>
       {open ? (
-        <form action={action} className="absolute right-0 z-20 mt-2 grid w-72 max-w-[calc(100vw-2rem)] gap-3 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+        <form {...actionForm} className="absolute right-0 z-20 mt-2 grid w-72 max-w-[calc(100vw-2rem)] gap-3 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg">
           <input type="hidden" name="docketId" value={docketId} />
           <ChoiceTrack name="toStatus" label="New status" defaultValue={targets[0]} options={targets.map((value) => [value, statusLabel(value)] as const)} />
           <FormFooter state={state} pending={pending} label="Save" />
@@ -118,6 +122,7 @@ export function DocketStatusControl({ docketId, status }: { docketId: string; st
 export function RecordEntryForm({ docketId, timeZone, versions }: { docketId: string; timeZone: string; versions: DocumentVersionOption[] }) {
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useCommand(recordEntry, () => setOpen(false))
+  const actionForm = useKeptForm(action, state)
   return (
     <section aria-labelledby="record-entry-heading" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       <header className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -125,7 +130,7 @@ export function RecordEntryForm({ docketId, timeZone, versions }: { docketId: st
         <Track><button type="button" onClick={() => setOpen(!open)} aria-pressed={open} className={trackItemClass(open)}><Plus className="size-3.5" aria-hidden="true" />Entry</button></Track>
       </header>
       {open ? (
-        <form action={action} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
+        <form {...actionForm} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
           <input type="hidden" name="docketId" value={docketId} />
           <input type="hidden" name="timezone" value={timeZone} />
           <TextField id="entry-title" name="title" label="Title" required maxLength={300} className="sm:col-span-2" />
@@ -145,10 +150,11 @@ export function RecordEntryForm({ docketId, timeZone, versions }: { docketId: st
 
 function VerifyEntryForm({ docketId, entry, onDone }: { docketId: string; entry: DocketEntryRow; onDone: () => void }) {
   const [state, action, pending] = useCommand(verifyEntry, onDone)
+  const actionForm = useKeptForm(action, state)
   const outcomes = (ENTRY_OUTCOMES[entry.status] ?? []).filter((outcome) => (outcome !== 'filed' || entry.filedAt) && (outcome !== 'entered' || entry.enteredAt))
   if (!outcomes.length) return <p className="text-xs text-muted-foreground">No verification outcome is available for this entry.</p>
   return (
-    <form action={action} className="grid gap-3">
+    <form {...actionForm} className="grid gap-3">
       <input type="hidden" name="docketId" value={docketId} />
       <input type="hidden" name="entryId" value={entry.id} />
       <ChoiceTrack name="toStatus" label="Court record shows" defaultValue={outcomes[0]} options={outcomes.map((value) => [value, statusLabel(value)] as const)} />
@@ -192,6 +198,7 @@ export function EntryTimeline({ docketId, entries, timeZone, canRecord }: { dock
 export function DocketDeadlines({ docketId, deadlines, timeZone, canAdd }: { docketId: string; deadlines: Array<{ id: string; title: string | null; status: string; deadlineType: string | null; dueAt: string | null; timezone: string | null; isVerified: boolean | null }>; timeZone: string; canAdd: boolean }) {
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useCommand(addDocketDeadline, () => setOpen(false))
+  const actionForm = useKeptForm(action, state)
   const format = (value: string | null, zone: string | null) => {
     if (!value) return 'No due time'
     try { return new Intl.DateTimeFormat('en', { timeZone: zone || timeZone, dateStyle: 'medium', timeStyle: 'short', timeZoneName: 'short' }).format(new Date(value)) } catch { return value }
@@ -204,7 +211,7 @@ export function DocketDeadlines({ docketId, deadlines, timeZone, canAdd }: { doc
       bodyClassName="p-0"
     >
       {open ? (
-        <form action={action} className="grid gap-4 border-b border-border p-4">
+        <form {...actionForm} className="grid gap-4 border-b border-border p-4">
           <input type="hidden" name="docketId" value={docketId} />
           <input type="hidden" name="timezone" value={timeZone} />
           <TextField id="deadline-title" name="title" label="Title" required maxLength={300} />

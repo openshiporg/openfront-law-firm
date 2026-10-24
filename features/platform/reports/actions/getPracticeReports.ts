@@ -117,9 +117,12 @@ export async function getPracticeReports(auditPage = 1, reportDeadlinePage = 1) 
       query { expenses(where: { status: { in: [submitted, approved] } }, orderBy: [{ incurredAt: asc }, { id: asc }], take: 100) { id status amountMinor currencyCode matter { matterNumber } } }
     `),
     query<DeadlineCounts>(reportDeadlineCountQuery),
-    query<{ trustBalanceSnapshots: Array<{ id: string; snapshotType: string; balanceMinor: number; currencyCode: string; asOf: string; ledgerAccount?: { id: string; ledgerNumber: string; client: { displayName: string } } | null }> }>(`
-      query { trustBalanceSnapshots(where: { snapshotType: { equals: client_balance } }, orderBy: [{ asOf: desc }, { id: asc }], take: 100) { id snapshotType balanceMinor currencyCode asOf ledgerAccount { id ledgerNumber client { displayName } } } }
-    `),
+    // Live client balances from each open ledger's posted entries (not reconciliation snapshots).
+    query<{ trustLedgerAccounts: Array<{ id: string; ledgerNumber: string; balanceMinor: number | null; currencyCode: string; client: { displayName: string } }> }>(`
+      query { trustLedgerAccounts(where: { status: { not: { equals: closed } } }, orderBy: [{ ledgerNumber: asc }, { id: asc }], take: 100) { id ledgerNumber balanceMinor currencyCode client { displayName } } }
+    `).then((result) => result.success
+      ? { ...result, data: { trustBalanceSnapshots: result.data.trustLedgerAccounts.map((ledger) => ({ id: ledger.id, snapshotType: 'client_balance', balanceMinor: ledger.balanceMinor ?? 0, currencyCode: ledger.currencyCode, asOf: new Date().toISOString(), ledgerAccount: { id: ledger.id, ledgerNumber: ledger.ledgerNumber, client: ledger.client } })) } }
+      : result),
     query<{ total: number | null }>(auditEventCountQuery),
   ])
   const [audit, deadlines] = await Promise.all([

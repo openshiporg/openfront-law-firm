@@ -1,6 +1,7 @@
 'use server'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { formatMoneyLabel } from '@/features/platform/lib/money'
 import { communicationDispatchState } from '@/features/shared/dispatch-outcome'
 
 import type { PracticeOverviewQueueItem, PracticeWorkspace, PracticeWorkspaceResponse, PracticeWorkspaceSection } from '../types'
@@ -71,7 +72,7 @@ const paymentPageQuery = `
       take: ${WORK_QUEUE_PAGE_SIZE}
       skip: $skip
     ) {
-      id paymentNumber status createdAt
+      id paymentNumber status createdAt amountMinor currencyCode payer { displayName }
     }
   }
 `
@@ -171,7 +172,7 @@ type ConflictCheckRecord = {
 }
 type IntakeRecord = { id: string; intakeNumber: string; title?: string | null; status: string; receivedAt: string | null; primaryContact?: { displayName: string | null } | null }
 type MatterPartyRecord = { id: string; partyRole: string; side: string; status: string; updatedAt: string | null }
-type PaymentRecord = { id: string; paymentNumber: string; status: string; createdAt: string | null }
+type PaymentRecord = { id: string; paymentNumber: string; status: string; createdAt: string | null; amountMinor?: number | null; currencyCode?: string | null; payer?: { displayName: string | null } | null }
 type InvoiceMetadataRecord = {
   id: string
   invoiceNumber: string | null
@@ -279,7 +280,7 @@ function mapPayment(record: PaymentRecord, canAct: boolean): PracticeOverviewQue
     id: record.id,
     kind: 'Payment',
     title: record.paymentNumber,
-    subtitle: 'Payment awaiting capture, settlement or allocation',
+    subtitle: `${formatMoneyLabel(record.amountMinor, record.currencyCode)} · ${record.payer?.displayName ?? 'Payer unavailable'}`,
     status: record.status,
     at: toIso(record.createdAt),
     href: `/dashboard/platform/billing#payments-${encodeURIComponent(record.id)}`,

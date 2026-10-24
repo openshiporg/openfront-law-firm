@@ -122,7 +122,7 @@ export async function OperatingDesk({
           ? <WorkspaceRegisterView register={registerResult.data} backHref={`/dashboard/platform/${desk}`} backLabel={definition.title} timeZone={timeZone} rowHref={(item) => deskItemHref(desk, item)} />
           : <PracticeLoadError message={registerResult.error} />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24 sm:pb-0">
           <SectionJumps sections={response.data.sections.map((section) => ({ key: section.key, title: section.title, total: section.total }))} />
           <div className="grid items-start gap-6 lg:grid-cols-2">
             <DeskCreatePanel desk={desk} timeZone={timeZone} />

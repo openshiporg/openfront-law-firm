@@ -66,8 +66,8 @@ type PaymentRow = {
 const paymentFields = `
   id paymentNumber status paymentType amountMinor refundedMinor currencyCode
   payer { displayName } invoice { invoiceNumber }
-  allocations(take: 500) { amountMinor allocationType }
-  refunds(take: 200) { amountMinor status }
+  allocations(take: 100) { amountMinor allocationType }
+  refunds(take: 100) { amountMinor status }
 `
 
 // Mirrors requestRefund: captured amount less refunded, pending refunds and net allocations.

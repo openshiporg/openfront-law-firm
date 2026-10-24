@@ -17,20 +17,10 @@ import {
   type MatterBillingSources,
 } from '../actions/assembleInvoice'
 import { formatMoneyLabel } from '@/features/platform/lib/money'
+import { useKeptForm } from '../../components/useKeptForm'
 
 export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) {
   const router = useRouter()
-  const [state, action, pending] = useActionState<InvoiceAssemblyState, FormData>(async (previous, formData) => {
-    const result = await assembleInvoice(previous, formData)
-    if (result.ok) {
-      setSources(null)
-      const matterId = String(formData.get('matterId') ?? '')
-      if (matterId) selectMatter(matterId)
-      router.refresh()
-    }
-    return result
-  }, { ok: false, message: '' })
-  const unpricedIds = new Set(state.unpricedIds ?? [])
   const [selectedMatterId, setSelectedMatterId] = useState('')
   const [matterQuery, setMatterQuery] = useState('')
   const [found, setFound] = useState<BillingMatterOption[]>([])
@@ -50,6 +40,19 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
       else setLoadError(result.error)
     })
   }
+
+  const [state, action, pending] = useActionState<InvoiceAssemblyState, FormData>(async (previous, formData) => {
+    const result = await assembleInvoice(previous, formData)
+    if (result.ok) {
+      setSources(null)
+      const matterId = String(formData.get('matterId') ?? '')
+      if (matterId) selectMatter(matterId)
+      router.refresh()
+    }
+    return result
+  }, { ok: false, message: '' })
+  const actionForm = useKeptForm(action, state)
+  const unpricedIds = new Set(state.unpricedIds ?? [])
 
   function findMatters() {
     setLoadError('')
@@ -86,7 +89,7 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
             {errors}
           </div>
         ) : (
-          <form action={action} className="min-w-0">
+          <form {...actionForm} className="min-w-0">
             <div className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
               <div className={labelClass}>
                 <label htmlFor="billing-matter">Matter</label>

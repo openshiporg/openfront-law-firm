@@ -11,6 +11,7 @@ import { SearchableOptionSelect } from '@/features/platform/components/Searchabl
 import { EmptyState, Notice, Panel, StatusDot, StatusText, Track, fieldClass, labelClass, pillDangerClass, pillPrimaryClass, statusTone, textareaClass, trackItemClass } from '@/features/platform/components/ui'
 import { addDocumentSignerAction, cancelSignatureRequestAction, prepareSignatureRequestAction } from '../actions/signatureRequests'
 import type { DocumentSignatureSetup, SignatureActionState, SignatureRequestRow } from '../actions/signatureTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: SignatureActionState = { ok: false, message: '', revision: 0 }
 const CANCELLABLE = new Set(['draft', 'sent', 'partially_signed'])
@@ -38,13 +39,14 @@ function date(value: string | null) {
 
 function RequestForm({ documentId, setup, onDone }: { documentId: string; setup: DocumentSignatureSetup; onDone: () => void }) {
   const [state, action, pending] = useSignatureAction(prepareSignatureRequestAction, onDone)
+  const actionForm = useKeptForm(action, state)
   const [expiry, setExpiry] = useState('')
   // The expiry day ends at 23:59 in the viewer's own time zone.
   const expiresAt = expiry ? new Date(`${expiry}T23:59:59`).toISOString() : ''
   const version = setup.currentVersion
   if (!version) return <Notice>Upload a version before requesting signatures.</Notice>
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="documentId" value={documentId} />
       <input type="hidden" name="documentVersionId" value={version.id} />
       <input type="hidden" name="expiresAt" value={expiresAt} />
@@ -74,9 +76,10 @@ function RequestForm({ documentId, setup, onDone }: { documentId: string; setup:
 
 function SignerForm({ documentId, request, onDone }: { documentId: string; request: SignatureRequestRow; onDone: () => void }) {
   const [state, action, pending] = useSignatureAction(addDocumentSignerAction, onDone)
+  const actionForm = useKeptForm(action, state)
   const nextOrder = Math.max(0, ...request.signers.map((signer) => signer.signingOrder ?? 0)) + 1
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="documentId" value={documentId} />
       <input type="hidden" name="requestId" value={request.id} />
       <div className="sm:col-span-2"><SearchableOptionSelect id={`signer-contact-${request.id}`} name="contactId" label="Contact (optional)" kind="contact" options={[]} emptyLabel="No contact" /></div>
@@ -93,8 +96,9 @@ function SignerForm({ documentId, request, onDone }: { documentId: string; reque
 
 function CancelForm({ documentId, request, onDone }: { documentId: string; request: SignatureRequestRow; onDone: () => void }) {
   const [state, action, pending] = useSignatureAction(cancelSignatureRequestAction, onDone)
+  const actionForm = useKeptForm(action, state)
   return (
-    <form action={action} className="grid gap-3">
+    <form {...actionForm} className="grid gap-3">
       <input type="hidden" name="documentId" value={documentId} />
       <input type="hidden" name="requestId" value={request.id} />
       <label className={labelClass}>Reason for cancelling<textarea name="note" required minLength={5} maxLength={2000} rows={2} className={textareaClass} /></label>

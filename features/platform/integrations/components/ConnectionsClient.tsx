@@ -10,9 +10,11 @@ import { PracticeRowAction } from '@/features/platform/components/PracticeRowAct
 import { EmptyState, Notice, Panel, StatusDot, Track, fieldClass, labelClass, pillPrimaryClass, statusLabel, statusTone, trackItemClass } from '@/features/platform/components/ui'
 import { createConnectionAction } from '../actions/integrationAccess'
 import type { ConnectionRow, IntegrationActionState } from '../actions/integrationAccessTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 function AddForm({ categories, onDone }: { categories: Array<[string, string]>; onDone: () => void }) {
   const [state, action, pending] = useActionState<IntegrationActionState, FormData>(createConnectionAction, { ok: false, message: '', revision: 0 })
+  const actionForm = useKeptForm(action, state)
   const router = useRouter()
   const handled = useRef(0)
   useEffect(() => {
@@ -22,7 +24,7 @@ function AddForm({ categories, onDone }: { categories: Array<[string, string]>; 
     onDone()
   }, [state, router, onDone])
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-3">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-3">
       <label className={labelClass}>Name<input name="name" required maxLength={200} className={fieldClass} /></label>
       <label className={labelClass}>Provider<input name="provider" required maxLength={120} placeholder="docusign" className={fieldClass} /></label>
       <div className="grid min-w-0 gap-1.5">

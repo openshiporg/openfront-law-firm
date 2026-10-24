@@ -6,7 +6,7 @@ export async function getFirmSetup(): Promise<FirmSetup> {
   const response = await keystoneClient<{ firms: FirmDefaults[]; offices: OfficeRow[]; officesCount: number }>(`
     query FirmSetup {
       firms(take: 1) { id name slug status defaultTimezone defaultCurrency }
-      offices(orderBy: [{ name: asc }, { id: asc }], take: 200) { id name code status timezone email phone }
+      offices(orderBy: [{ name: asc }, { id: asc }], take: 100) { id name code status timezone email phone }
       officesCount
     }
   `)

@@ -4,6 +4,8 @@ export type PracticeOptionKind =
 
 export type PracticeOption = { value: string; label: string; currencyCode?: string }
 
+const TRUST_ACCOUNT_TYPES: Record<string, string> = { trust: 'Trust', pooled_trust: 'IOLTA / pooled trust', dedicated_client: 'Dedicated client trust', other: 'Other safeguarded funds' }
+
 type Row = Record<string, unknown>
 
 // Reads a nested string from an untyped GraphQL row without trusting its shape.
@@ -23,7 +25,8 @@ export const practiceOptionDefinitions: Record<PracticeOptionKind, PracticeOptio
     query: `query MemberOptions($where: FirmMembershipWhereInput!, $take: Int!, $skip: Int!) { rows: firmMemberships(where: $where, orderBy: [{ createdAt: asc }, { id: asc }], take: $take, skip: $skip) { user { id name email } } }`,
     // Global login email deliberately remains non-filterable on User. Page
     // duplicate names and support an exact already-known identity ID instead.
-    where: (q) => ({ status: { equals: 'active' }, OR: [{ user: { name: q } }, { user: { id: { equals: q.contains } } }] }),
+    // An empty ID filter is rejected by Keystone, so the unfiltered first page omits it.
+    where: (q) => ({ status: { equals: 'active' }, ...(q.contains ? { OR: [{ user: { name: q } }, { user: { id: { equals: q.contains } } }] } : {}) }),
     map: (row) => ({ value: text(row, 'user', 'id'), label: `${text(row, 'user', 'name') || 'Unnamed member'}${text(row, 'user', 'email') ? ` · ${text(row, 'user', 'email')}` : ''}` }),
   },
   office: {
@@ -59,7 +62,7 @@ export const practiceOptionDefinitions: Record<PracticeOptionKind, PracticeOptio
   trustAccount: {
     query: `query TrustAccountOptions($where: TrustAccountWhereInput!, $take: Int!, $skip: Int!) { rows: trustAccounts(where: $where, orderBy: [{ name: asc }, { id: asc }], take: $take, skip: $skip) { id name accountType currencyCode bankAccountLastFour } }`,
     where: (q) => ({ name: q }),
-    map: (row) => ({ value: text(row, 'id'), label: `${text(row, 'name')} · ${text(row, 'accountType')} · ${text(row, 'currencyCode')} · ••••${text(row, 'bankAccountLastFour') || '----'}`, currencyCode: text(row, 'currencyCode') }),
+    map: (row) => ({ value: text(row, 'id'), label: `${text(row, 'name')} · ${TRUST_ACCOUNT_TYPES[text(row, 'accountType')] ?? 'Trust'} · ${text(row, 'currencyCode')} · ••••${text(row, 'bankAccountLastFour') || '----'}`, currencyCode: text(row, 'currencyCode') }),
   },
   trustLedger: {
     query: `query TrustLedgerOptions($where: TrustLedgerAccountWhereInput!, $take: Int!, $skip: Int!) { rows: trustLedgerAccounts(where: $where, orderBy: [{ ledgerNumber: asc }, { id: asc }], take: $take, skip: $skip) { id ledgerNumber currencyCode trustAccount { name } client { displayName } } }`,

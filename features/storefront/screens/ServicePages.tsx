@@ -12,6 +12,11 @@ import { ConsultationBookingForm } from '../CustomerForms'
 import { CancelConsultationForm } from '../CancelConsultationForm'
 import { formatMinorUnits as formatMoney } from '@/features/platform/lib/money'
 
+/** A request-time check: the appointment page is rendered per request. */
+function notStarted(startsAt: string | null | undefined) {
+  return !startsAt || new Date(startsAt).getTime() > Date.now()
+}
+
 function feeLabel(service: Pick<Service, 'consultationFeeMinor' | 'currencyCode'>) {
   return service.consultationFeeMinor > 0 ? formatMoney(service.consultationFeeMinor, service.currencyCode) : 'No fee'
 }
@@ -133,7 +138,7 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
               <div><dt>Consultation fee</dt><dd className="sf-num">{feeLabel(service)}</dd></div>
               <div><dt>Payment</dt><dd>Not collected online</dd></div>
             </dl>
-            {settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link className="sf-pill sf-pill--primary sf-pill--lg" href={book}>Choose a time</Link></div> : <p className="sf-notice sf-notice--plain">Online booking is closed.</p>}
+            {settings.bookingEnabled ? <div className="sf-track sf-track--block sf-docked"><Link className="sf-pill sf-pill--primary sf-pill--lg" href={book}>Choose a time</Link></div> : <p className="sf-notice sf-notice--plain">Online booking is closed.</p>}
             <p className="sf-fine">A request does not create an attorney-client relationship. The firm runs a conflict check before confirming.</p>
           </div>
         </div>
@@ -150,11 +155,18 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
   if (lookup?.status === 'unavailable') return <ServiceUnavailable title="Choose an appointment" retryHref={`/consultation?service=${encodeURIComponent(selected ?? '')}`} />
   const service = lookup?.status === 'ok' ? lookup.data : null
   const notice = settings.isLocalFictional ? FIXTURE_FIRST_CONTACT_NOTICE : settings.publication.firstContactNotice
-  if (!service || !settings.bookingEnabled || !notice) return <PublicPage><div className="sf-shell sf-page"><div className="sf-narrow grid gap-6">
-    <h1 className="sf-title">{settings.bookingEnabled && notice ? 'Choose an appointment' : 'Online booking is not available'}</h1>
-    <p role="status" className="sf-notice sf-notice--plain">{settings.bookingEnabled && notice ? (selected ? 'This appointment is not available. Choose a practice area.' : 'Choose a practice area to see open times.') : 'This firm is not taking consultation requests online. Contact the firm directly.'}</p>
-    <div className="sf-track">{settings.bookingEnabled && notice ? <Link className="sf-pill sf-pill--raised" href="/practice-areas">Practice areas</Link> : null}<Link className={settings.bookingEnabled && notice ? 'sf-pill' : 'sf-pill sf-pill--raised'} href="/contact">Contact the firm</Link></div>
-  </div></div></PublicPage>
+  if (!service || !settings.bookingEnabled || !notice) {
+    const open = Boolean(settings.bookingEnabled && notice)
+    // Without a chosen service, the published practice areas are offered directly.
+    const catalog = open ? await getConsultationCatalog() : null
+    const choices = catalog?.status === 'ok' ? catalog.data.services : []
+    return <PublicPage><div className="sf-shell sf-page"><div className="sf-narrow grid gap-6">
+      <h1 className="sf-title">{open ? 'Choose an appointment' : 'Online booking is not available'}</h1>
+      <p role="status" className="sf-notice sf-notice--plain">{open ? (selected ? 'This appointment is not available. Choose a practice area.' : 'Choose a practice area to see open times.') : 'This firm is not taking consultation requests online. Contact the firm directly.'}</p>
+      {choices.length ? <div className="sf-track sf-slots__track">{choices.map((choice) => <Link key={choice.id} className="sf-pill sf-pill--raised" href={`/consultation?service=${encodeURIComponent(choice.id)}`}>{choice.name}</Link>)}</div> : null}
+      <div className="sf-track">{open && !choices.length ? <Link className="sf-pill sf-pill--raised" href="/practice-areas">Practice areas</Link> : null}<Link className={open ? 'sf-pill' : 'sf-pill sf-pill--raised'} href="/contact">Contact the firm</Link></div>
+    </div></div></PublicPage>
+  }
   const history = await getCustomerConsultations()
   if (history.status === 'signed_out') redirect(`/account/signin?service=${encodeURIComponent(service.id)}`)
   if (history.status === 'unavailable') return <ServiceUnavailable title={service.name} retryHref={`/consultation?service=${encodeURIComponent(service.id)}`} />
@@ -207,11 +219,11 @@ export async function AppointmentPage({ params }: { params: Promise<{ id: string
       <dl className="sf-facts">
         <div><dt>Status</dt><dd className="flex items-center gap-2"><span className={`sf-dot ${status.tone}`} aria-hidden="true" />{status.label}</dd></div>
         <div><dt>Time</dt><dd className="sf-num">{formatAppointmentTime(row.startsAt, row.timezone)}</dd></div>
-        <div><dt>Consultation fee</dt><dd className="sf-num">{formatMoney(row.feeMinor, row.currencyCode)}</dd></div>
+        <div><dt>Consultation fee</dt><dd className="sf-num">{row.feeMinor > 0 ? formatMoney(row.feeMinor, row.currencyCode) : 'No fee'}</dd></div>
         <div><dt>Payment</dt><dd>{appointmentPaymentState(row)}</dd></div>
       </dl>
       <p role="status" className="sf-notice">{row.status === 'requested' ? 'The firm runs a conflict check before confirming. No payment is collected online.' : 'No payment is collected online.'}</p>
-      {['requested', 'scheduled'].includes(row.status) && (!row.startsAt || new Date(row.startsAt).getTime() > Date.now()) ? <CancelConsultationForm consultationId={row.id} /> : null}
+      {['requested', 'scheduled'].includes(row.status) && notStarted(row.startsAt) ? <CancelConsultationForm consultationId={row.id} /> : null}
       <div className="sf-track"><Link className="sf-pill sf-pill--raised" href="/account">Your appointments</Link><Link className="sf-pill" href="/contact">Contact the firm</Link></div>
     </div>
   </div></PublicPage>

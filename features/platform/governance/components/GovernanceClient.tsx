@@ -19,6 +19,7 @@ import {
   type HoldTargetOption,
   type RetentionPolicyRow,
 } from '../actions/governance'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: GovernanceActionState = { ok: false, message: '' }
 
@@ -47,8 +48,9 @@ function useRefreshingAction(action: (previous: GovernanceActionState, formData:
 
 function NewPolicyForm({ practiceAreas, onDone }: { practiceAreas: GovernanceSetup['practiceAreas']; onDone: () => void }) {
   const [state, run, pending] = useRefreshingAction(createRetentionPolicy, onDone)
+  const runForm = useKeptForm(run, state)
   return (
-    <form action={run} className="min-w-0 rounded-xl border border-border">
+    <form {...runForm} className="min-w-0 rounded-xl border border-border">
       <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
         <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">New retention policy</legend>
         <label className={labelClass}>Name<input name="name" required minLength={2} maxLength={200} autoComplete="off" className={fieldClass} /></label>
@@ -88,6 +90,7 @@ function NewPolicyForm({ practiceAreas, onDone }: { practiceAreas: GovernanceSet
 function PolicyTransitions({ policy }: { policy: RetentionPolicyRow }) {
   const [target, setTarget] = useState<'active' | 'retired' | null>(null)
   const [state, run, pending] = useRefreshingAction(transitionPolicy, () => setTarget(null))
+  const runForm = useKeptForm(run, state)
   const options: Array<'active' | 'retired'> = policy.status === 'draft' ? ['active', 'retired'] : policy.status === 'active' ? ['retired'] : []
   if (!options.length) return null
   return (
@@ -100,7 +103,7 @@ function PolicyTransitions({ policy }: { policy: RetentionPolicyRow }) {
         ))}
       </Track>
       {target ? (
-        <form action={run} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
+        <form {...runForm} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
           <input type="hidden" name="policyId" value={policy.id} />
           <input type="hidden" name="toStatus" value={target} />
           <label className={cn(labelClass, 'flex-1')}>Reason<input name="reason" required minLength={5} maxLength={2000} autoComplete="off" className={fieldClass} /></label>
@@ -213,6 +216,7 @@ export function LegalHoldForm({ policies }: { policies: Array<{ id: string; labe
   const [kind, setKind] = useState<HoldTargetKind>('matter')
   const [formKey, setFormKey] = useState(0)
   const [state, run, pending] = useRefreshingAction(placeHold, () => setFormKey((value) => value + 1))
+  const runForm = useKeptForm(run, state)
   return (
     <Panel
       id="place-hold"
@@ -220,7 +224,7 @@ export function LegalHoldForm({ policies }: { policies: Array<{ id: string; labe
       actions={<Track><button type="button" className={open ? pillClass : pillPrimaryClass} aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? 'Close' : 'Place legal hold'}</button></Track>}
     >
       {open ? (
-        <form key={formKey} action={run} className="grid min-w-0 gap-4">
+        <form key={formKey} {...runForm} className="grid min-w-0 gap-4">
           <input type="hidden" name="targetKind" value={kind} />
           <div className="grid min-w-0 gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">Hold covers</span>

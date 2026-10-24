@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { FormSelect } from '@/components/ui/form-select'
 import { useFormStatus } from 'react-dom'
 import { KeyRound, Loader2, Share2, UserPlus, UserX } from 'lucide-react'
@@ -24,6 +24,7 @@ import { EmailDeliveryStatus } from '@/features/platform/integrations/components
 
 import { managePortal } from '../actions/managePortal'
 import type { PortalManagementState } from '../actions/types'
+import { useKeptForm } from '../../components/useKeptForm'
 
 type Option = { id: string; title: string; subtitle: string; status: string }
 type Resource = Option & { resourceType: 'document' | 'invoice' | 'communication_thread' }
@@ -80,11 +81,18 @@ export function PortalManagementPanel({
   resources: Resource[]
 }) {
   const [state, formAction] = useActionState(managePortal, initialState)
+  const formActionForm = useKeptForm(formAction, state)
   const targets = [
     ...accounts.map((item) => ({ ...item, value: `account:${item.id}` })),
     ...shares.map((item) => ({ ...item, value: `share:${item.id}` })),
   ]
   const card = 'flex min-w-0 flex-col gap-4 bg-card p-4'
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [invitedToken, setInvitedToken] = useState(state.inviteToken)
+  if (invitedToken !== state.inviteToken) {
+    setInvitedToken(state.inviteToken)
+    if (state.inviteToken) setInviteEmail('')
+  }
 
   const acceptPath = state.inviteToken ? `/portal/accept?token=${encodeURIComponent(state.inviteToken)}` : ''
   const threadCount = resources.filter((item) => item.resourceType === 'communication_thread').length
@@ -96,12 +104,21 @@ export function PortalManagementPanel({
       <EmailDeliveryStatus configured={emailConfigured} context="portal" />
 
       <div className="grid min-w-0 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-xs md:grid-cols-2 xl:grid-cols-4">
-        <form action={formAction} className={card}>
+        <form {...formActionForm} className={card}>
           <input type="hidden" name="operation" value="invite" />
           <CardTitle icon={<UserPlus className="size-4" />}>Invite a client</CardTitle>
-          <Select name="contactId" label="Contact" options={contacts} search="contact" />
+          <SearchableOptionSelect
+            id="portal-contactId"
+            name="contactId"
+            label="Contact"
+            emptyLabel="Select…"
+            required
+            kind="contact"
+            options={contacts.map((option) => ({ value: option.id, label: `${option.title} · ${option.subtitle}` }))}
+            onOptionChange={(option) => setInviteEmail(option?.label.match(/[^\s·]+@[^\s·]+/)?.[0] ?? '')}
+          />
           {contactPreviewNote ? <p role="note" className="text-xs leading-5 text-muted-foreground">{contactPreviewNote}</p> : null}
-          <label className={labelClass}>Client email<input name="email" type="email" required maxLength={320} autoComplete="off" className={fieldClass} /></label>
+          <label className={labelClass}>Client email<input name="email" type="email" required maxLength={320} autoComplete="off" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} className={fieldClass} /></label>
           <div className="mt-auto"><Submit label={emailConfigured ? 'Send invitation' : 'Create invitation link'} /></div>
         </form>
 
@@ -111,7 +128,7 @@ export function PortalManagementPanel({
           <div className="mt-auto"><Track><a href="#portal-policy" className={pillClass}>Manage matter access</a></Track></div>
         </div>
 
-        <form action={formAction} className={card}>
+        <form {...formActionForm} className={card}>
           <input type="hidden" name="operation" value="share" />
           <CardTitle icon={<Share2 className="size-4" />}>Share an item</CardTitle>
           <Select name="accessId" label="Client and matter" options={grants} />
@@ -120,7 +137,7 @@ export function PortalManagementPanel({
           <div className="mt-auto"><Submit label="Share with client" /></div>
         </form>
 
-        <form action={formAction} className={card}>
+        <form {...formActionForm} className={card}>
           <input type="hidden" name="operation" value="revoke" />
           <CardTitle icon={<UserX className="size-4" />}>Remove access</CardTitle>
           <Select name="target" label="Client or shared item" options={targets} />

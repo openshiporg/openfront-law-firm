@@ -6,6 +6,7 @@ import { runSerializableTransaction } from '../lib/transactions'
 import { sha256Digest } from '../lib/digests'
 import { recordAuditEvent } from './workflow-helpers'
 import { assertCurrentCommandActor } from './command-authority'
+import { adversePartyContact, normalizeConflictTerm, parseAdversePartyNames } from './intakeWorkflows'
 import { loadActiveHumanSession } from '../lib/machine-auth'
 import {
   FIRST_CONTACT_ACKNOWLEDGMENT,
@@ -313,8 +314,20 @@ export async function bookClientConsultation(
     await tx.intakeSubmission.create({ data: { firmId: firm.id, intakeId: intake.id, submittedByContactId: contact.id, status: 'submitted', schemaVersion: 'consultation-v2', formSchema: { fields: ['service', 'startsAt', 'jurisdiction', 'opposingParties', 'keyDeadline', 'summary', 'acknowledgment'] }, responses: { service: snapshot, startsAt: start.toISOString(), jurisdiction: firstContact.jurisdiction, opposingParties: firstContact.opposingParties, keyDeadline: firstContact.keyDeadline || null, summary, acknowledgment: { ...acknowledgment, acceptedAt: acceptedAt.toISOString() } }, submittedAt: acceptedAt } })
     const check = await tx.conflictCheck.create({ data: { firmId: firm.id, intakeId: intake.id, checkNumber: `CHK-${suffix}`, status: 'requested', requestedById: receiver.userId, searchScope: 'contacts_and_matters', searchVersion: 'v1' } })
     await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: user.name, normalizedTerm: user.name.toLowerCase(), termType: 'person', sourceContactId: contact.id } })
+    // Named opposing parties are handled as on a staff intake: each becomes an opposing
+    // contact, an adverse-party participant (a matter party on conversion) and a search term.
     if (hasNamedOpposingParty(firstContact.opposingParties)) {
-      await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: firstContact.opposingParties, normalizedTerm: firstContact.opposingParties.toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}]+/gu, ' ').trim(), termType: 'other', includeAliases: false } })
+      let names: string[]
+      try { names = parseAdversePartyNames(firstContact.opposingParties, [user.name]) } catch { names = [] }
+      for (const name of names.slice(0, 25)) {
+        const identity = adversePartyContact(name)
+        const adverse = await tx.contact.create({ data: { firmId: firm.id, ...identity, status: 'opposing', primaryEmail: '', primaryPhone: '', conflictSearchAliases: [] } })
+        await tx.intakeParticipant.create({ data: { firmId: firm.id, intakeId: intake.id, contactId: adverse.id, participantRole: 'adverse_party', status: 'active' } })
+        await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: name, normalizedTerm: normalizeConflictTerm(name), termType: identity.contactType, sourceContactId: adverse.id, includeAliases: true } })
+      }
+      if (!names.length) {
+        await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: firstContact.opposingParties.slice(0, 500), normalizedTerm: normalizeConflictTerm(firstContact.opposingParties).slice(0, 500), termType: 'other', includeAliases: false } })
+      }
     }
     const row = await tx.consultation.create({ data: { firmId: firm.id, intakeId: intake.id, accountId: user.id, requestKey: args.requestKey, requestDigest: fingerprint, serviceTitle: service.name, serviceSnapshot: snapshot, feeMinor: service.consultationFeeMinor, currencyCode: firm.defaultCurrency, startsAt: start, endsAt: end, status: 'requested', timezone: receiver.timezone, hostId: receiver.userId, officeId: receiver.officeId, participants: { connect: { id: contact.id } } } })
     await recordAuditEvent(tx, { firmId: firm.id, actorUserId: user.id, actorType: 'customer', eventType: 'consultation.requested', category: 'legal_workflow', intakeId: intake.id, metadata: { consultationId: row.id, requestDigest: fingerprint, isLocalFixture: mode === 'fixture', acknowledgmentVersion: acknowledgment.version } })

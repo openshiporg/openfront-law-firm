@@ -10,16 +10,18 @@ import { prepareDeliveriesAction } from '../actions/recipients'
 import type { MessageDeliverySetup } from '../actions/recipientTypes'
 import { participantName, participantRole } from './ThreadRecipientsClient'
 import { ActionMessage, useRecipientAction } from './useRecipientAction'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const EMAIL = /^[^\s@<>,;()"]+@[^\s@<>,;()"]+\.[^\s@<>,;()"]+$/
 
 function PrepareForm({ messageId, setup, onDone }: { messageId: string; setup: MessageDeliverySetup; onDone: () => void }) {
   const [state, action, pending] = useRecipientAction(prepareDeliveriesAction, onDone)
+  const actionForm = useKeptForm(action, state)
   const eligible = setup.participants.filter((participant) => participant.displayAddress && EMAIL.test(participant.displayAddress))
   const prepared = new Set(setup.deliveries.map((delivery) => delivery.recipientAddress))
   if (!eligible.length) return <Notice>Add recipients with an email address to the thread first.</Notice>
   return (
-    <form action={action} className="grid gap-4">
+    <form {...actionForm} className="grid gap-4">
       <input type="hidden" name="messageId" value={messageId} />
       <fieldset className="grid gap-1.5">
         <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Recipients</legend>

@@ -32,6 +32,7 @@ import {
   type StaffInviteState,
   type TeamSetup,
 } from '../actions/inviteStaff'
+import { useKeptForm } from '../../components/useKeptForm'
 
 export function StaffInvitationPanel({ setup }: { setup: TeamSetup }) {
   const initial: StaffInviteState = {
@@ -41,12 +42,13 @@ export function StaffInvitationPanel({ setup }: { setup: TeamSetup }) {
     values: { name: '', email: '', roleId: '', officeId: '' },
   }
   const [state, action, pending] = useActionState(inviteStaff, initial)
+  const actionForm = useKeptForm(action, state)
 
   return (
     <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
       <aside className="min-w-0 xl:sticky xl:top-20 xl:order-last">
         <Panel title="Invite staff member">
-          <form action={action} className="space-y-4">
+          <form {...actionForm} className="space-y-4">
             <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-1">
               <Field id="name" label="Name" defaultValue={state.values.name} autoComplete="name" />
               <Field id="email" label="Work email" defaultValue={state.values.email} type="email" autoComplete="email" />
@@ -115,9 +117,10 @@ export function StaffInvitationPanel({ setup }: { setup: TeamSetup }) {
 
 function StandardRolesControl({ missing }: { missing: string[] }) {
   const [state, action, pending] = useActionState(addStandardRoles, { message: null, success: null } as StandardRolesState)
+  const actionForm = useKeptForm(action, state)
   if (!missing.length && !state.success) return null
   return (
-    <form action={action} className="mt-4 space-y-2 border-t border-border pt-4">
+    <form {...actionForm} className="mt-4 space-y-2 border-t border-border pt-4">
       {missing.length ? <>
         <p className="text-xs text-muted-foreground">Missing standard roles: {missing.join(', ')}</p>
         <Track><button type="submit" className={pillClass} disabled={pending}>{pending ? 'Adding roles…' : 'Add standard roles'}</button></Track>
@@ -136,8 +139,9 @@ function memberPageHref(setup: TeamSetup, page: number) {
 
 function ResendSetupLink({ membershipId }: { membershipId: string }) {
   const [state, action, pending] = useActionState(resendStaffSetupLink, { message: null, success: null } as MemberAccessState)
+  const actionForm = useKeptForm(action, state)
   return (
-    <form action={action} className="mt-3 flex min-w-0 flex-wrap items-center gap-3">
+    <form {...actionForm} className="mt-3 flex min-w-0 flex-wrap items-center gap-3">
       <input type="hidden" name="membershipId" value={membershipId} />
       <Track><button type="submit" className={pillClass} disabled={pending}>{pending ? 'Sending…' : 'Resend setup link'}</button></Track>
       {state.message ? <p role="alert" className="text-xs text-destructive">{state.message}</p> : null}
@@ -155,13 +159,14 @@ function MembershipControl({
 }) {
   const initial: MemberAccessState = { message: null, success: null }
   const [state, action, pending] = useActionState(changeStaffAccess, initial)
+  const actionForm = useKeptForm(action, state)
   const [officeValue, setOfficeValue] = useState('__unchanged__')
   return (
     <details className="group mt-3">
       <summary className="inline-flex cursor-pointer list-none items-center text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
         <span className="group-open:hidden">Change access</span><span className="hidden group-open:inline">Close access change</span>
       </summary>
-      <form action={action} className="mt-3 grid min-w-0 gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:grid-cols-2 2xl:grid-cols-4 2xl:items-end">
+      <form {...actionForm} className="mt-3 grid min-w-0 gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:grid-cols-2 2xl:grid-cols-4 2xl:items-end">
         <input type="hidden" name="membershipId" value={membership.id} />
         <SearchableOptionSelect id={`role-${membership.id}`} name="roleId" label="New role" emptyLabel="Keep current role" kind="role" total={setup.rolesCount} options={setup.roles.map((role) => ({ value: role.id, label: role.name }))} />
         <SearchableOptionSelect id={`office-${membership.id}`} name="officeId" label="New primary office" kind="office" emptyLabel="No primary office" value={officeValue} onValueChange={setOfficeValue} total={setup.officesCount + 2} options={[{ value: '__unchanged__', label: membership.office ? `Keep current office · ${membership.office.name}` : 'Keep current · no primary office' }, ...(membership.office ? [{ value: membership.office.id, label: `${membership.office.name} · current office` }] : []), ...setup.offices.map((office) => ({ value: office.id, label: `${office.name} · ${office.code}` }))]} />

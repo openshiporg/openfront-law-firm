@@ -18,6 +18,7 @@ import {
   type OfficeRow,
   type OfficeStatus,
 } from '../lib/firmTypes'
+import { useKeptForm } from '../../components/useKeptForm'
 
 function Result({ state }: { state: FirmActionState }) {
   if (!state.message) return <span />
@@ -38,10 +39,11 @@ function useRefreshOnSuccess(state: FirmActionState, onDone?: () => void) {
 
 export function FirmDefaultsForm({ firm, timeZones }: { firm: FirmDefaults; timeZones: string[] }) {
   const [state, action, pending] = useActionState(saveFirmDefaults, initialFirmActionState)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state)
   return (
     <Panel title={<h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold"><StatusDot tone={statusTone(firm.status)} /><span className="truncate">Firm defaults</span></h2>}>
-      <form action={action} className="grid gap-4 sm:grid-cols-2">
+      <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
         <input type="hidden" name="firmId" value={firm.id} />
         <label className={cn(labelClass, 'sm:col-span-2')}>Legal name<input name="name" required maxLength={200} defaultValue={firm.name} className={fieldClass} /></label>
         <label className={cn(labelClass, 'sm:col-span-2')}>Slug<input name="slug" required maxLength={80} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={firm.slug} className={cn(fieldClass, 'font-mono')} /></label>
@@ -60,10 +62,11 @@ export function FirmDefaultsForm({ firm, timeZones }: { firm: FirmDefaults; time
 
 function OfficeForm({ office, defaultTimeZone, onDone }: { office?: OfficeRow; defaultTimeZone: string; onDone: () => void }) {
   const [state, action, pending] = useActionState(saveOffice, initialFirmActionState)
+  const actionForm = useKeptForm(action, state)
   const [status, setStatus] = useState<OfficeStatus>(office?.status ?? 'active')
   useRefreshOnSuccess(state, onDone)
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="officeId" value={office?.id ?? ''} />
       <input type="hidden" name="status" value={status} />
       <label className={labelClass}>Name<input name="name" required maxLength={200} defaultValue={office?.name ?? ''} className={fieldClass} /></label>

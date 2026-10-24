@@ -9,7 +9,7 @@ import {
 } from "@keystone-6/core/fields";
 
 import { permissions, rules } from "../access";
-import { denyAll, firmOwnedHooks } from "../tenancy";
+import { changedFields, denyAll, firmOwnedHooks } from "../tenancy";
 import {
   firmRelationship,
   readOnlyRelationship,
@@ -65,7 +65,7 @@ const retentionPolicyHooks = {
       await baseRetentionPolicyHooks.validate.update(args);
       if (
         args.item?.status !== "draft" &&
-        Object.keys(args.resolvedData).some((field) => immutableActivePolicyFields.has(field))
+        changedFields(args.resolvedData).some((field) => immutableActivePolicyFields.has(field))
       ) {
         args.addValidationError("Active or retired retention policy terms are immutable; create a new policy version.");
       }

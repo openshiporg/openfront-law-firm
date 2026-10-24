@@ -169,9 +169,9 @@ function TrustBasis({ sample }: { sample: TrustSnapshotSampleSummary }) {
         sample.rawSourceRows === null
           ? 'Hidden for your role.'
           : sample.representedLedgers === 0
-            ? 'No trust balances recorded.'
-            : `Latest recorded balance for ${sample.representedLedgers.toLocaleString()} client ${sample.representedLedgers === 1 ? 'ledger' : 'ledgers'}. Reconcile in Accounting.`,
-        sample.sourceCapReached ? `Checks the latest ${sample.sourceCap} balance records; some ledgers may be missing.` : null,
+            ? 'No open client ledgers.'
+            : `Posted balance of ${sample.representedLedgers.toLocaleString()} open client ${sample.representedLedgers === 1 ? 'ledger' : 'ledgers'}.`,
+        sample.sourceCapReached ? `First ${sample.sourceCap} ledgers shown.` : null,
       ]}
     />
   )
@@ -244,7 +244,7 @@ function TrustSnapshotRegister({
         meta={sample.rawSourceRows === null ? 'Hidden' : visibleRows.length < rows.length ? `${visibleRows.length} of ${rows.length}` : rows.length.toLocaleString()}
       />
       {!sample.rawSourceRows ? (
-        <EmptyState title={sample.rawSourceRows === null ? 'Trust balances are hidden for your role.' : 'No trust balances recorded.'} />
+        <EmptyState title={sample.rawSourceRows === null ? 'Trust balances are hidden for your role.' : 'No open client ledgers.'} />
       ) : !rows.length ? (
         <EmptyState title="No client ledger balances recorded." />
       ) : (
@@ -372,7 +372,7 @@ function ReportDeadlinePagination({ total, pagination, auditPage }: { total: num
 }
 
 function humanEvent(eventType: string) {
-  const text = eventType.replaceAll('.', ' ').replaceAll('_', ' ').trim()
+  const text = eventType.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replaceAll('.', ' ').replaceAll('_', ' ').trim().toLowerCase().replace(/\b(create|update|delete)$/, (verb) => `${verb}d`)
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Activity'
 }
 function money(value: number, currency: string) { return formatMinorUnits(value, currency) }

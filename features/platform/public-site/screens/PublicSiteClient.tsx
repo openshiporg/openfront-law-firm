@@ -10,6 +10,7 @@ import { ErrorBanner, Notice, Panel, StatusDot, Track, fieldClass, labelClass, p
 import { minorUnitsToDecimal } from '@/features/platform/lib/money'
 import { CONSULTATION_HOURS_LABEL } from '@/features/storefront/lib/consultation-presentation'
 import { savePracticeArea, savePublicSitePolicy, type PublicPracticeAreaRow, type PublicSitePolicyRow, type PublicSiteState } from '../actions/publicSite'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: PublicSiteState = { ok: false, message: '', revision: 0 }
 
@@ -35,11 +36,12 @@ function Switch({ name, label, defaultChecked, detail }: { name: string; label: 
 
 export function PublicSitePolicyForm({ policy }: { policy: PublicSitePolicyRow | null }) {
   const [state, action, pending] = useActionState(savePublicSitePolicy, initial)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state)
   const published = policy?.status === 'published'
   const [status, setStatus] = useState<'draft' | 'published'>(policy?.status ?? 'draft')
   return (
-    <form action={action} className="min-w-0">
+    <form {...actionForm} className="min-w-0">
       <input type="hidden" name="policyId" value={policy?.id ?? ''} />
       <input type="hidden" name="status" value={status} />
       <Panel
@@ -78,11 +80,12 @@ export function PublicSitePolicyForm({ policy }: { policy: PublicSitePolicyRow |
 
 function PracticeAreaForm({ area, currencyCode, onDone }: { area?: PublicPracticeAreaRow; currencyCode: string; onDone?: () => void }) {
   const [state, action, pending] = useActionState(savePracticeArea, initial)
+  const actionForm = useKeptForm(action, state)
   useRefreshOnSuccess(state)
   useEffect(() => { if (state.ok && state.revision && onDone) onDone() }, [state, onDone])
   const fee = minorUnitsToDecimal(area?.consultationFeeMinor ?? 0, currencyCode)
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form {...actionForm} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="id" value={area?.id ?? ''} />
       <input type="hidden" name="currencyCode" value={currencyCode} />
       <label className={labelClass}>Name<input name="name" required maxLength={200} defaultValue={area?.name ?? ''} className={fieldClass} /></label>

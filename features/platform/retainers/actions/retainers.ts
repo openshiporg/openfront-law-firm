@@ -126,10 +126,10 @@ export async function getRetainerFormSetup(): Promise<{ success: true; data: Ret
     firms: Array<{ defaultCurrency: string | null }>
   }>(`
     query RetainerFormSetup($statuses: [MatterStatusType!], $prefix: String!) {
-      matters(where: { status: { in: $statuses } }, orderBy: [{ matterNumber: asc }, { id: asc }], take: 200) {
+      matters(where: { status: { in: $statuses } }, orderBy: [{ matterNumber: asc }, { id: asc }], take: 100) {
         id matterNumber title status client { id displayName }
       }
-      numbers: retainerAgreements(where: { agreementNumber: { startsWith: $prefix } }, take: 1000) { agreementNumber }
+      numbers: retainerAgreements(where: { agreementNumber: { startsWith: $prefix } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 100) { agreementNumber }
       firms(take: 1) { defaultCurrency }
     }
   `, { statuses: OPEN_MATTER_STATUSES, prefix })

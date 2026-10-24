@@ -466,12 +466,21 @@ export async function assembleDraftInvoice(
     }
     const matter = await tx.matter.findFirst({ where: { id: args.matterId, firmId, clientId: args.clientId }, select: { id: true } });
     if (!matter) throw new Error("Invoice client must match the selected active-firm matter.");
-    const [timeEntries, expenses] = await Promise.all([
+    const [approvedTime, expenses] = await Promise.all([
       tx.timeEntry.findMany({ where: { id: { in: timeEntryIds }, firmId, matterId: args.matterId, status: "approved", isBillable: true, invoiceLine: null } }),
       tx.expense.findMany({ where: { id: { in: expenseIds }, firmId, matterId: args.matterId, status: "approved", isBillable: true, invoiceLine: null } }),
     ]);
-    if (timeEntries.length !== timeEntryIds.length || expenses.length !== expenseIds.length) {
+    if (approvedTime.length !== timeEntryIds.length || expenses.length !== expenseIds.length) {
       throw new Error("Every invoice source must be approved, billable, unbilled, and scoped to the selected matter.");
+    }
+    // Time approved before any rate applied carries no amount. It is priced here, once, from
+    // the active rules (as approval would have), and recorded on the entry before billing.
+    const timeEntries = [];
+    for (const entry of approvedTime) {
+      if (entry.amountMinor !== null && entry.amountMinor !== undefined) { timeEntries.push(entry); continue; }
+      const price = await priceUnpricedTime(tx, entry);
+      if (!("amountMinor" in price)) throw new Error(`Time entry "${String(entry.description).slice(0, 60)}" has no applicable rate.`);
+      timeEntries.push(await tx.timeEntry.update({ where: { id: entry.id }, data: price }));
     }
     const currencies = new Set([...timeEntries, ...expenses].map((item: any) => item.currencyCode));
     if (currencies.size !== 1) throw new Error("Invoice sources must use one currency.");

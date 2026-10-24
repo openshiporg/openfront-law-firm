@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { useActionState, useState, type ChangeEvent } from 'react'
 import { Save } from 'lucide-react'
 
@@ -14,6 +16,7 @@ import {
   type BrandingState,
 } from '../actions/branding'
 import { NEUTRAL_FIRM_NAME, STOREFRONT_ACCENT_PRESETS, accentContrastOnPaper, accentIdFromHex, normalizeAccentHex, resolveStorefrontAccent, storefrontThemeVariables } from '@/features/storefront/lib/accent'
+import { useKeptForm } from '../../components/useKeptForm'
 
 const optional = <span className="font-normal text-muted-foreground/80"> · optional</span>
 
@@ -35,6 +38,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
     saved: false,
     values: initialValues,
   })
+  const formActionForm = useKeptForm(formAction, state)
 
   const value = (key: keyof BrandingState['values']) => state.values[key] ?? ''
   const selectedAccent = state.values.accentId || accentIdFromHex(firm?.brandColor)
@@ -75,7 +79,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
   const previewName = preview.displayName.trim() || preview.name.trim() || NEUTRAL_FIRM_NAME
 
   return (
-    <form action={formAction} onChange={onFormChange} className="min-w-0">
+    <form {...formActionForm} onChange={onFormChange} className="min-w-0">
       <input type="hidden" name="firmId" value={firm?.id || ''} />
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
@@ -83,7 +87,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
           <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">Storefront preview</p>
-              <a href="/dashboard/platform/public-site" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><StatusDot tone={!firm ? 'zinc' : publication === 'unpublished' ? 'amber' : 'emerald'} />{!firm ? 'No firm' : publication === 'unpublished' ? 'Site not published' : publication === 'booking' ? 'Published · booking open' : 'Published'}</a>
+              <Link href="/dashboard/platform/public-site" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><StatusDot tone={!firm ? 'zinc' : publication === 'unpublished' ? 'amber' : 'emerald'} />{!firm ? 'No firm' : publication === 'unpublished' ? 'Site not published' : publication === 'booking' ? 'Published · booking open' : 'Published'}</Link>
             </div>
             <div className="bg-[oklch(0.955_0.010_78)] px-5 py-6 text-[oklch(0.22_0.01_78)]">
               <div className="flex min-w-0 items-center gap-3">

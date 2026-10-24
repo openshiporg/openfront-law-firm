@@ -9,7 +9,7 @@ import {
 } from "@keystone-6/core/fields";
 
 import { permissions, rules } from "../access";
-import { denyAll, firmOwnedHooks } from "../tenancy";
+import { changedFields, denyAll, firmOwnedHooks } from "../tenancy";
 import { firmRelationship, immutableUpdateDeleteGraphql, readOnlyRelationship, requiredRelationship, scopedAccess, uniqueConstraints } from "./fields";
 import { trackingFields } from "./trackingFields";
 
@@ -201,7 +201,7 @@ const deadlineHooks = {
         "matter", "docket", "sourceEntry", "title", "deadlineType", "dueAt", "timezone",
         "source", "calculationMethod", "ruleReference", "parentDeadline",
       ]);
-      if (args.item.isVerified && Object.keys(args.resolvedData).some((field) => verifiedSnapshotFields.has(field))) {
+      if (args.item.isVerified && changedFields(args.resolvedData).some((field) => verifiedSnapshotFields.has(field))) {
         args.addValidationError("A verified deadline snapshot cannot be changed; create a corrected deadline with new verification evidence.");
       }
     },
