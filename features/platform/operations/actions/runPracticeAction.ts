@@ -25,6 +25,8 @@ const mutations = {
   trustAccount: `mutation($id: ID!, $to: String!, $reason: String!) { transitionTrustAccount(trustAccountId: $id, toStatus: $to, reason: $reason) { id status } }`,
   trustLedger: `mutation($id: ID!, $to: String!, $reason: String!) { transitionTrustLedgerAccount(ledgerAccountId: $id, toStatus: $to, reason: $reason) { id status } }`,
   trustReconciliation: `mutation($id: ID!, $to: String!, $reason: String!) { transitionTrustReconciliation(reconciliationId: $id, toStatus: $to, reason: $reason) { id status } }`,
+  consultation: `mutation($id: ID!, $to: String!, $reason: String, $outcome: String) { transitionConsultation(consultationId: $id, toStatus: $to, reason: $reason, outcome: $outcome) { id status } }`,
+  consultationConfirm: `mutation($id: ID!, $startsAt: DateTime!, $endsAt: DateTime!, $hostId: ID!, $officeId: ID, $location: String, $reason: String) { scheduleConsultation(consultationId: $id, startsAt: $startsAt, endsAt: $endsAt, hostId: $hostId, officeId: $officeId, location: $location, reason: $reason) { id status } }`,
 } as const
 
 // Enum-typed command targets mirror schema.graphql so a row action can never send a
@@ -71,6 +73,14 @@ const commands = {
   freezeTrustLedger: { mutation: 'trustLedger', toStatus: 'frozen' },
   reviewTrustReconciliation: { mutation: 'trustReconciliation', toStatus: 'in_review' },
   completeTrustReconciliation: { mutation: 'trustReconciliation', toStatus: 'completed' },
+  confirmConsultation: { mutation: 'consultationConfirm', toStatus: null },
+  cancelConsultation: { mutation: 'consultation', toStatus: 'cancelled' },
+  completeConsultation: { mutation: 'consultation', toStatus: 'completed' },
+  markConsultationNoShow: { mutation: 'consultation', toStatus: 'no_show' },
+  beginClosingMatter: { mutation: 'matter', toStatus: 'closing' },
+  closeMatter: { mutation: 'matter', toStatus: 'closed' },
+  markInvoiceOverdue: { mutation: 'invoice', toStatus: 'overdue' },
+  voidInvoice: { mutation: 'invoice', toStatus: 'void' },
 } as const satisfies Record<string, Command>
 
 export type PracticeActionOperation = keyof typeof commands
@@ -105,7 +115,14 @@ export async function runPracticeAction(
     const dueInstant = dueAt ? zonedWallTimeToInstant(`${dueAt}T23:59`, await getFirmTimeZone()) : null
     if (dueAt && !dueInstant) throw new Error('Enter a valid due date.')
 
+    if (operation === 'completeConsultation' && outcome && !['recommend_engagement', 'decline', 'follow_up', 'pending'].includes(outcome)) {
+      throw new Error('Select a consultation outcome.')
+    }
+    // Confirming a booked request keeps its requested time and host.
+    const confirmation = operation === 'confirmConsultation' ? await consultationSlot(id) : null
+
     const response = await keystoneClient<Record<string, unknown>>(mutation, {
+      ...(confirmation ?? {}),
       id,
       ...(command.toStatus ? { to: command.toStatus } : {}),
       reason,
@@ -120,4 +137,12 @@ export async function runPracticeAction(
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'The workflow could not be updated.' }
   }
+}
+
+async function consultationSlot(id: string) {
+  const response = await keystoneClient<{ consultation: { startsAt: string | null; endsAt: string | null; location: string | null; host: { id: string } | null; office: { id: string } | null } | null }>(`query ConsultationSlot($id: ID!) { consultation(where: { id: $id }) { startsAt endsAt location host { id } office { id } } }`, { id })
+  const row = response.success ? response.data.consultation : null
+  if (!row) throw new Error('This consultation is unavailable.')
+  if (!row.startsAt || !row.endsAt || !row.host) throw new Error('This request has no time or host. Open it to schedule a time.')
+  return { startsAt: row.startsAt, endsAt: row.endsAt, hostId: row.host.id, officeId: row.office?.id ?? null, location: row.location ?? null }
 }

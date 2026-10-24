@@ -14,6 +14,8 @@ import { PortalPolicyDirectory, type PortalDirectoryParams } from '@/features/pl
 import { BillingOperationsPanel } from '@/features/platform/billing/components/BillingOperationsPanel'
 import { BillingRatesPanel } from '@/features/platform/billing/components/BillingRatesPanel'
 import { BillingPaymentPanel } from '@/features/platform/billing/components/BillingPaymentPanel'
+import { BillingRefundsPanel } from '@/features/platform/billing/components/BillingRefundsPanel'
+import { GovernanceManagementPanel } from '@/features/platform/governance/components/GovernanceManagementPanel'
 import { TrustSetupPanel } from '@/features/platform/accounting/components/TrustSetupPanel'
 import { InvoiceMetadataRegister } from '@/features/platform/billing/components/InvoiceMetadataRegister'
 import { IntakeOperationsPanel } from '@/features/platform/intake/components/IntakeOperationsPanel'
@@ -31,6 +33,7 @@ import { describePortalContactPreview } from './portalContactPreview'
 import { describePortalAccountPreview } from './portalAccountPreview'
 import { EmailDeliveryStatus } from '@/features/platform/integrations/components/EmailDeliveryStatus'
 import { getEmailDeliveryConfigured } from '@/features/platform/integrations/lib/emailDelivery'
+import { IntegrationAccessPanel } from '@/features/platform/integrations/components/IntegrationAccessPanel'
 
 // Plain firm-owner wording for the portal register sections (server titles stay as fallbacks).
 const portalSectionCopy: Record<string, { title: string; description: string }> = {
@@ -95,6 +98,8 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
           {category === 'billing' ? <BillingOperationsPanel /> : null}
           {category === 'billing' ? <BillingRatesPanel /> : null}
           {category === 'billing' ? <BillingPaymentPanel /> : null}
+          {category === 'billing' ? <BillingRefundsPanel /> : null}
+          {category === 'governance' ? <GovernanceManagementPanel /> : null}
           {category === 'reports' ? <PracticeReportsPanel auditPage={auditPage} reportDeadlinePage={reportDeadlinePage} /> : null}
           {category === 'data' ? (
             <DataTransferPanel
@@ -124,6 +129,7 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
             </div>
           ) : null}
           {category === 'integrations' ? <div className="rounded-xl border border-border bg-card p-4 shadow-xs"><EmailDeliveryStatus configured={emailConfigured} /></div> : null}
+          {category === 'integrations' ? <IntegrationAccessPanel /> : null}
           {category === 'portal' ? <PortalPolicyDirectory params={portalParams} /> : null}
           {category === 'portal' ? (
             <PortalManagementPanel

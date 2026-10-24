@@ -9,6 +9,7 @@ import { firmMetadata } from '../lib/metadata'
 import { FIXTURE_FIRST_CONTACT_NOTICE, firstContactVersion } from '../lib/first-contact'
 import { appointmentPaymentState, appointmentStatus, formatAppointmentTime, getConsultationAvailability, getConsultationCatalog, getConsultationService, getConsultationServiceById, getCustomerConsultation, getCustomerConsultations, type Service } from '../lib/consultation-data'
 import { ConsultationBookingForm } from '../CustomerForms'
+import { CancelConsultationForm } from '../CancelConsultationForm'
 import { formatMinorUnits as formatMoney } from '@/features/platform/lib/money'
 
 function feeLabel(service: Pick<Service, 'consultationFeeMinor' | 'currencyCode'>) {
@@ -210,6 +211,7 @@ export async function AppointmentPage({ params }: { params: Promise<{ id: string
         <div><dt>Payment</dt><dd>{appointmentPaymentState(row)}</dd></div>
       </dl>
       <p role="status" className="sf-notice">{row.status === 'requested' ? 'The firm runs a conflict check before confirming. No payment is collected online.' : 'No payment is collected online.'}</p>
+      {['requested', 'scheduled'].includes(row.status) && (!row.startsAt || new Date(row.startsAt).getTime() > Date.now()) ? <CancelConsultationForm consultationId={row.id} /> : null}
       <div className="sf-track"><Link className="sf-pill sf-pill--raised" href="/account">Your appointments</Link><Link className="sf-pill" href="/contact">Contact the firm</Link></div>
     </div>
   </div></PublicPage>

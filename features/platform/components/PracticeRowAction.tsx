@@ -31,9 +31,13 @@ const transitions: Record<string, Record<string, Action>> = {
     review_required: { operation: 'finalizeConflictReview', label: 'Finalize review' },
   },
   Matter: {
-    open: { operation: 'holdMatter', label: 'Place on hold' },
-    on_hold: { operation: 'resumeMatter', label: 'Resume matter' },
-    closing: { operation: 'resumeMatter', label: 'Return to open' },
+    open: { operation: 'holdMatter', label: 'Place on hold', alternates: [{ operation: 'beginClosingMatter', label: 'Begin closing' }] },
+    on_hold: { operation: 'resumeMatter', label: 'Resume matter', alternates: [{ operation: 'beginClosingMatter', label: 'Begin closing' }] },
+    closing: { operation: 'closeMatter', label: 'Close matter', alternates: [{ operation: 'resumeMatter', label: 'Return to open' }] },
+  },
+  Consultation: {
+    requested: { operation: 'confirmConsultation', label: 'Confirm request', alternates: [{ operation: 'cancelConsultation', label: 'Cancel request' }] },
+    scheduled: { operation: 'completeConsultation', label: 'Record outcome', alternates: [{ operation: 'markConsultationNoShow', label: 'Mark no-show' }, { operation: 'cancelConsultation', label: 'Cancel consultation' }] },
   },
   Deadline: {
     draft: { operation: 'markDeadlinePending', label: 'Mark pending' },
@@ -67,7 +71,10 @@ const transitions: Record<string, Record<string, Action>> = {
       label: 'Manage draft invoice',
       alternates: [{ operation: 'discardDraftInvoice', label: 'Discard draft & release sources' }],
     },
-    approved: { operation: 'issueInvoice', label: 'Issue invoice' },
+    approved: { operation: 'issueInvoice', label: 'Issue invoice', alternates: [{ operation: 'voidInvoice', label: 'Void invoice' }] },
+    issued: { operation: 'markInvoiceOverdue', label: 'Invoice actions', alternates: [{ operation: 'voidInvoice', label: 'Void invoice' }] },
+    partially_paid: { operation: 'markInvoiceOverdue', label: 'Invoice actions', alternates: [{ operation: 'voidInvoice', label: 'Void invoice' }] },
+    overdue: { operation: 'voidInvoice', label: 'Void invoice' },
   },
   'Legal hold': {
     active: { operation: 'releaseHold', label: 'Release hold' },
@@ -94,6 +101,15 @@ const transitions: Record<string, Record<string, Action>> = {
 }
 
 const initialState: PracticeActionState = { ok: false, message: '' }
+
+// Wording for the primary choice when it sits in a select next to alternates.
+const primaryLabels: Partial<Record<PracticeActionOperation, string>> = {
+  approveInvoice: 'Approve invoice',
+  markInvoiceOverdue: 'Mark overdue',
+  completeConsultation: 'Mark completed',
+  confirmConsultation: 'Confirm at requested time',
+  holdMatter: 'Place on hold',
+}
 
 export function PracticeRowAction({
   id,
@@ -133,7 +149,7 @@ export function PracticeRowAction({
           <label className={labelClass} htmlFor={`operation-${id}`}>
             Action
             <FormSelect id={`operation-${id}`} name="operation" value={selectedOperation} onValueChange={(value) => setChoice({ identity: actionIdentity, operation: value as PracticeActionOperation })} className={fieldClass}>
-              <option value={action.operation}>{action.operation === 'approveInvoice' ? 'Approve invoice' : action.label}</option>
+              <option value={action.operation}>{primaryLabels[action.operation] ?? action.label}</option>
               {action.alternates.map((alternate) => <option key={alternate.operation} value={alternate.operation}>{alternate.label}</option>)}
             </FormSelect>
           </label>
@@ -152,6 +168,17 @@ export function PracticeRowAction({
               ))}
             </div>
           </fieldset>
+        ) : null}
+        {selectedOperation === 'completeConsultation' ? (
+          <label className={labelClass} htmlFor={`consult-outcome-${id}`}>
+            Outcome
+            <FormSelect id={`consult-outcome-${id}`} name="outcome" defaultValue="pending" className={fieldClass}>
+              <option value="pending">Outcome pending</option>
+              <option value="recommend_engagement">Recommend engagement</option>
+              <option value="follow_up">Follow up</option>
+              <option value="decline">Decline</option>
+            </FormSelect>
+          </label>
         ) : null}
         {selectedOperation === 'issueInvoice' ? (
           <label className={labelClass} htmlFor={`due-${id}`}>

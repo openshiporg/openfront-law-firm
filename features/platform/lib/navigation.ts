@@ -3,12 +3,14 @@ import {
   ArrowLeftRight,
   BarChart3,
   BrainCircuit,
+  Building2,
   BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
   Clock3,
   ContactRound,
   FileSignature,
+  Gavel,
   Globe,
   Inbox,
   Landmark,
@@ -63,6 +65,7 @@ export const practiceNavGroups: PracticeNavGroup[] = [
     icon: BriefcaseBusiness,
     items: [
       { title: 'Calendar & tasks', href: '/dashboard/platform/work', description: 'Deadlines, dockets, consultations, and assigned work.', icon: CalendarDays },
+      { title: 'Courts & dockets', href: '/dashboard/platform/dockets', description: 'Courts, dockets, entries and linked deadlines.', icon: Gavel },
       { title: 'Documents', href: '/dashboard/platform/documents', description: 'Documents, versions, templates, and signature handoffs.', icon: FileSignature },
       { title: 'Communications', href: '/dashboard/platform/communications', description: 'Matter threads, drafts, delivery, and client updates.', icon: MessagesSquare },
       { title: 'Time & expenses', href: '/dashboard/platform/time-expenses', description: 'Capture, review, and prepare billable work.', icon: Clock3 },
@@ -74,6 +77,7 @@ export const practiceNavGroups: PracticeNavGroup[] = [
     icon: Landmark,
     items: [
       { title: 'Billing & payments', href: '/dashboard/platform/billing', description: 'Bills, balances, allocations, refunds, and collections.', icon: ReceiptText },
+      { title: 'Retainers', href: '/dashboard/platform/retainers', description: 'Fee agreements, retainer terms, acceptance and activation.', icon: FileSignature },
       { title: 'Trust & accounting', href: '/dashboard/platform/accounting', description: 'Trust ledgers, reconciliations, and operating books.', icon: Landmark },
       { title: 'Client portal', href: '/dashboard/platform/portal', description: 'Invitations, matter grants, shares, and sessions.', icon: CircleDollarSign },
     ],
@@ -98,6 +102,7 @@ export const practiceNavGroups: PracticeNavGroup[] = [
     items: [
       { title: 'Retention & holds', href: '/dashboard/platform/governance', description: 'Legal holds, retention review, and disposal evidence.', icon: ShieldCheck },
       { title: 'Reports', href: '/dashboard/platform/reports', description: 'Operational, financial, trust, and audit reporting.', icon: BarChart3 },
+      { title: 'Firm & offices', href: '/dashboard/platform/firm', description: 'Firm defaults, time zone, currency and offices.', icon: Building2 },
       { title: 'People & access', href: '/dashboard/platform/team', description: 'Staff invitations, memberships, firm roles, and office scope.', icon: UsersRound },
       { title: 'Import & export', href: '/dashboard/platform/data', description: 'Staged migrations, validation, and data portability.', icon: ArrowLeftRight },
       { title: 'Integrations', href: '/dashboard/platform/integrations', description: 'Provider connections, webhooks, OAuth, and API keys.', icon: PlugZap },

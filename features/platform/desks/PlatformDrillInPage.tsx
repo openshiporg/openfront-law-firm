@@ -10,6 +10,12 @@ import { deskDetailKinds, deskTitle, type DeskKind } from './OperatingDesk'
 import { ThreadReplyDraft } from './ThreadReplyDraft'
 import { getDocumentVersions } from '@/features/platform/documents/actions/documentVersions'
 import { DocumentVersionPanel } from '@/features/platform/documents/components/DocumentVersionPanel'
+import { DocumentSignaturesPanel } from '@/features/platform/documents/components/DocumentSignaturesPanel'
+import { ThreadRecipientsPanel } from '@/features/platform/communications/components/ThreadRecipientsPanel'
+import { MessageDeliveriesPanel } from '@/features/platform/communications/components/MessageDeliveriesPanel'
+import { getConsultationSchedule } from '@/features/platform/consultations/actions/getConsultationSchedule'
+import { ConsultationSchedulePanel } from '@/features/platform/consultations/components/ConsultationSchedulePanel'
+import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 
 // Queue kinds whose section-level action affordance applies to a drill-in record.
 const queueKind: Record<string, string> = { 'Communication thread': 'Thread' }
@@ -35,6 +41,8 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
   // Reply drafts need communication-management permission, which the desk exposes on drafts.
   const canDraftReply = kind === 'thread' && canActOn('Message')
   const documentFiles = kind === 'document' ? await getDocumentVersions(recordId) : null
+  const consultationSchedule = kind === 'consultation' && canAct ? await getConsultationSchedule(recordId) : null
+  const firmTimeZone = consultationSchedule ? await getFirmTimeZone() : 'UTC'
   return <PracticePage
     title={record.title}
     description={`${record.kind} in ${deskName}.`}
@@ -57,7 +65,11 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
             {record.facts.map(([term, value]) => <div key={term} className="min-w-0 bg-card px-4 py-3"><dt className="text-xs text-muted-foreground">{term}</dt><dd className="mt-1 break-words text-sm font-medium leading-5 text-foreground">{value}</dd></div>)}
           </dl>
         </section>
+        {consultationSchedule ? <ConsultationSchedulePanel consultation={consultationSchedule} timeZone={firmTimeZone} /> : null}
         {documentFiles ? <DocumentVersionPanel documentId={recordId} storage={documentFiles.storage} currentVersionId={documentFiles.currentVersionId} versions={documentFiles.versions} /> : null}
+        {kind === 'document' ? <DocumentSignaturesPanel documentId={recordId} /> : null}
+        {kind === 'thread' ? <ThreadRecipientsPanel threadId={recordId} /> : null}
+        {kind === 'message' ? <MessageDeliveriesPanel messageId={recordId} /> : null}
         {record.lists.filter((list) => !(documentFiles && list.title === 'Version history')).map((list) => (
           <Panel key={list.title} title={<h2 id={`list-${list.title}`} className="flex items-baseline gap-2 text-sm font-semibold">{list.title}<span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{list.total.toLocaleString()}</span></h2>} bodyClassName="p-0">
             {list.rows.length ? (

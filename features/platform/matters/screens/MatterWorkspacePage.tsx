@@ -1,19 +1,24 @@
 import Link from 'next/link'
-import { ArrowLeft, BrainCircuit, ReceiptText, Settings2 } from 'lucide-react'
+import { ArrowLeft, BrainCircuit, Gavel, ReceiptText, Settings2 } from 'lucide-react'
 
 import { PracticePage, PracticeStatus, SectionJumps } from '@/features/platform/components/PracticeSurface'
-import { EmptyState, ErrorBanner, Pager, StatusDot, Track, statusLabel, statusTone, trackItemClass } from '@/features/platform/components/ui'
+import { EmptyState, ErrorBanner, Pager, Panel, StatusDot, Track, statusLabel, statusTone, trackItemClass } from '@/features/platform/components/ui'
 import type { WorkQueuePageInfo } from '@/features/platform/operations/lib/workQueuePagination'
 import { getMatterWorkspace } from '../actions/getMatterWorkspace'
 import { DeskCreatePanel } from '@/features/platform/desks/DeskCreatePanel'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
+import { PracticeRowAction } from '@/features/platform/components/PracticeRowAction'
+import { getMatterAdministration } from '../actions/getMatterAdministration'
+import { ConfidentialityPanel, EthicalWallsPanel, MatterTeamPanel, StatusHistoryList } from '../components/MatterAdministrationPanels'
 
 export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 1, communicationPage = 1, deadlinePage = 1, taskPage = 1, documentPage = 1, invoicePage = 1 }: { matterId: string; teamPage?: number; partyPage?: number; communicationPage?: number; deadlinePage?: number; taskPage?: number; documentPage?: number; invoicePage?: number }) {
-  const [result, timeZone] = await Promise.all([getMatterWorkspace(matterId, { teamPage, partyPage, communicationPage, deadlinePage, taskPage, documentPage, invoicePage }), getFirmTimeZone()])
+  const [result, timeZone, admin] = await Promise.all([getMatterWorkspace(matterId, { teamPage, partyPage, communicationPage, deadlinePage, taskPage, documentPage, invoicePage }), getFirmTimeZone(), getMatterAdministration(matterId)])
   if (!result.success) {
     return <PracticePage title="Matter unavailable" description="The requested matter was not returned within the current authorization scope." trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: 'Matter unavailable' }]}><ErrorBanner>{result.error}</ErrorBanner></PracticePage>
   }
-  const { matter, sections } = result.data
+  const { matter } = result.data
+  // The team-access panel replaces the read-only team register when the viewer can read it.
+  const sections = admin.team ? result.data.sections.filter((section) => section.key !== 'team') : result.data.sections
   return (
     <PracticePage
       title={matter.title}
@@ -21,12 +26,15 @@ export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 
       status={<PracticeStatus status={matter.status} />}
       meta={<span className="font-mono text-xs">{matter.matterNumber} · {statusLabel(matter.confidentiality)}</span>}
       trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: matter.matterNumber }]}
-      actions={<Track>
+      actions={<>
+      <PracticeRowAction id={matter.id} kind="Matter" status={matter.status} path={`/dashboard/platform/matters/${encodeURIComponent(matter.id)}`} canAct={admin.canActOnMatter} timeZone={timeZone} />
+      <Track>
         <Link href="/dashboard/platform/matters" className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />Matters</Link>
         <Link href={`/dashboard/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(false)}><Settings2 className="size-4" aria-hidden="true" />Fields</Link>
         <Link href="/dashboard/platform/billing" className={trackItemClass(false)}><ReceiptText className="size-4" aria-hidden="true" />Bill</Link>
         <Link href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(true)}><BrainCircuit className="size-4" aria-hidden="true" />AI evidence</Link>
-      </Track>}
+      </Track>
+      </>}
     >
       <div className="space-y-6">
         <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border xl:grid-cols-4" aria-label="Matter identity">
@@ -43,6 +51,31 @@ export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 
         <SectionJumps sections={sections.map((section) => ({ key: section.key, title: section.title, total: section.pagination ? section.total ?? 0 : section.rows.length }))} />
 
         <div className="grid items-start gap-6 xl:grid-cols-2">
+          <MatterTeamPanel matterId={matter.id} team={admin.team} />
+          <div className="grid min-w-0 gap-6">
+            <ConfidentialityPanel matterId={matter.id} confidentiality={matter.confidentiality} />
+            <EthicalWallsPanel matterId={matter.id} walls={admin.walls} />
+          </div>
+          <Panel
+            id="dockets"
+            title={<h2 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground"><span className="truncate">Dockets</span><span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{(admin.dockets?.length ?? 0).toLocaleString()}</span></h2>}
+            actions={<Track><Link href="/dashboard/platform/dockets" className={trackItemClass(false)}><Gavel className="size-3.5" aria-hidden="true" />Courts &amp; dockets</Link></Track>}
+            bodyClassName="p-0"
+          >
+            {!admin.dockets ? <div className="p-4"><EmptyState title="Dockets are unavailable to your role" /></div> : admin.dockets.length ? (
+              <ul className="divide-y divide-border">
+                {admin.dockets.map((docket) => <li key={docket.id} className="min-w-0 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <StatusDot tone={statusTone(docket.status)} />
+                    <h3 className="min-w-0 truncate text-sm font-semibold text-foreground"><Link href={`/dashboard/platform/dockets/${encodeURIComponent(docket.id)}`} className="underline-offset-4 hover:underline">{docket.docketNumber}</Link></h3>
+                    <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{statusLabel(docket.status)}</span>
+                  </div>
+                  <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground">{[docket.title, docket.court?.name].filter(Boolean).join(' · ')}</p>
+                </li>)}
+              </ul>
+            ) : <div className="p-4"><EmptyState title="No dockets" /></div>}
+          </Panel>
+          <StatusHistoryList history={admin.history} timeZone={timeZone} />
           {sections.map((section) => (
             <section key={section.key} id={section.key} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-labelledby={`${section.key}-heading`}>
               <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
