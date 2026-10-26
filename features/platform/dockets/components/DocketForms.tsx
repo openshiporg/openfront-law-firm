@@ -51,7 +51,7 @@ export function CourtsPanel({ courts }: { courts: CourtRow[] }) {
   return (
     <Panel
       id="courts"
-      title={<h2 className="flex items-baseline gap-2 text-sm font-semibold">Courts<span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{courts.length.toLocaleString()}</span></h2>}
+      title={<h2 className="flex items-baseline gap-2 text-sm font-semibold">Courts<span className="lf-figures text-sm font-normal text-muted-foreground">{courts.length.toLocaleString()}</span></h2>}
       actions={<Track><button type="button" onClick={() => setOpen(open === 'new' ? null : 'new')} aria-pressed={open === 'new'} className={trackItemClass(open === 'new')}><Plus className="size-3.5" aria-hidden="true" />Add court</button></Track>}
       bodyClassName="p-0"
     >
@@ -172,7 +172,7 @@ export function EntryTimeline({ docketId, entries, timeZone, canRecord }: { dock
     try { return new Intl.DateTimeFormat('en', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) } catch { return value }
   }
   return (
-    <Panel id="entries" title={<h2 className="flex items-baseline gap-2 text-sm font-semibold">Entries<span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{entries.length.toLocaleString()}</span></h2>} bodyClassName="p-0">
+    <Panel id="entries" title={<h2 className="flex items-baseline gap-2 text-sm font-semibold">Entries<span className="lf-figures text-sm font-normal text-muted-foreground">{entries.length.toLocaleString()}</span></h2>} bodyClassName="p-0">
       {entries.length ? <ol className="divide-y divide-border">
         {entries.map((entry) => <li key={entry.id} className="grid gap-1 px-4 py-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -206,7 +206,7 @@ export function DocketDeadlines({ docketId, deadlines, timeZone, canAdd }: { doc
   return (
     <Panel
       id="deadlines"
-      title={<h2 className="flex items-baseline gap-2 text-sm font-semibold">Deadlines<span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{deadlines.length.toLocaleString()}</span></h2>}
+      title={<h2 className="flex items-baseline gap-2 text-sm font-semibold">Deadlines<span className="lf-figures text-sm font-normal text-muted-foreground">{deadlines.length.toLocaleString()}</span></h2>}
       actions={canAdd ? <Track><button type="button" onClick={() => setOpen(!open)} aria-pressed={open} className={trackItemClass(open)}><Plus className="size-3.5" aria-hidden="true" />Add deadline</button></Track> : null}
       bodyClassName="p-0"
     >

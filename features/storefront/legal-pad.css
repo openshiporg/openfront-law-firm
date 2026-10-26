@@ -134,7 +134,8 @@
   .sf-header__bar > .sf-firm { flex: 0 0 auto; }
   .sf-header__bar > .sf-firm .sf-firm__name { white-space: nowrap; }
 }
-.sf-header__nav .sf-track { gap: 1.5rem; }
+.sf-header__nav .sf-track,
+.sf-header__actions .sf-track { gap: 1.5rem; }
 .sf-header__nav .sf-pill,
 .sf-header__actions .sf-pill:not(.sf-pill--primary) {
   min-height: 4rem;

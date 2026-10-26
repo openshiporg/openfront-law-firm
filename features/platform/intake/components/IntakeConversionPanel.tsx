@@ -19,7 +19,7 @@ export function IntakeConversionPanel({ setup, pageHrefs }: { setup: IntakeSetup
     <section id="intake-conversion" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="conversion-heading">
       <h2 id="conversion-heading" className="flex min-w-0 items-baseline gap-2 text-base font-semibold tracking-tight text-foreground">
         <span className="truncate">Open matter from cleared intake</span>
-        <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{setup.decisionIntakesCount.toLocaleString()}</span>
+        <span className="lf-figures text-sm font-normal text-muted-foreground">{setup.decisionIntakesCount.toLocaleString()}</span>
       </h2>
       {opened ? (
         <div role="status" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-[6px] border border-border bg-card px-4 py-3">

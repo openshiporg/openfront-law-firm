@@ -36,7 +36,7 @@ export function WorkspaceRegisterView({
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <h2 id="register-heading" className="flex min-w-0 items-baseline gap-2 text-lg font-semibold tracking-tight text-foreground">
           <span className="truncate">{params.scope === "history" ? "History and current records" : register.title}</span>
-          <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{register.total.toLocaleString()}</span>
+          <span className="lf-figures text-sm font-normal text-muted-foreground">{register.total.toLocaleString()}</span>
         </h2>
         <Link href={backHref} className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />{backLabel}</Link>
       </div>

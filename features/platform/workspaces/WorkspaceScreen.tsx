@@ -195,10 +195,8 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
                     />
                   ) : (
                     <QueuePanel
-                      title={previewCopy
-                        ? `${sectionTitle} · ${previewCopy.summary}`
-                        : sectionTitle}
-                      count={previewCopy ? undefined : section.total}
+                      title={sectionTitle}
+                      count={section.total}
                       description={previewCopy
                         ? `${sectionDescription} ${previewCopy.description}`.trim()
                         : sectionDescription}

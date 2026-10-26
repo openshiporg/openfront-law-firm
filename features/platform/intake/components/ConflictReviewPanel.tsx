@@ -31,7 +31,7 @@ export function ConflictReviewPanel({ setup, pageHrefs, timeZone }: { setup: Con
     <section id="conflict-review" className="min-w-0 scroll-mt-20 space-y-3" aria-labelledby="manual-conflicts-heading">
       <h2 id="manual-conflicts-heading" className="flex min-w-0 items-baseline gap-2 text-base font-semibold tracking-tight text-foreground">
         <span className="truncate">Conflict review</span>
-        <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{setup.total.toLocaleString()}</span>
+        <span className="lf-figures text-sm font-normal text-muted-foreground">{setup.total.toLocaleString()}</span>
       </h2>
       {!setup.conflictChecks.length ? <EmptyState title="No conflict checks awaiting work" /> : (
         <div className="space-y-4">

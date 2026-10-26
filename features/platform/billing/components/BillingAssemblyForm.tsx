@@ -85,7 +85,7 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
 
         {!options.length ? (
           <div className="space-y-2 p-4">
-            <p role="status" className="rounded-[6px] border  border-border px-4 py-8 text-center text-sm text-muted-foreground">No matter with approved, unbilled work</p>
+            <p role="status" className="rounded-[6px] border border-border px-4 py-4 text-sm text-muted-foreground">No matter with approved, unbilled work</p>
             {errors}
           </div>
         ) : (

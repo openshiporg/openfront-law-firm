@@ -17,11 +17,11 @@ export function PracticeStatus({ status }: { status: string }) {
   return <StatusText status={status} />
 }
 
-const cellClass = 'px-3 py-2.5 align-middle first:pl-4 last:pr-4'
+const cellClass = 'align-middle sm:px-3 sm:py-2.5 sm:first:pl-4 sm:last:pr-4'
 
 /** Ledger table of practice records: record, kind, status, date and the row's next action.
  * Below `sm` each row stacks: record line, then kind, status and date on one line. */
-export function RecordTable({ items, rowHref, actionPath, timeZone, anchor, empty, showKind = true, label }: {
+export function RecordTable({ items, rowHref, actionPath, timeZone, anchor, empty, showKind = true, compact = false, label }: {
   items: PracticeOverviewQueueItem[]
   rowHref?: (item: PracticeOverviewQueueItem) => string | null
   actionPath: string
@@ -29,6 +29,8 @@ export function RecordTable({ items, rowHref, actionPath, timeZone, anchor, empt
   anchor?: string
   empty: string
   showKind?: boolean
+  /** Half-width tables: the date moves into the record line. */
+  compact?: boolean
   label?: string
 }) {
   if (!items.length) return <p role="status" className="px-4 py-4 text-sm text-muted-foreground">{empty}</p>
@@ -39,37 +41,37 @@ export function RecordTable({ items, rowHref, actionPath, timeZone, anchor, empt
           <th scope="col" className={cn(cellClass, 'py-2 font-medium')}>Record</th>
           {showKind ? <th scope="col" className={cn(cellClass, 'w-36 py-2 font-medium max-lg:hidden')}>Type</th> : null}
           <th scope="col" className={cn(cellClass, 'w-36 py-2 font-medium')}>Status</th>
-          <th scope="col" className={cn(cellClass, 'w-40 py-2 font-medium')}>Date</th>
+          {compact ? null : <th scope="col" className={cn(cellClass, 'w-40 py-2 font-medium')}>Date</th>}
           <th scope="col" className={cn(cellClass, 'w-px py-2 text-right font-medium')}><span className="sr-only">Action</span></th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
         {items.map((item) => (
-          <RecordRow key={`${item.kind}-${item.id}`} item={item} href={rowHref ? rowHref(item) : item.href} actionPath={actionPath} timeZone={timeZone} anchor={anchor} showKind={showKind} />
+          <RecordRow key={`${item.kind}-${item.id}`} item={item} href={rowHref ? rowHref(item) : item.href} actionPath={actionPath} timeZone={timeZone} anchor={anchor} showKind={showKind} compact={compact} />
         ))}
       </tbody>
     </table>
   )
 }
 
-export function RecordRow({ item, href, actionPath, timeZone, anchor, showKind = true }: { item: PracticeOverviewQueueItem; href: string | null; actionPath: string; timeZone: string; anchor?: string; showKind?: boolean }) {
+export function RecordRow({ item, href, actionPath, timeZone, anchor, showKind = true, compact = false }: { item: PracticeOverviewQueueItem; href: string | null; actionPath: string; timeZone: string; anchor?: string; showKind?: boolean; compact?: boolean }) {
   const when = item.at ? formatInstant(item.at, timeZone, { includeTime: isTimeSensitiveKind(item.kind) }) : 'No date'
   const { number, rest } = splitFileNumber(item.subtitle ?? '')
   const title = <span className="block truncate font-medium text-foreground group-hover:text-[var(--lf-rust-ink)] group-hover:underline group-hover:underline-offset-4">{item.title}</span>
   return (
     <tr id={anchor ? `${anchor}-${item.id}` : undefined} className="scroll-mt-28 transition-colors hover:bg-muted/40 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-x-3 max-sm:px-4 max-sm:py-3">
-      <td className={cn(cellClass, 'min-w-0 max-w-0 max-sm:col-span-2 max-sm:max-w-none max-sm:p-0')}>
+      <td className={cn(cellClass, 'min-w-0 max-w-0 max-sm:col-span-2 max-sm:max-w-none')}>
         {href ? <Link href={href} className="group block min-w-0 rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--lf-rust)]/40">{title}</Link> : <span className="block min-w-0">{title}</span>}
         <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
           {number ? <FileLabel>{number}</FileLabel> : null}
           <span className="truncate">{rest}</span>
+          <span className={cn('lf-figures ml-auto shrink-0 whitespace-nowrap font-mono', compact ? '' : 'sm:hidden')}>{when}</span>
         </span>
       </td>
       {showKind ? <td className={cn(cellClass, 'whitespace-nowrap text-xs text-muted-foreground max-lg:hidden')}>{item.kind}</td> : null}
-      <td className={cn(cellClass, 'max-sm:mt-2 max-sm:p-0')}><StatusText status={item.status} /></td>
-      <td className={cn(cellClass, 'lf-figures whitespace-nowrap font-mono text-xs text-muted-foreground max-sm:hidden')}>{when}</td>
-      <td className={cn(cellClass, 'text-right max-sm:col-span-2 max-sm:mt-2 max-sm:p-0 max-sm:text-left')}>
-        <span className="lf-figures mr-3 font-mono text-xs text-muted-foreground sm:hidden">{when}</span>
+      <td className={cn(cellClass, 'max-sm:mt-2 max-sm:self-center')}><StatusText status={item.status} /></td>
+      {compact ? null : <td className={cn(cellClass, 'lf-figures whitespace-nowrap font-mono text-xs text-muted-foreground max-sm:hidden')}>{when}</td>}
+      <td className={cn(cellClass, 'text-right max-sm:mt-2')}>
         <PracticeRowAction id={item.id} kind={item.kind} status={item.status} path={actionPath} canAct={item.canAct} timeZone={timeZone} />
       </td>
     </tr>
@@ -112,6 +114,7 @@ export function QueuePanel({
   timeZone = 'UTC',
   count,
   showKind,
+  compact,
   className,
 }: {
   title: string
@@ -128,6 +131,7 @@ export function QueuePanel({
   timeZone?: string
   count?: number
   showKind?: boolean
+  compact?: boolean
   className?: string
 }) {
   const rowAnchor = anchor ?? viewAllHref.split('#')[1] ?? 'item'
@@ -151,7 +155,7 @@ export function QueuePanel({
         />
       ) : undefined}
     >
-      <RecordTable items={items} actionPath={rowActionPath} timeZone={timeZone} anchor={rowAnchor} empty={empty} showKind={showKind} label={title} />
+      <RecordTable items={items} actionPath={rowActionPath} timeZone={timeZone} anchor={rowAnchor} empty={empty} showKind={showKind} compact={compact} label={title} />
     </RecordSection>
   )
 }

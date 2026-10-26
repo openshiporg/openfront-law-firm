@@ -27,7 +27,7 @@ export function CommandDeck({ title = 'Actions', panels, id = 'actions' }: { tit
   if (!panels.length) return null
   return (
     <section id={id} aria-labelledby={`${base}-title`} className="min-w-0 scroll-mt-28">
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-6 border-b border-border">
+      <div className={cn('flex min-w-0 flex-wrap items-end justify-between gap-x-6 border-b border-border', panels.length === 1 && 'sr-only')}>
         <h2 id={`${base}-title`} className="pb-2.5 text-[15px] font-semibold tracking-tight text-foreground">{title}</h2>
         {panels.length > 1 ? (
           <div role="tablist" aria-labelledby={`${base}-title`} className="-mb-px flex max-w-full gap-5 overflow-x-auto [scrollbar-width:none]">
@@ -69,7 +69,7 @@ export function CommandDeck({ title = 'Actions', panels, id = 'actions' }: { tit
           id={`${base}-panel-${panel.key}`}
           aria-labelledby={panels.length > 1 ? `${base}-tab-${panel.key}` : undefined}
           hidden={panel.key !== current}
-          className="pt-4"
+          className={panels.length > 1 ? 'pt-4' : undefined}
         >
           {panel.content}
         </div>

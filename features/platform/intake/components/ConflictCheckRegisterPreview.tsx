@@ -26,7 +26,7 @@ export function ConflictCheckRegisterPreview({
     <section className="min-w-0 space-y-3" aria-labelledby="conflict-status-preview-heading">
       <h2 id="conflict-status-preview-heading" className="flex min-w-0 items-baseline gap-2 text-base font-semibold tracking-tight text-foreground">
         <span className="truncate">Conflict queue</span>
-        <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{total.toLocaleString()}</span>
+        <span className="lf-figures text-sm font-normal text-muted-foreground">{total.toLocaleString()}</span>
       </h2>
 
       {rows.length ? (
@@ -48,7 +48,7 @@ export function ConflictCheckRegisterPreview({
           ))}
         </RowList>
       ) : (
-        <p role="status" className="rounded-[6px] border  border-border px-4 py-8 text-center text-sm text-muted-foreground">No pending conflict checks</p>
+        <p role="status" className="rounded-[6px] border border-border px-4 py-4 text-sm text-muted-foreground">No pending conflict checks</p>
       )}
 
       {pagination ? (

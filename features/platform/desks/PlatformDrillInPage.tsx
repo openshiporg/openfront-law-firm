@@ -71,7 +71,7 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
         {kind === 'thread' ? <ThreadRecipientsPanel threadId={recordId} /> : null}
         {kind === 'message' ? <MessageDeliveriesPanel messageId={recordId} /> : null}
         {record.lists.filter((list) => !(documentFiles && list.title === 'Version history')).map((list) => (
-          <Panel key={list.title} title={<h2 id={`list-${list.title}`} className="flex items-baseline gap-2 text-sm font-semibold">{list.title}<span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{list.total.toLocaleString()}</span></h2>} bodyClassName="p-0">
+          <Panel key={list.title} title={<h2 id={`list-${list.title}`} className="flex items-baseline gap-2 text-sm font-semibold">{list.title}<span className="lf-figures text-sm font-normal text-muted-foreground">{list.total.toLocaleString()}</span></h2>} bodyClassName="p-0">
             {list.rows.length ? (
               <ul className="divide-y divide-border">
                 {list.rows.map((row, index) => (

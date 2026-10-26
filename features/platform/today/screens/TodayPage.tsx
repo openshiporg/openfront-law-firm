@@ -62,6 +62,7 @@ export async function TodayPage() {
                 viewAllHref={href}
                 timeZone={timeZone}
                 showKind={false}
+                compact
               />
             ))}
           </div>

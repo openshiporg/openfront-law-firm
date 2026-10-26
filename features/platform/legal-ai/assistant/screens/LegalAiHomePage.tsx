@@ -42,7 +42,7 @@ export async function LegalAiHomePage({ searchParams }: { searchParams?: Promise
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 id="matter-evidence-heading" className="flex items-baseline gap-2 text-base font-semibold tracking-tight text-foreground">
             Matter evidence sets
-            {total !== null ? <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{total.toLocaleString()}</span> : null}
+            {total !== null ? <span className="lf-figures text-sm font-normal text-muted-foreground">{total.toLocaleString()}</span> : null}
           </h2>
           <EvidenceSearch action="/dashboard/platform/ai" query={result.success ? result.data.query : ''} label="Search matters" />
         </div>

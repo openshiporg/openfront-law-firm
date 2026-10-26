@@ -17,7 +17,7 @@ const roleLabel = (role: string) => TEAM_ROLES.find(([value]) => value === role)
 const capabilities = (member: MatterTeamEntry) => [member.canEdit && 'Edit', member.canBill && 'Bill', member.canAccessRestricted && 'Restricted'].filter(Boolean).join(' · ') || 'Read only'
 
 function Count({ title, count }: { title: string; count: number }) {
-  return <h2 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground"><span className="truncate">{title}</span><span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{count.toLocaleString()}</span></h2>
+  return <h2 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground"><span className="truncate">{title}</span><span className="lf-figures text-sm font-normal text-muted-foreground">{count.toLocaleString()}</span></h2>
 }
 
 function RoleSelect({ id, defaultValue }: { id: string; defaultValue: string }) {
