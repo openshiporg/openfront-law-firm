@@ -1,4 +1,8 @@
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import { CommandDeck, type CommandDeckPanel } from '@/features/platform/components/CommandDeck'
+import { pillPrimaryClass } from '@/features/platform/components/ui'
+import { sectionEmptyCopy } from '@/features/platform/lib/emptyCopy'
 import {
   PracticeLoadError,
   PracticePage,
@@ -139,10 +143,14 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
       { key: 'policies', label: 'Access by matter', content: <PortalPolicyDirectory params={portalParams} /> },
     ] : []),
   ]
-  const panelFirst = (['intake', 'reports', 'data', 'integrations'] as WorkspaceCategory[]).includes(category)
+  const panelFirst = (['reports', 'data', 'integrations'] as WorkspaceCategory[]).includes(category)
 
   return (
-    <PracticePage title={definition.title} description={definition.description}>
+    <PracticePage
+      title={definition.title}
+      description={definition.description}
+      actions={category === 'intake' ? <Link href="#new-intake" className={pillPrimaryClass}><Plus className="size-4" aria-hidden="true" />New intake</Link> : undefined}
+    >
       {!response.success ? (
         <PracticeLoadError message={response.error} />
       ) : (
@@ -201,7 +209,7 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
                         ? `${sectionDescription} ${previewCopy.description}`.trim()
                         : sectionDescription}
                       items={section.items}
-                      empty={`No ${sectionTitle.toLowerCase()}`}
+                      empty={sectionEmptyCopy(section.key)}
                       viewAllHref={category === 'reports' ? `/dashboard/platform/${section.key}` : registerHref(category, { view: section.key })}
                       showViewAll={section.total > 0 && (category === 'reports' || Boolean(registerDefinition(category, section.key)))}
                       anchor={section.key}

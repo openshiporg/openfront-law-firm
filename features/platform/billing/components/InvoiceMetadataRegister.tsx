@@ -34,13 +34,13 @@ export function InvoiceMetadataRegister({
           <span>Invoices</span>
           {register.success ? <span className="lf-figures text-sm font-normal text-muted-foreground">{register.total.toLocaleString()}</span> : null}
         </h2>
-        {register.success ? <span className="lf-figures text-xs text-muted-foreground">Newest first · page {register.pagination.page} of {register.pagination.pageCount}</span> : null}
+        {register.success && register.total > 0 ? <span className="text-xs text-muted-foreground">Newest first</span> : null}
       </header>
 
       {!register.success ? (
         <ErrorBanner>{register.error}</ErrorBanner>
       ) : (
-        <div className="min-w-0 overflow-x-auto rounded-[6px] border border-border bg-card">
+        <div className={register.items.length ? 'min-w-0 overflow-x-auto rounded-[6px] border border-border bg-card' : 'min-w-0 border-t border-border'}>
           {register.items.length ? (
             <table className="w-full min-w-[44rem] border-collapse text-sm">
               <thead>
@@ -64,23 +64,23 @@ export function InvoiceMetadataRegister({
                     : null
                   return (
                     <tr key={item.id} className="hover:bg-muted/40">
-                      <td className={`${td} whitespace-nowrap font-mono font-medium`}>
-                        {actionHref ? <Link href={actionHref} className="text-[var(--lf-rust-ink)] underline-offset-4 hover:underline">{number}</Link> : number}
-                        <span className="block font-sans text-xs font-normal text-muted-foreground">Created <time dateTime={createdAt ?? undefined}>{formatInstant(item.createdAt, timeZone, { includeTime: false, missing: 'unavailable' })}</time></span>
+                      <td className={`${td} lf-figures whitespace-nowrap font-medium`}>
+                        {actionHref ? <Link href={actionHref} className="underline decoration-border underline-offset-4 hover:decoration-foreground">{number}</Link> : number}
+                        <span className="block text-xs font-normal text-muted-foreground">Created <time dateTime={createdAt ?? undefined}>{formatInstant(item.createdAt, timeZone, { includeTime: false, missing: 'unavailable' })}</time></span>
                       </td>
                       <td className={`${td} max-w-[14rem] truncate`}>{item.clientName ?? 'Client restricted'}</td>
                       <td className={td}>{item.matterId ? <Link href={`/dashboard/platform/matters/${encodeURIComponent(item.matterId)}#invoices`} className="rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--lf-rust)]/40"><FileLabel>{item.matterNumber ?? 'Matter'}</FileLabel></Link> : <span className="text-xs text-muted-foreground">Restricted</span>}</td>
                       <td className={td}><StatusText status={status} /></td>
-                      <td className={`${td} lf-figures whitespace-nowrap font-mono text-xs text-muted-foreground`}>{formatInstant(item.dueAt, timeZone, { includeTime: false, missing: 'Not set' })}</td>
-                      <td className={`${td} lf-figures whitespace-nowrap text-right font-mono font-semibold`}>{formatMoneyLabel(item.balanceDueMinor, item.currencyCode)}</td>
-                      <td className={`${td} lf-figures whitespace-nowrap text-right font-mono text-muted-foreground`}>{formatMoneyLabel(item.totalMinor, item.currencyCode)}</td>
+                      <td className={`${td} lf-figures whitespace-nowrap text-xs text-muted-foreground`}>{formatInstant(item.dueAt, timeZone, { includeTime: false, missing: 'Not set' })}</td>
+                      <td className={`${td} lf-figures whitespace-nowrap text-right font-semibold`}>{formatMoneyLabel(item.balanceDueMinor, item.currencyCode)}</td>
+                      <td className={`${td} lf-figures whitespace-nowrap text-right text-muted-foreground`}>{formatMoneyLabel(item.totalMinor, item.currencyCode)}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           ) : (
-            <p role="status" className="px-4 py-4 text-sm text-muted-foreground">{register.total ? 'No invoices on this page' : 'No invoices yet'}</p>
+            <p role="status" className="py-3 text-sm text-muted-foreground">{register.total ? 'No invoices on this page' : 'No invoices yet'}</p>
           )}
           {register.total > 0 ? (
             <div className="border-t border-border px-4 py-2.5">
@@ -88,7 +88,7 @@ export function InvoiceMetadataRegister({
                 label="Invoice pages"
                 previous={paginationHrefs?.previous}
                 next={paginationHrefs?.next}
-                summary={`${register.pagination.loadedCount ? `${register.pagination.firstItem.toLocaleString()}–${register.pagination.lastItem.toLocaleString()}` : 'None on this page'} of ${register.total.toLocaleString()}`}
+                summary={`${register.pagination.firstItem.toLocaleString()}–${register.pagination.lastItem.toLocaleString()} of ${register.total.toLocaleString()}`}
               />
             </div>
           ) : null}

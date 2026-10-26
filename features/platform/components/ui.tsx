@@ -28,7 +28,7 @@ export const pillPrimaryClass = cn('inline-flex h-8 shrink-0 items-center justif
 export const pillDangerClass = 'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[4px] border border-destructive/40 bg-background px-3 text-sm font-medium text-destructive outline-none transition-colors hover:bg-destructive/5 focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:pointer-events-none disabled:opacity-50'
 
 /** Text link styled as an action ("Search all", "Open"). */
-export const actionLinkClass = cn('inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[2px] text-sm font-medium text-[var(--lf-rust-ink)] underline-offset-4 hover:underline', focusRing)
+export const actionLinkClass = cn('inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[2px] text-sm font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground', focusRing)
 
 /** Segmented choice: a joined row of square options; pair each label span with `segmentItemClass`. */
 export const segmentClass = 'inline-flex max-w-full flex-wrap overflow-hidden rounded-[4px] border border-input bg-background'
@@ -96,7 +96,7 @@ export function splitFileNumber(text: string): { number: string | null; rest: st
 
 /** Matter number as a typed file-jacket label: the platform's signature mark. */
 export function FileLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return <span className={cn('lf-figures inline-flex h-5 shrink-0 items-center rounded-[2px] border border-[var(--lf-manila-line)] bg-[var(--lf-manila)] px-1.5 font-mono text-[11px] font-medium leading-none tracking-tight text-[var(--lf-rust-ink)]', className)}>{children}</span>
+  return <span className={cn('lf-figures inline-flex h-5 shrink-0 items-center rounded-[2px] border border-[var(--lf-manila-line)] bg-[var(--lf-manila)] px-1.5 text-[11px] font-semibold leading-none text-foreground', className)}>{children}</span>
 }
 
 /** Title with its status on the same line. */

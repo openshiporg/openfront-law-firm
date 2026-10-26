@@ -11,6 +11,7 @@ import { getPracticeWorkspace } from '@/features/platform/operations/actions'
 import { getWorkspaceRegister } from '@/features/platform/operations/actions/getWorkspaceRegister'
 import { registerHref, type RegisterParams } from '@/features/platform/operations/lib/workspaceRegister'
 import type { PracticeOverviewQueueItem, PracticeWorkspaceSection } from '@/features/platform/operations/types'
+import { sectionEmptyCopy } from '@/features/platform/lib/emptyCopy'
 import { DeskCreatePanel } from './DeskCreatePanel'
 import { LocalTimerClient } from './TimerControl'
 
@@ -162,20 +163,18 @@ function DeskLane({ desk, section, timeZone, paginationHrefs }: { desk: DeskKind
       id={section.key}
       title={section.title}
       count={section.total}
-      range={section.pagination ? `Page ${section.pagination.page} of ${section.pagination.pageCount}` : undefined}
+      empty={!section.items.length}
       actions={section.total ? <Link href={registerHref(desk, { view: section.key })} className={actionLinkClass}>Search all<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : undefined}
-      footer={section.pagination && paginationHrefs ? (
+      footer={section.pagination && paginationHrefs && section.total > 0 ? (
         <Pager
           label={`${section.title} pages`}
           previous={paginationHrefs.previous}
           next={paginationHrefs.next}
-          summary={section.pagination.loadedCount
-            ? `${section.pagination.firstItem.toLocaleString()}–${section.pagination.lastItem.toLocaleString()} of ${section.total.toLocaleString()}`
-            : `0 of ${section.total.toLocaleString()}`}
+          summary={`${section.pagination.firstItem.toLocaleString()}–${section.pagination.lastItem.toLocaleString()} of ${section.total.toLocaleString()}`}
         />
       ) : undefined}
     >
-      <RecordTable items={section.items} rowHref={(item) => deskItemHref(desk, item)} actionPath={`/dashboard/platform/${desk}`} timeZone={timeZone} anchor={section.key} empty={`No ${section.title.toLowerCase()}`} showKind={kinds.size > 1} label={section.title} />
+      <RecordTable items={section.items} rowHref={(item) => deskItemHref(desk, item)} actionPath={`/dashboard/platform/${desk}`} timeZone={timeZone} anchor={section.key} empty={sectionEmptyCopy(section.key)} showKind={kinds.size > 1} label={section.title} />
     </RecordSection>
   )
 }

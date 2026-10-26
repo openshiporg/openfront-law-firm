@@ -22,7 +22,10 @@ export async function IntakeOperationsPanel({ reviewPage = 1, decisionPage = 1, 
       {/* Clearing conflicts and opening cleared matters is the daily work; a new intake is the less frequent entry. */}
       {conflicts.success ? <ConflictReviewPanel setup={conflicts.data} pageHrefs={reviewHrefs} timeZone={timeZone} /> : <ErrorBanner title="Conflict review unavailable">{conflicts.error}</ErrorBanner>}
       <IntakeConversionPanel setup={response.data} pageHrefs={decisionHrefs} />
-      <IntakeStartPanel setup={response.data} />
+      <details id="new-intake" className="group/new scroll-mt-28 rounded-[6px] border border-border bg-card open:border-0 open:bg-transparent">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold group-open:sr-only [&::-webkit-details-marker]:hidden">New intake<span className="text-xs font-normal text-muted-foreground">Open the form</span></summary>
+        <IntakeStartPanel setup={response.data} />
+      </details>
     </div>
   )
 }

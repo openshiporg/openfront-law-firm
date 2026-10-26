@@ -31,7 +31,7 @@ export default async function AttorneyPage({ params }: { params: Promise<{ slug:
       <div className="sf-split">
         <article className="grid gap-6">
           <div className="flex items-center gap-5">
-            <span aria-hidden="true" className="grid size-20 shrink-0 place-items-center rounded-full bg-[var(--sf-tint)] font-[family-name:var(--font-display)] text-3xl">{initialsOf(person.name)}</span>
+            <span aria-hidden="true" className="grid size-20 shrink-0 place-items-center rounded-[2px] bg-[var(--sf-tint)] font-[family-name:var(--font-display)] text-3xl">{initialsOf(person.name)}</span>
             <div className="grid min-w-0 gap-1">{person.title || person.focus ? <p className="sf-label">{[person.title, person.focus].filter(Boolean).join(' · ')}</p> : null}<h1 className="sf-title">{person.name}</h1></div>
           </div>
           {person.biography ? <div className="sf-prose sf-prose--lead">{person.biography.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : null}

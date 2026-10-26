@@ -18,7 +18,7 @@ export default async function AttorneysPage() {
       {attorneys === null ? <p role="alert" className="sf-notice sf-notice--plain">Attorney profiles could not be loaded. <Link className="sf-link" href="/attorneys">Try again</Link></p>
         : attorneys.length ? <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {attorneys.map((person) => <li key={person.slug}><Link href={`/attorneys/${encodeURIComponent(person.slug)}`} className="sf-card grid h-full content-start gap-4 p-5 no-underline transition-colors hover:border-[var(--color-ink)]">
-          <span aria-hidden="true" className="grid size-14 place-items-center rounded-full bg-[var(--sf-tint)] font-[family-name:var(--font-display)] text-xl">{initialsOf(person.name)}</span>
+          <span aria-hidden="true" className="grid size-14 place-items-center rounded-[2px] bg-[var(--sf-tint)] font-[family-name:var(--font-display)] text-xl">{initialsOf(person.name)}</span>
           <span className="grid gap-1"><span className="sf-h3">{person.name}</span><span className="sf-muted text-sm">{[person.title, person.focus].filter(Boolean).join(' · ')}</span></span>
         </Link></li>)}
       </ul> : <div className="sf-empty">

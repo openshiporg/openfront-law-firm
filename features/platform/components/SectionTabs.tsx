@@ -17,7 +17,8 @@ export function SectionTabs({ sections }: { sections: Array<{ key: string; title
     targets.forEach((node) => observer.observe(node))
     return () => observer.disconnect()
   }, [keys])
-  if (sections.length < 2) return null
+  // Two sections read fine as headings; the index earns its row at three or more.
+  if (sections.length < 3) return null
   return (
     <nav aria-label="Sections" className="sticky top-0 z-10 -mx-4 overflow-x-auto border-b border-border bg-background/95 px-4 backdrop-blur-sm [scrollbar-width:none] md:-mx-6 md:px-6">
       <ul className="flex min-w-max items-end gap-5">

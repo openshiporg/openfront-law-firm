@@ -496,6 +496,8 @@ a.sf-row:hover .sf-row__title { color: var(--color-accent); text-decoration: und
 .sf-notice--plain { border-color: var(--pad-rule-strong); }
 .sf-fine { font-size: var(--text-xs); line-height: 1.6; color: var(--ink-muted); }
 
+.sf-page__head + .sf-empty,
+.sf-page__head + .sf-index { border-top: 0; }
 .sf-empty {
   display: grid;
   justify-items: start;

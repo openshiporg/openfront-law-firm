@@ -28,15 +28,15 @@ export async function TodayPage() {
       ) : (
         <div className="space-y-8">
           {response.data.metrics.length ? (
-            <nav aria-label="Open obligations" className="grid grid-cols-2 border-y border-border sm:grid-cols-4 xl:grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]">
+            <nav aria-label="Open obligations" className="grid grid-cols-4 border-y border-border xl:grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]">
               {response.data.metrics.map((metric) => (
                 <Link
                   key={metric.key}
                   href={metric.href}
-                  className="group min-w-0 border-b border-border px-3 py-3 outline-none transition-colors hover:bg-[var(--lf-manila)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lf-rust)]/40 max-sm:odd:border-r sm:border-r sm:last:border-r-0 xl:border-b-0"
+                  className="group min-w-0 border-b border-r border-border px-2 py-2 outline-none transition-colors hover:bg-[var(--lf-manila)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lf-rust)]/40 sm:px-3 sm:py-3 [&:nth-child(4n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(4n)]:border-r xl:last:border-r-0"
                 >
-                  <span className="block truncate text-xs text-muted-foreground group-hover:text-foreground">{metric.label}</span>
-                  <span className={cn('lf-figures mt-1 block truncate text-2xl font-semibold tracking-tight', metric.value ? 'text-foreground' : 'text-muted-foreground/60')}>{metric.value.toLocaleString()}</span>
+                  <span className="block text-[11px] leading-tight text-muted-foreground group-hover:text-foreground sm:truncate sm:text-xs">{metric.label}</span>
+                  <span className={cn('lf-figures mt-1 block truncate text-lg font-semibold tracking-tight sm:text-2xl', metric.value ? 'text-foreground' : 'text-muted-foreground/60')}>{metric.value.toLocaleString()}</span>
                 </Link>
               ))}
             </nav>

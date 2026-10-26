@@ -7,25 +7,15 @@ export async function generateMetadata() { return firmMetadata('Contact') }
 export default async function ContactPage() {
   const settings = await getStorefrontSettings()
   return <PublicPage><div className="sf-shell sf-page">
-    <header className="sf-page__head"><h1 className="sf-title">Contact</h1><p className="sf-label">{settings.firmName || 'Contact'}</p></header>
-    <div className="grid gap-4 lg:grid-cols-3">
-      <section className="sf-card" aria-labelledby="contact-new"><div className="sf-card__body grid h-full content-start gap-4">
-        <h2 id="contact-new" className="sf-h3">Consultations</h2>
-        {settings.bookingEnabled ? <div className="sf-track"><Link href="/practice-areas" className="sf-pill sf-pill--primary">Request a consultation</Link></div> : <p className="sf-muted text-sm">Consultations are not booked online. Write to the firm using the public contact.</p>}
-      </div></section>
-      <section id="existing-clients" className="sf-card scroll-mt-24" aria-labelledby="contact-existing"><div className="sf-card__body grid h-full content-start gap-4">
-        <h2 id="contact-existing" className="sf-h3">Existing clients</h2>
-        <div className="sf-track"><Link href="/portal" className="sf-pill sf-pill--raised">Open portal</Link><Link href="/portal/accept" className="sf-pill">Use invitation</Link></div>
-        <div className="grid gap-1 text-sm leading-6">
-          <p className="font-medium">New invitation</p>
-          {settings.supportEmail ? <><a className="sf-link break-all" href={`mailto:${settings.supportEmail}?subject=${encodeURIComponent('Client portal invitation request')}`}>{settings.supportEmail}</a><p className="sf-muted">Send your name only, not matter details. Invitations go only to the address the firm has on file.</p></> : <p className="sf-muted">Ask your attorney using the contact details in your engagement materials.</p>}
-        </div>
-      </div></section>
-      <section className="sf-card" aria-labelledby="contact-public"><div className="sf-card__body grid h-full content-start gap-4">
-        <h2 id="contact-public" className="sf-h3">Public contact</h2>
-        {settings.supportEmail ? <a className="sf-link break-all text-base" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : <p className="sf-muted text-sm">No public phone or email is configured.</p>}
-      </div></section>
+    <header className="sf-page__head"><h1 className="sf-title">Contact</h1>{settings.firmName ? <p className="sf-label">{settings.firmName}</p> : null}</header>
+    <div className="grid max-w-3xl gap-10">
+      <dl className="sf-facts" aria-label="How to reach the firm">
+        <div><dt>Consultations</dt><dd>{settings.bookingEnabled ? <Link href="/practice-areas" className="sf-link">Request a consultation</Link> : 'Not booked online'}</dd></div>
+        <div><dt>Email</dt><dd>{settings.supportEmail ? <a className="sf-link break-all" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : <span className="sf-muted">Not listed online</span>}</dd></div>
+        <div><dt>Existing clients</dt><dd className="flex flex-wrap gap-x-5 gap-y-1"><Link href="/portal" className="sf-link">Open the client portal</Link><Link href="/portal/accept" className="sf-link">Use an invitation</Link></dd></div>
+        <div id="existing-clients" className="scroll-mt-24"><dt>New portal invitation</dt><dd>{settings.supportEmail ? <><a className="sf-link break-all" href={`mailto:${settings.supportEmail}?subject=${encodeURIComponent('Client portal invitation request')}`}>Ask by email</a><span className="sf-muted mt-1 block font-normal">Send your name only, not matter details. Invitations go only to the address the firm has on file.</span></> : <span className="sf-muted">Ask your attorney using the contact details in your engagement materials.</span>}</dd></div>
+      </dl>
+      <p role="note" className="sf-notice">No legal advice or representation. Do not send confidential, sensitive or time-critical information here. Not for emergencies or deadline protection.</p>
     </div>
-    <p role="note" className="sf-notice mt-8 max-w-3xl">No legal advice or representation. Do not send confidential, sensitive or time-critical information here. Not for emergencies or deadline protection.</p>
   </div></PublicPage>
 }

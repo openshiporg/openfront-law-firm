@@ -54,11 +54,11 @@ export async function HomePage() {
           {settings.isLocalFictional ? <p className="sf-fine">Fictional local workspace</p> : null}
           <dl className="sf-hero__facts">
             <div><dt>Consultations</dt><dd>{settings.bookingEnabled ? 'Request a time online' : 'Not taken online'}</dd></div>
-            {settings.supportEmail ? <div><dt>Email</dt><dd><a className="sf-link" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a></dd></div> : null}
+            <div><dt>Email</dt><dd>{settings.supportEmail ? <a className="sf-link" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : <span className="sf-muted">Not listed online</span>}</dd></div>
             <div><dt>Clients</dt><dd><Link className="sf-link" href="/portal">Client portal</Link></dd></div>
           </dl>
           <div className="sf-track">
-            {settings.bookingEnabled ? <><Link href="/practice-areas" className="sf-pill sf-pill--primary sf-pill--lg">Request a consultation</Link><Link href="/account" className="sf-pill sf-pill--raised sf-pill--lg">Your appointments</Link></> : <Link href="/contact" className="sf-pill sf-pill--primary sf-pill--lg">Contact the firm</Link>}
+            {settings.bookingEnabled ? <><Link href="/practice-areas" className="sf-pill sf-pill--primary sf-pill--lg">Request a consultation</Link><Link href="/account" className="sf-pill sf-pill--raised sf-pill--lg">Your appointments</Link></> : settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="sf-pill sf-pill--primary sf-pill--lg">Email the firm</a> : <Link href="/portal" className="sf-pill sf-pill--primary sf-pill--lg">Client portal</Link>}
           </div>
         </div>
         <aside className="sf-hero__seal" aria-labelledby="home-portal">
@@ -82,18 +82,6 @@ export async function HomePage() {
         <div className="sf-prose sf-prose--lead"><p>{about}</p></div>
       </section> : null}
 
-      <section className="sf-section" aria-labelledby="home-contact">
-        <div className="sf-card sf-card--ink">
-          <div className="sf-card__body grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-            <div className="grid gap-2">
-              <h2 id="home-contact" className="sf-h2">Contact {settings.firmName || NEUTRAL_FIRM_NAME}</h2>
-              {settings.supportEmail ? <a className="text-base underline underline-offset-4" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : null}
-              <p className="sf-muted text-sm">Not for emergencies or deadline protection.</p>
-            </div>
-            <div className="sf-track"><Link href="/contact" className="sf-pill sf-pill--raised">Contact details</Link></div>
-          </div>
-        </div>
-      </section>
     </div>
   </PublicPage>
 }

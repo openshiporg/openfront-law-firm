@@ -5,6 +5,7 @@ import { PracticePage, PracticeStatus, SectionJumps } from '@/features/platform/
 import { EmptyState, ErrorBanner, FileLabel, Pager, Panel, StatusText, Track, statusLabel, trackItemClass } from '@/features/platform/components/ui'
 import type { WorkQueuePageInfo } from '@/features/platform/operations/lib/workQueuePagination'
 import { getMatterWorkspace } from '../actions/getMatterWorkspace'
+import { sectionEmptyCopy } from '@/features/platform/lib/emptyCopy'
 import { DeskCreatePanel } from '@/features/platform/desks/DeskCreatePanel'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 import { PracticeRowAction } from '@/features/platform/components/PracticeRowAction'
@@ -53,7 +54,7 @@ export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 
                     <span className="lf-figures text-sm text-muted-foreground">{count.toLocaleString()}</span>
                   </header>
                   <div className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-card">
-                    {!section.rows.length ? <EmptyState className="px-4 py-3" title={`No ${section.title.toLowerCase()}`} /> : (
+                    {!section.rows.length ? <EmptyState className="px-4 py-3" title={sectionEmptyCopy(section.key)} /> : (
                       <ul className="divide-y divide-border">
                         {section.rows.map((row) => <li key={row.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-2.5 hover:bg-muted/40">
                           <div className="min-w-0">

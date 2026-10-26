@@ -33,7 +33,7 @@ export function RecordTable({ items, rowHref, actionPath, timeZone, anchor, empt
   compact?: boolean
   label?: string
 }) {
-  if (!items.length) return <p role="status" className="px-4 py-4 text-sm text-muted-foreground">{empty}</p>
+  if (!items.length) return <p role="status" className="py-3 text-sm text-muted-foreground">{empty}</p>
   return (
     <table aria-label={label} className="w-full min-w-0 border-collapse text-sm">
       <thead className="max-sm:sr-only">
@@ -65,12 +65,12 @@ export function RecordRow({ item, href, actionPath, timeZone, anchor, showKind =
         <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
           {number ? <FileLabel>{number}</FileLabel> : null}
           <span className="truncate">{rest}</span>
-          <span className={cn('lf-figures ml-auto shrink-0 whitespace-nowrap font-mono', compact ? '' : 'sm:hidden')}>{when}</span>
+          <span className={cn('lf-figures ml-auto shrink-0 whitespace-nowrap', compact ? '' : 'sm:hidden')}>{when}</span>
         </span>
       </td>
       {showKind ? <td className={cn(cellClass, 'whitespace-nowrap text-xs text-muted-foreground max-lg:hidden')}>{item.kind}</td> : null}
       <td className={cn(cellClass, 'max-sm:mt-2 max-sm:self-center')}><StatusText status={item.status} /></td>
-      {compact ? null : <td className={cn(cellClass, 'lf-figures whitespace-nowrap font-mono text-xs text-muted-foreground max-sm:hidden')}>{when}</td>}
+      {compact ? null : <td className={cn(cellClass, 'lf-figures whitespace-nowrap text-xs text-muted-foreground max-sm:hidden')}>{when}</td>}
       <td className={cn(cellClass, 'text-right max-sm:mt-2')}>
         <PracticeRowAction id={item.id} kind={item.kind} status={item.status} path={actionPath} canAct={item.canAct} timeZone={timeZone} />
       </td>
@@ -79,7 +79,7 @@ export function RecordRow({ item, href, actionPath, timeZone, anchor, showKind =
 }
 
 /** A heading row and the range in view above a framed ledger table. */
-export function RecordSection({ id, title, count, range, actions, children, footer, className }: { id?: string; title: ReactNode; count?: number; range?: ReactNode; actions?: ReactNode; children: ReactNode; footer?: ReactNode; className?: string }) {
+export function RecordSection({ id, title, count, range, actions, children, footer, className, empty = false }: { id?: string; title: ReactNode; count?: number; range?: ReactNode; actions?: ReactNode; children: ReactNode; footer?: ReactNode; className?: string; empty?: boolean }) {
   return (
     <section id={id} aria-labelledby={id ? `${id}-heading` : undefined} className={cn('min-w-0 scroll-mt-28', className)}>
       <header className="mb-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -92,10 +92,12 @@ export function RecordSection({ id, title, count, range, actions, children, foot
           {actions}
         </div>
       </header>
-      <div className="min-w-0 rounded-[6px] border border-border bg-card">
-        {children}
-        {footer ? <div className="border-t border-border px-4 py-2.5">{footer}</div> : null}
-      </div>
+      {empty ? <div className="min-w-0 border-t border-border">{children}</div> : (
+        <div className="min-w-0 rounded-[6px] border border-border bg-card">
+          {children}
+          {footer ? <div className="border-t border-border px-4 py-2.5">{footer}</div> : null}
+        </div>
+      )}
     </section>
   )
 }
@@ -142,16 +144,15 @@ export function QueuePanel({
       title={title}
       count={count}
       className={className}
-      range={paged && pagination ? `Page ${pagination.page} of ${pagination.pageCount}` : undefined}
+      empty={!items.length}
+      range={undefined}
       actions={!paged && showViewAll ? <Link href={viewAllHref} className={actionLinkClass}>View all<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : undefined}
-      footer={pagination && paginationHrefs ? (
+      footer={pagination && paginationHrefs && (authorizedTotal ?? 0) > 0 ? (
         <Pager
           label={`${title} pages`}
           previous={paginationHrefs.previous}
           next={paginationHrefs.next}
-          summary={pagination.loadedCount
-            ? `${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()} of ${(authorizedTotal ?? 0).toLocaleString()}`
-            : `0 of ${(authorizedTotal ?? 0).toLocaleString()}`}
+          summary={`${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()} of ${(authorizedTotal ?? 0).toLocaleString()}`}
         />
       ) : undefined}
     >
