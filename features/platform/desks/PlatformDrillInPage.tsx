@@ -59,7 +59,7 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
   >
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="min-w-0 space-y-6">
-        <section aria-labelledby="record-facts" className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+        <section aria-labelledby="record-facts" className="overflow-hidden rounded-[6px] border border-border bg-card">
           <h2 id="record-facts" className="sr-only">Record facts</h2>
           <dl className="grid min-w-0 gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
             {record.facts.map(([term, value]) => <div key={term} className="min-w-0 bg-card px-4 py-3"><dt className="text-xs text-muted-foreground">{term}</dt><dd className="mt-1 break-words text-sm font-medium leading-5 text-foreground">{value}</dd></div>)}
@@ -91,7 +91,7 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
         {record.related.length ? (
           <Panel title="Related" bodyClassName="p-2">
             <nav aria-label="Related records" className="grid">
-              {record.related.map((link) => <Link key={link.href} href={link.href} className="flex min-h-10 items-center justify-between gap-2 rounded-lg px-2 text-sm font-medium text-foreground hover:bg-muted">{link.label}<ArrowUpRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link>)}
+              {record.related.map((link) => <Link key={link.href} href={link.href} className="flex min-h-10 items-center justify-between gap-2 rounded-[4px] px-2 text-sm font-medium text-foreground hover:bg-muted">{link.label}<ArrowUpRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link>)}
             </nav>
           </Panel>
         ) : null}

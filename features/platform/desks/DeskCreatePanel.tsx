@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react'
 
 import { FormSelect } from '@/components/ui/form-select'
 import { cn } from '@/lib/utils'
-import { fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass } from '@/features/platform/components/ui'
+import { fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass, segmentClass, segmentItemClass } from '@/features/platform/components/ui'
 import { SearchableOptionSelect } from '@/features/platform/components/SearchableOptionSelect'
 
 import { createDeskRecord, type DeskCreateState } from './actions/createDeskRecord'
@@ -36,7 +36,7 @@ export function DeskCreatePanel({ desk, timeZone, matter }: { desk: DeskKind; ti
   const [selected, setSelected] = useState<CreateKind | null>(null)
   if (desk === 'matters' && !matter) {
     return (
-      <section aria-labelledby="open-matter-heading" className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-xs">
+      <section aria-labelledby="open-matter-heading" className="min-w-0 rounded-[6px] border border-border bg-card p-4">
         <h2 id="open-matter-heading" className="text-sm font-semibold">Open a matter</h2>
         <nav aria-label="Open a matter" className={cn(trackClass, 'mt-3')}>
           <Link href="/dashboard/platform/intake#new-intake-heading" className={pillPrimaryClass}><Plus className="size-4" aria-hidden="true" />Start client intake</Link>
@@ -48,7 +48,7 @@ export function DeskCreatePanel({ desk, timeZone, matter }: { desk: DeskKind; ti
   const options = matter ? matterForms : forms[desk]
   const active = options.find((form) => form.kind === selected)
   return (
-    <section aria-labelledby={`create-${desk}-heading`} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+    <section aria-labelledby={`create-${desk}-heading`} className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-card">
       <header className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
         <h2 id={`create-${desk}-heading`} className="text-sm font-semibold">New</h2>
         <div role="group" aria-label="Record to create" className={trackClass}>
@@ -146,11 +146,11 @@ function ChoiceTrack({ name, label, defaultValue, options, className }: { name: 
   return (
     <fieldset className={cn('grid min-w-0 gap-1.5', className)}>
       <legend className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</legend>
-      <div className={trackClass}>
+      <div className={segmentClass}>
         {options.map(([value, text]) => (
-          <label key={value} className="relative">
+          <label key={value} className="relative flex border-r border-input last:border-r-0">
             <input type="radio" name={name} value={value} defaultChecked={value === defaultValue} className="peer sr-only" />
-            <span className={cn(trackItemClass(false), 'cursor-pointer peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-black/5 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50 dark:peer-checked:bg-zinc-800')}>{text}</span>
+            <span className={segmentItemClass}>{text}</span>
           </label>
         ))}
       </div>

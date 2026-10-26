@@ -13,7 +13,7 @@ export function ThreadReplyDraft({ threadId, subject }: { threadId: string; subj
   const [state, action, pending] = useActionState<DeskCreateState, FormData>(createDeskRecord, { ok: false, message: '' })
   const actionForm = useKeptForm(action, state)
   return (
-    <form {...actionForm} aria-labelledby="reply-draft-heading" className="grid min-w-0 gap-4 rounded-xl border border-border bg-card p-4 shadow-xs">
+    <form {...actionForm} aria-labelledby="reply-draft-heading" className="grid min-w-0 gap-4 rounded-[6px] border border-border bg-card p-4">
       <h2 id="reply-draft-heading" className="text-sm font-semibold text-foreground">Reply draft</h2>
       <input type="hidden" name="kind" value="reply" />
       <input type="hidden" name="threadId" value={threadId} />

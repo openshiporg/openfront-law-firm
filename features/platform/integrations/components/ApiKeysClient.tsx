@@ -45,7 +45,7 @@ function IssueForm({ scopes, onIssued }: { scopes: string[]; onIssued: (revealed
       <fieldset className="grid gap-1.5 sm:col-span-2">
         <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Scopes</legend>
         <div className="flex flex-wrap gap-2">
-          {scopes.map((scope) => <label key={scope} className="relative"><input type="checkbox" name="scopes" value={scope} className="peer sr-only" /><span className="inline-flex h-8 cursor-pointer items-center rounded-full bg-muted px-3 font-mono text-xs text-muted-foreground shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)] peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-black/10 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50">{scope}</span></label>)}
+          {scopes.map((scope) => <label key={scope} className="relative"><input type="checkbox" name="scopes" value={scope} className="peer sr-only" /><span className="inline-flex h-8 cursor-pointer items-center rounded-[4px] border border-input px-2.5 font-mono text-xs text-muted-foreground peer-checked:border-[var(--lf-rust)] peer-checked:bg-[var(--lf-manila)] peer-checked:text-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--lf-rust)]/40">{scope}</span></label>)}
         </div>
       </fieldset>
       <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">

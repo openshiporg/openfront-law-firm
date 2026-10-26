@@ -80,7 +80,7 @@ function StatusSelect({ value, onChange }: { value: ContactStatus; onChange: (va
   return (
     <fieldset className="grid gap-1.5 sm:col-span-2">
       <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Status</legend>
-      <div className={cn(trackClass, 'flex-wrap rounded-2xl')}>
+      <div className={cn(trackClass, 'flex-wrap rounded-[6px]')}>
         {CONTACT_STATUSES.filter((status) => status !== 'archived').map((status) => (
           <button key={status} type="button" aria-pressed={value === status} onClick={() => onChange(status)} className={trackItemClass(value === status)}>
             <StatusDot tone={CONTACT_STATUS_TONES[status]} />{CONTACT_STATUS_LABELS[status]}
@@ -161,7 +161,7 @@ export function ContactStatusTrack({ contactId, status }: { contactId: string; s
     <Panel title="Status">
       <form {...actionForm} className="grid gap-3">
         <input type="hidden" name="contactId" value={contactId} />
-        <div role="group" aria-label="Contact status" className={cn(trackClass, 'flex-wrap rounded-2xl')}>
+        <div role="group" aria-label="Contact status" className={cn(trackClass, 'flex-wrap rounded-[6px]')}>
           {CONTACT_STATUSES.map((value) => (
             <button key={value} type="submit" name="status" value={value} disabled={pending || value === status} aria-pressed={value === status} className={cn(trackItemClass(value === status), value === status && 'disabled:opacity-100')}>
               <StatusDot tone={CONTACT_STATUS_TONES[value]} />{CONTACT_STATUS_LABELS[value]}

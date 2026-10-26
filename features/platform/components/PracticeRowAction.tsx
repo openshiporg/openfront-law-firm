@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react'
 import { FormSelect } from '@/components/ui/form-select'
 import { Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass } from './ui'
+import { fieldClass, labelClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass, segmentClass, segmentItemClass } from './ui'
 
 import {
   runPracticeAction,
@@ -146,7 +146,7 @@ export function PracticeRowAction({
       <summary className={cn(trackClass, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>
         <span className={cn(trackItemClass(true), 'h-7 px-3 text-xs')}>{action.label}</span>
       </summary>
-      <form {...formActionForm} className="absolute right-0 z-20 mt-2 box-border grid w-80 max-w-[calc(100vw-2rem)] gap-3 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+      <form {...formActionForm} className="absolute right-0 z-20 mt-2 box-border grid w-80 max-w-[calc(100vw-2rem)] gap-3 rounded-[6px] border border-border bg-popover p-3 text-popover-foreground shadow-lg">
         {action.alternates?.length ? (
           <label className={labelClass} htmlFor={`operation-${id}`}>
             Action
@@ -161,11 +161,11 @@ export function PracticeRowAction({
         {selectedOperation === 'finalizeConflictReview' ? (
           <fieldset className="grid gap-1.5">
             <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Review outcome</legend>
-            <div className={trackClass}>
+            <div className={segmentClass}>
               {([["cleared", "Cleared"], ["conflict_found", "Conflict found"]] as const).map(([value, label]) => (
-                <label key={value} className="relative">
+                <label key={value} className="relative flex border-r border-input last:border-r-0">
                   <input type="radio" name="outcome" value={value} required className="peer sr-only" />
-                  <span className={cn(trackItemClass(false), 'cursor-pointer peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-black/5 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50 dark:peer-checked:bg-zinc-800')}>{label}</span>
+                  <span className={segmentItemClass}>{label}</span>
                 </label>
               ))}
             </div>

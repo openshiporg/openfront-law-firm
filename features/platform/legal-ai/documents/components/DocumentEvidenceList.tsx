@@ -42,7 +42,7 @@ export function DocumentEvidenceList({ documents }: { documents: LegalAiEvidence
               ) : null}
             </div>
             {document.currentVersion?.checksumSha256 ? (
-              <div className="ml-4 inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-md bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground sm:ml-0 sm:justify-self-end" title={document.currentVersion.checksumSha256}>
+              <div className="ml-4 inline-flex max-w-full items-center gap-1.5 justify-self-start rounded-[4px] bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground sm:ml-0 sm:justify-self-end" title={document.currentVersion.checksumSha256}>
                 <Fingerprint className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="sr-only">SHA-256 </span>
                 <span className="max-w-40 truncate">{document.currentVersion.checksumSha256}</span>

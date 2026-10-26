@@ -16,7 +16,7 @@ export default async function AboutPage() {
     <div className="sf-shell sf-page">
       <div className="sf-split">
         <article className="grid gap-8">
-          <header className="grid gap-3"><p className="sf-label">About</p><h1 className="sf-title">{about && settings.firmName ? settings.firmName : 'Public information is not configured.'}</h1></header>
+          <header className="grid gap-3"><h1 className="sf-title">{settings.firmName ?? 'About'}</h1></header>
           <div className="sf-prose sf-prose--lead">
             {about ? about.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p>{who} has not published verified firm, attorney or practice-area information.</p>}
           </div>

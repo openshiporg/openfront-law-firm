@@ -58,9 +58,9 @@ export function StaffInvitationPanel({ setup }: { setup: TeamSetup }) {
 
             {!setup.roles.length ? <Notice>No roles yet. Add the standard roles below.</Notice> : null}
             {state.message ? (
-              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{state.message}</p>
+              <p role="alert" className="rounded-[4px] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{state.message}</p>
             ) : state.success ? (
-              <p role="status" className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">{state.success}</p>
+              <p role="status" className="rounded-[4px] border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">{state.success}</p>
             ) : null}
 
             <Track>
@@ -166,7 +166,7 @@ function MembershipControl({
       <summary className="inline-flex cursor-pointer list-none items-center text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
         <span className="group-open:hidden">Change access</span><span className="hidden group-open:inline">Close access change</span>
       </summary>
-      <form {...actionForm} className="mt-3 grid min-w-0 gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:grid-cols-2 2xl:grid-cols-4 2xl:items-end">
+      <form {...actionForm} className="mt-3 grid min-w-0 gap-3 rounded-[4px] border border-border bg-muted/30 p-3 sm:grid-cols-2 2xl:grid-cols-4 2xl:items-end">
         <input type="hidden" name="membershipId" value={membership.id} />
         <SearchableOptionSelect id={`role-${membership.id}`} name="roleId" label="New role" emptyLabel="Keep current role" kind="role" total={setup.rolesCount} options={setup.roles.map((role) => ({ value: role.id, label: role.name }))} />
         <SearchableOptionSelect id={`office-${membership.id}`} name="officeId" label="New primary office" kind="office" emptyLabel="No primary office" value={officeValue} onValueChange={setOfficeValue} total={setup.officesCount + 2} options={[{ value: '__unchanged__', label: membership.office ? `Keep current office · ${membership.office.name}` : 'Keep current · no primary office' }, ...(membership.office ? [{ value: membership.office.id, label: `${membership.office.name} · current office` }] : []), ...setup.offices.map((office) => ({ value: office.id, label: `${office.name} · ${office.code}` }))]} />

@@ -18,7 +18,7 @@ export default async function PortalSignInPage({ searchParams }: { searchParams:
       <section className="sf-card sf-portal-card">
         <div className="sf-card__body grid gap-6">
           <FirmBrand brand={{ name: published.firmName, brandTagline: published.tagline, logoIcon: published.logoIcon, logoColor: published.logoColor }} />
-          <header className="grid gap-2"><p className="sf-label">Client portal</p><h1 className="sf-h2">{signInToken ? 'Open your client portal' : 'Sign in'}</h1>{signInToken ? <p className="sf-muted text-sm">One-time link. Expires 15 minutes after it was sent.</p> : null}</header>
+          <header className="grid gap-2"><h1 className="sf-h2">{signInToken ? 'Open your client portal' : 'Sign in'}</h1><p className="sf-label">Client portal</p>{signInToken ? <p className="sf-muted text-sm">One-time link. Expires 15 minutes after it was sent.</p> : null}</header>
           {signInToken ? <PortalSignInConfirmForm token={signInToken} /> : <PortalSignInRequestForm />}
         </div>
         <div className="sf-card__foot text-sm">

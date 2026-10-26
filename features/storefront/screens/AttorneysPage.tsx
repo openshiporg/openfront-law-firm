@@ -14,7 +14,7 @@ export default async function AttorneysPage() {
   const attorneys = await getPublishedAttorneys(settings.publication.mode !== 'closed' || settings.isLocalFictional)
   return <PublicPage>
     <div className="sf-shell sf-page">
-      <header className="sf-page__head"><p className="sf-label">{settings.firmName || 'Directory'}</p><h1 className="sf-title">Attorneys</h1></header>
+      <header className="sf-page__head"><h1 className="sf-title">Attorneys</h1><p className="sf-label">{settings.firmName || 'Directory'}</p></header>
       {attorneys === null ? <p role="alert" className="sf-notice sf-notice--plain">Attorney profiles could not be loaded. <Link className="sf-link" href="/attorneys">Try again</Link></p>
         : attorneys.length ? <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {attorneys.map((person) => <li key={person.slug}><Link href={`/attorneys/${encodeURIComponent(person.slug)}`} className="sf-card grid h-full content-start gap-4 p-5 no-underline transition-colors hover:border-[var(--color-ink)]">

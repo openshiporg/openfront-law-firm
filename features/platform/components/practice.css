@@ -1,0 +1,26 @@
+/* Law Firm platform tokens. Redweld file: rust ink for the current obligation and the
+ * primary action only, manila for headings of ledgers and file labels. Platform pages only;
+ * the shared dashboard shell keeps its own tokens. */
+:root {
+  --lf-rust: oklch(0.47 0.135 36);
+  --lf-rust-hover: oklch(0.415 0.13 36);
+  --lf-rust-ink: oklch(0.46 0.135 36);
+  --lf-on-rust: oklch(0.99 0.005 80);
+  --lf-manila: oklch(0.968 0.026 86);
+  --lf-manila-strong: oklch(0.935 0.042 84);
+  --lf-manila-line: oklch(0.86 0.05 78);
+}
+
+.dark {
+  --lf-rust: oklch(0.71 0.125 46);
+  --lf-rust-hover: oklch(0.77 0.115 46);
+  --lf-rust-ink: oklch(0.77 0.115 46);
+  --lf-on-rust: oklch(0.2 0.02 40);
+  --lf-manila: oklch(0.235 0.016 70);
+  --lf-manila-strong: oklch(0.28 0.022 70);
+  --lf-manila-line: oklch(0.38 0.03 70);
+}
+
+.lf-figures {
+  font-variant-numeric: tabular-nums slashed-zero;
+}

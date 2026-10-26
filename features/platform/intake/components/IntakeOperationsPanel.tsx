@@ -19,9 +19,10 @@ export async function IntakeOperationsPanel({ reviewPage = 1, decisionPage = 1, 
   if (!response.success) return <ErrorBanner title="Intake unavailable">{response.error}</ErrorBanner>
   return (
     <div className="min-w-0 space-y-8">
-      <IntakeStartPanel setup={response.data} />
+      {/* Clearing conflicts and opening cleared matters is the daily work; a new intake is the less frequent entry. */}
       {conflicts.success ? <ConflictReviewPanel setup={conflicts.data} pageHrefs={reviewHrefs} timeZone={timeZone} /> : <ErrorBanner title="Conflict review unavailable">{conflicts.error}</ErrorBanner>}
       <IntakeConversionPanel setup={response.data} pageHrefs={decisionHrefs} />
+      <IntakeStartPanel setup={response.data} />
     </div>
   )
 }

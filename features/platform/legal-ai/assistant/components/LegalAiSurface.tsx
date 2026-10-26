@@ -30,7 +30,7 @@ export function LegalAiBoundaryNotice({ compact = false }: { compact?: boolean }
     <div
       role="note"
       className={cn(
-        'flex min-w-0 items-center gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 text-xs font-medium text-foreground',
+        'flex min-w-0 items-center gap-2.5 rounded-[4px] border border-amber-500/25 bg-amber-500/[0.06] px-3 text-xs font-medium text-foreground',
         compact ? 'py-2' : 'py-2.5',
       )}
     >
@@ -62,7 +62,7 @@ export function LegalAiNav({ current }: { current?: string } = {}) {
 
 export function EmptyEvidence({ children }: { children: ReactNode }) {
   return (
-    <div role="status" className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center">
+    <div role="status" className="flex flex-col items-center gap-2 rounded-[6px] border  border-border px-6 py-10 text-center">
       <BookOpenCheck className="size-5 text-muted-foreground" aria-hidden="true" />
       <p className="max-w-md text-sm font-medium text-foreground">{children}</p>
     </div>
@@ -74,7 +74,7 @@ export function EvidencePager({ label, page, pageCount, total, href, canContinue
     return (
       <nav aria-label={`${label} pages`} className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-full bg-amber-500" />
+          <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-[1px] bg-amber-500" />
           {label} inventory unavailable · not an empty or complete result
         </p>
         <Track>

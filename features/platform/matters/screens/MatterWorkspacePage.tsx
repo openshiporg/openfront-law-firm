@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ArrowLeft, BrainCircuit, Gavel, ReceiptText, Settings2 } from 'lucide-react'
 
 import { PracticePage, PracticeStatus, SectionJumps } from '@/features/platform/components/PracticeSurface'
-import { EmptyState, ErrorBanner, Pager, Panel, StatusDot, Track, statusLabel, statusTone, trackItemClass } from '@/features/platform/components/ui'
+import { EmptyState, ErrorBanner, FileLabel, Pager, Panel, StatusText, Track, statusLabel, trackItemClass } from '@/features/platform/components/ui'
 import type { WorkQueuePageInfo } from '@/features/platform/operations/lib/workQueuePagination'
 import { getMatterWorkspace } from '../actions/getMatterWorkspace'
 import { DeskCreatePanel } from '@/features/platform/desks/DeskCreatePanel'
@@ -19,83 +19,90 @@ export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 
   const { matter } = result.data
   // The team-access panel replaces the read-only team register when the viewer can read it.
   const sections = admin.team ? result.data.sections.filter((section) => section.key !== 'team') : result.data.sections
+  // Obligations first (deadlines, tasks), then the file's records, then who is on it.
+  const sectionOrder = ['deadlines', 'tasks', 'documents', 'communications', 'invoices', 'parties', 'team']
+  const orderedSections = [...sections].sort((a, b) => (sectionOrder.indexOf(a.key) + 1 || 99) - (sectionOrder.indexOf(b.key) + 1 || 99))
   return (
     <PracticePage
       title={matter.title}
       description="Authorized matter workspace for team, parties, work, documents, communications, and billing evidence."
       status={<PracticeStatus status={matter.status} />}
-      meta={<span className="font-mono text-xs">{matter.matterNumber} · {statusLabel(matter.confidentiality)}</span>}
+      meta={<span className="flex flex-wrap items-center gap-2"><FileLabel>{matter.matterNumber}</FileLabel><span>{matter.client?.displayName || 'Client unavailable'}</span><span aria-hidden="true">·</span><span>{statusLabel(matter.confidentiality)}</span></span>}
       trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: matter.matterNumber }]}
       actions={<>
       <PracticeRowAction id={matter.id} kind="Matter" status={matter.status} path={`/dashboard/platform/matters/${encodeURIComponent(matter.id)}`} canAct={admin.canActOnMatter} timeZone={timeZone} />
       <Track>
         <Link href="/dashboard/platform/matters" className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />Matters</Link>
         <Link href={`/dashboard/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(false)}><Settings2 className="size-4" aria-hidden="true" />Fields</Link>
-        <Link href="/dashboard/platform/billing" className={trackItemClass(false)}><ReceiptText className="size-4" aria-hidden="true" />Bill</Link>
         <Link href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(true)}><BrainCircuit className="size-4" aria-hidden="true" />AI evidence</Link>
+        <Link href="/dashboard/platform/billing#draft-invoice" className={trackItemClass(true)}><ReceiptText className="size-4" aria-hidden="true" />Bill</Link>
       </Track>
       </>}
     >
       <div className="space-y-6">
-        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border xl:grid-cols-4" aria-label="Matter identity">
-          {[
-            ['Client', matter.client?.displayName || 'Unavailable'],
-            ['Responsible attorney', matter.responsibleAttorney?.name || 'Unassigned'],
-            ['Office', matter.office?.name || 'No office'],
-            ['Practice area', matter.practiceArea?.name || 'No practice area'],
-          ].map(([label, value]) => <div key={label} className="min-w-0 bg-card px-4 py-3"><dt className="truncate text-xs text-muted-foreground">{label}</dt><dd className="mt-1 truncate text-sm font-semibold text-foreground">{value}</dd></div>)}
-        </dl>
-
-        {['open', 'on_hold', 'closing'].includes(matter.status) ? <DeskCreatePanel desk="matters" timeZone={timeZone} matter={{ id: matter.id, label: `${matter.matterNumber} · ${matter.title}` }} /> : null}
-
-        <SectionJumps sections={sections.map((section) => ({ key: section.key, title: section.title, total: section.pagination ? section.total ?? 0 : section.rows.length }))} />
-
-        <div className="grid items-start gap-6 xl:grid-cols-2">
-          <MatterTeamPanel matterId={matter.id} team={admin.team} />
-          <div className="grid min-w-0 gap-6">
-            <ConfidentialityPanel matterId={matter.id} confidentiality={matter.confidentiality} />
-            <EthicalWallsPanel matterId={matter.id} walls={admin.walls} />
-          </div>
-          <Panel
-            id="dockets"
-            title={<h2 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground"><span className="truncate">Dockets</span><span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{(admin.dockets?.length ?? 0).toLocaleString()}</span></h2>}
-            actions={<Track><Link href="/dashboard/platform/dockets" className={trackItemClass(false)}><Gavel className="size-3.5" aria-hidden="true" />Courts &amp; dockets</Link></Track>}
-            bodyClassName="p-0"
-          >
-            {!admin.dockets ? <div className="p-4"><EmptyState title="Dockets are unavailable to your role" /></div> : admin.dockets.length ? (
-              <ul className="divide-y divide-border">
-                {admin.dockets.map((docket) => <li key={docket.id} className="min-w-0 px-4 py-3">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <StatusDot tone={statusTone(docket.status)} />
-                    <h3 className="min-w-0 truncate text-sm font-semibold text-foreground"><Link href={`/dashboard/platform/dockets/${encodeURIComponent(docket.id)}`} className="underline-offset-4 hover:underline">{docket.docketNumber}</Link></h3>
-                    <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{statusLabel(docket.status)}</span>
+        <SectionJumps sections={orderedSections.map((section) => ({ key: section.key, title: section.title, total: section.pagination ? section.total ?? 0 : section.rows.length }))} />
+        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_23rem]">
+          <div className="min-w-0 space-y-8">
+            {['open', 'on_hold', 'closing'].includes(matter.status) ? <DeskCreatePanel desk="matters" timeZone={timeZone} matter={{ id: matter.id, label: `${matter.matterNumber} · ${matter.title}` }} /> : null}
+            {orderedSections.map((section) => {
+              const count = section.pagination ? section.total ?? 0 : section.rows.length
+              return (
+                <section key={section.key} id={section.key} className="min-w-0 scroll-mt-28" aria-labelledby={`${section.key}-heading`}>
+                  <header className="mb-2 flex min-w-0 items-baseline gap-2">
+                    <h2 id={`${section.key}-heading`} className="min-w-0 truncate text-[15px] font-semibold tracking-tight text-foreground">{section.title}</h2>
+                    <span className="lf-figures text-sm text-muted-foreground">{count.toLocaleString()}</span>
+                  </header>
+                  <div className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-card">
+                    {!section.rows.length ? <EmptyState className="px-4 py-3" title={`No ${section.title.toLowerCase()}`} /> : (
+                      <ul className="divide-y divide-border">
+                        {section.rows.map((row) => <li key={row.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-2.5 hover:bg-muted/40">
+                          <div className="min-w-0">
+                            <h3 className="min-w-0 truncate text-sm font-medium text-foreground">{row.href ? <Link href={row.href} className="underline-offset-4 hover:text-[var(--lf-rust-ink)] hover:underline">{row.title}</Link> : row.title}</h3>
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.meta}</p>
+                          </div>
+                          <StatusText status={row.status} />
+                        </li>)}
+                      </ul>
+                    )}
+                    {(section.key === 'team' || section.key === 'parties' || section.key === 'communications' || section.key === 'deadlines' || section.key === 'tasks' || section.key === 'documents' || section.key === 'invoices') && section.pagination ? <MatterWorkspacePagination sectionKey={section.key} matterId={matter.id} total={section.total ?? 0} pagination={section.pagination} teamPage={teamPage} partyPage={partyPage} communicationPage={communicationPage} deadlinePage={deadlinePage} taskPage={taskPage} documentPage={documentPage} invoicePage={invoicePage} /> : null}
                   </div>
-                  <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground">{[docket.title, docket.court?.name].filter(Boolean).join(' · ')}</p>
-                </li>)}
-              </ul>
-            ) : <div className="p-4"><EmptyState title="No dockets" /></div>}
-          </Panel>
-          <StatusHistoryList history={admin.history} timeZone={timeZone} />
-          {sections.map((section) => (
-            <section key={section.key} id={section.key} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-labelledby={`${section.key}-heading`}>
-              <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-                <h2 id={`${section.key}-heading`} className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground"><span className="truncate">{section.title}</span><span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{(section.pagination ? section.total ?? 0 : section.rows.length).toLocaleString()}</span></h2>
-              </header>
-              {!section.rows.length ? <div className="p-4"><EmptyState title={`No ${section.title.toLowerCase()}`} /></div> : (
+                </section>
+              )
+            })}
+          </div>
+
+          <aside aria-label="Matter file" className="min-w-0 space-y-6 xl:sticky xl:top-14">
+            <dl className="divide-y divide-border overflow-hidden rounded-[6px] border border-border bg-[var(--lf-manila)]" aria-label="Matter identity">
+              {[
+                ['Client', matter.client?.displayName || 'Unavailable'],
+                ['Responsible attorney', matter.responsibleAttorney?.name || 'Unassigned'],
+                ['Office', matter.office?.name || 'No office'],
+                ['Practice area', matter.practiceArea?.name || 'No practice area'],
+              ].map(([label, value]) => <div key={label} className="grid min-w-0 grid-cols-[9rem_minmax(0,1fr)] gap-3 px-4 py-2.5"><dt className="truncate text-xs text-muted-foreground">{label}</dt><dd className="truncate text-sm font-medium text-foreground">{value}</dd></div>)}
+            </dl>
+            <Panel
+              id="dockets"
+              title={<h2 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground"><span className="truncate">Dockets</span><span className="lf-figures text-xs font-normal text-muted-foreground">{(admin.dockets?.length ?? 0).toLocaleString()}</span></h2>}
+              actions={<Link href="/dashboard/platform/dockets" className={trackItemClass(false)}><Gavel className="size-3.5" aria-hidden="true" />Courts &amp; dockets</Link>}
+              bodyClassName="p-0"
+            >
+              {!admin.dockets ? <EmptyState className="px-4 py-3" title="Dockets are unavailable to your role" /> : admin.dockets.length ? (
                 <ul className="divide-y divide-border">
-                  {section.rows.map((row) => <li key={row.id} className="min-w-0 px-4 py-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <StatusDot tone={statusTone(row.status)} />
-                      <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{row.href ? <Link href={row.href} className="underline-offset-4 hover:underline">{row.title}</Link> : row.title}</h3>
-                      <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{statusLabel(row.status)}</span>
+                  {admin.dockets.map((docket) => <li key={docket.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <h3 className="min-w-0 truncate font-mono text-sm font-medium text-foreground"><Link href={`/dashboard/platform/dockets/${encodeURIComponent(docket.id)}`} className="underline-offset-4 hover:underline">{docket.docketNumber}</Link></h3>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{[docket.title, docket.court?.name].filter(Boolean).join(' · ')}</p>
                     </div>
-                    <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground">{row.meta}</p>
+                    <StatusText status={docket.status} />
                   </li>)}
                 </ul>
-              )}
-              {(section.key === 'team' || section.key === 'parties' || section.key === 'communications' || section.key === 'deadlines' || section.key === 'tasks' || section.key === 'documents' || section.key === 'invoices') && section.pagination ? <MatterWorkspacePagination sectionKey={section.key} matterId={matter.id} total={section.total ?? 0} pagination={section.pagination} teamPage={teamPage} partyPage={partyPage} communicationPage={communicationPage} deadlinePage={deadlinePage} taskPage={taskPage} documentPage={documentPage} invoicePage={invoicePage} /> : null}
-            </section>
-          ))}
+              ) : <EmptyState className="px-4 py-3" title="No dockets" />}
+            </Panel>
+            <MatterTeamPanel matterId={matter.id} team={admin.team} />
+            <ConfidentialityPanel matterId={matter.id} confidentiality={matter.confidentiality} />
+            <EthicalWallsPanel matterId={matter.id} walls={admin.walls} />
+            <StatusHistoryList history={admin.history} timeZone={timeZone} />
+          </aside>
         </div>
       </div>
     </PracticePage>

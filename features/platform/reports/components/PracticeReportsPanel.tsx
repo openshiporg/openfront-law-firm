@@ -117,7 +117,7 @@ function Amounts({ amounts }: { amounts: Map<string, number> }) {
 function Basis({ title, lines }: { title: string; lines: Array<ReactNode | null | false> }) {
   const shown = lines.filter(Boolean)
   return (
-    <div role="note" className="min-w-0 rounded-lg bg-muted/60 px-3 py-2">
+    <div role="note" className="min-w-0 rounded-[4px] bg-muted/60 px-3 py-2">
       <p className="text-xs font-medium text-foreground">{title}</p>
       <ul className="mt-1 space-y-0.5 text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">
         {shown.map((line, index) => <li key={index}>{line}</li>)}
@@ -200,7 +200,7 @@ function AccountsReceivableRegister({ rows, unavailable }: { rows: ArRow[]; unav
       {!rows.length ? (
         <EmptyState title={unavailable ? 'Invoices are hidden for your role.' : 'No unpaid invoices.'} />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-[6px] border border-border bg-card">
           <table className="w-full min-w-[34rem] text-sm tabular-nums">
             <thead className="border-b border-border bg-muted/40">
               <tr><th className={th}>Invoice</th><th className={th}>Matter</th><th className={th}>Client</th><th className={th}>Due</th><th className={`${th} text-right`}>Balance due</th></tr>
@@ -248,7 +248,7 @@ function TrustSnapshotRegister({
       ) : !rows.length ? (
         <EmptyState title="No client ledger balances recorded." />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-[6px] border border-border bg-card">
           <table className="w-full min-w-[30rem] text-sm tabular-nums">
             <thead className="border-b border-border bg-muted/40">
               <tr><th className={th}>Client</th><th className={th}>Ledger</th><th className={th}>As of</th><th className={`${th} text-right`}>Balance</th></tr>

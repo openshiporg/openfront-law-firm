@@ -105,10 +105,10 @@ export function LocalTimerClient({ scopeKey }: { scopeKey: string }) {
   }
   function reset() { writeDraft(storageKey, null); setAnnouncement('Timer reset.') }
   return <div className="space-y-4">
-    {legacyPresent ? <div role="alert" className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p>An older unsaved timer draft on this device has an unverified owner. It was not restored or saved.</p><div className={trackClass}><button type="button" className={pillClass} onClick={() => { try { window.localStorage.removeItem("openfront-law-firm:timer-draft"); setLegacyPresent(false); setAnnouncement("The older unverified draft was discarded. No time entry was saved."); } catch { setAnnouncement("The older draft could not be removed from this device."); } }}>Discard older draft</button></div></div> : null}
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/60 px-4 py-3 shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
+    {legacyPresent ? <div role="alert" className="space-y-3 rounded-[4px] border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p>An older unsaved timer draft on this device has an unverified owner. It was not restored or saved.</p><div className={trackClass}><button type="button" className={pillClass} onClick={() => { try { window.localStorage.removeItem("openfront-law-firm:timer-draft"); setLegacyPresent(false); setAnnouncement("The older unverified draft was discarded. No time entry was saved."); } catch { setAnnouncement("The older draft could not be removed from this device."); } }}>Discard older draft</button></div></div> : null}
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] bg-muted/60 px-4 py-3 shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
       <div className="flex items-center gap-2.5">
-        <span aria-hidden="true" className={cn('size-2 rounded-full ring-2 ring-background', running ? 'animate-pulse bg-emerald-500' : elapsed ? 'bg-amber-500' : 'bg-zinc-400')} />
+        <span aria-hidden="true" className={cn('size-2 rounded-[1px] ring-2 ring-background', running ? 'animate-pulse bg-emerald-500' : elapsed ? 'bg-amber-500' : 'bg-zinc-400')} />
         <output aria-label="Elapsed time" aria-live="off" className="font-mono text-3xl font-semibold tabular-nums tracking-tight text-foreground">{duration}</output>
       </div>
       <div className={trackClass}>

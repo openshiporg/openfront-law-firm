@@ -70,7 +70,7 @@ export function InvoiceMetadataRegister({
           })}
         </RowList>
       ) : (
-        <p role="status" className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">No invoices on this page</p>
+        <p role="status" className="rounded-[6px] border  border-border px-4 py-8 text-center text-sm text-muted-foreground">No invoices on this page</p>
       )}
 
       {register.success ? (

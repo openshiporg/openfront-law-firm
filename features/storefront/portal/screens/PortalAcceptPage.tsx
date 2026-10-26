@@ -22,7 +22,7 @@ export default async function PortalAcceptPage({
       <section className="sf-card sf-portal-card">
         <div className="sf-card__body grid gap-6">
           <FirmBrand brand={{ name: published.firmName, brandTagline: published.tagline, logoIcon: published.logoIcon, logoColor: published.logoColor }} />
-          <header className="grid gap-2"><p className="sf-label">Client portal</p><h1 className="sf-h2">Accept your invitation</h1></header>
+          <header className="grid gap-2"><h1 className="sf-h2">Accept your invitation</h1><p className="sf-label">Client portal</p></header>
           <PortalAcceptForm token={typeof token === 'string' ? token : ''} />
         </div>
         <div className="sf-card__foot text-sm">

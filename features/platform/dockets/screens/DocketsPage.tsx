@@ -38,7 +38,7 @@ export async function DocketsPage({ searchParams }: { searchParams?: Promise<Sea
             </form>
           </div>
           {!register.success ? <ErrorBanner>{register.error}</ErrorBanner> : register.data.dockets.length ? (
-            <ul aria-label={`${statusLabel(status)} dockets`} className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            <ul aria-label={`${statusLabel(status)} dockets`} className="divide-y divide-border overflow-hidden rounded-[6px] border border-border bg-card">
               {register.data.dockets.map((docket) => <li key={docket.id}>
                 <Link href={`/dashboard/platform/dockets/${encodeURIComponent(docket.id)}`} className="group grid min-w-0 gap-0.5 px-4 py-3 outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring">
                   <span className="flex min-w-0 items-center gap-2">

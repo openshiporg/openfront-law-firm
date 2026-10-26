@@ -28,8 +28,8 @@ function Submit({ label, danger = false }: { label: string; danger?: boolean }) 
   )
 }
 
-const chipClass = 'inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-sm text-foreground has-[:checked]:border-foreground/40 has-[:checked]:bg-muted has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50'
-const formClass = 'min-w-0 space-y-4 rounded-xl border border-border bg-card p-4 shadow-xs'
+const chipClass = 'inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[4px] border border-border bg-background px-3 text-sm text-foreground has-[:checked]:border-foreground/40 has-[:checked]:bg-muted has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50'
+const formClass = 'min-w-0 space-y-4 rounded-[6px] border border-border bg-card p-4'
 
 function Message({ ok, message }: { ok: boolean; message: string }) {
   if (!message) return null
@@ -39,7 +39,7 @@ function Message({ ok, message }: { ok: boolean; message: string }) {
 export function PortalPolicyForm({ revision }: { revision: number }) {
   const [state, action] = useActionState(policyPortal, { ok: false, message: '' })
   const actionForm = useKeptForm(action, state)
-  return <details className="group rounded-xl border border-border bg-card shadow-xs" open={revision === 0}>
+  return <details className="group rounded-[6px] border border-border bg-card" open={revision === 0}>
     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
       {revision === 0 ? 'Set sharing rules' : 'Change sharing rules'}
       <span className="text-xs font-medium text-muted-foreground"><span className="group-open:hidden">Open</span><span className="hidden group-open:inline">Close</span></span>
@@ -78,8 +78,8 @@ export function PortalGrantForm({ operation, intentKey, policyRevision, expected
       <Meta label="Client">{accountLabel}</Meta>
       <Meta label="Matter">{matterLabel}</Meta>
     </MetaGrid>
-    {operation === 'grant' && grantId ? <p role="note" className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground">Changing access replaces the current access. Items already shared must be shared again.</p> : null}
-    {operation === 'revoke' ? <p role="note" className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground">The client loses this matter and every item shared from it.</p> : null}
+    {operation === 'grant' && grantId ? <p role="note" className="rounded-[4px] bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground">Changing access replaces the current access. Items already shared must be shared again.</p> : null}
+    {operation === 'revoke' ? <p role="note" className="rounded-[4px] bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground">The client loses this matter and every item shared from it.</p> : null}
     {Object.entries({ operation, policyRevision, expectedVersion, portalAccountId, contactId, matterId, grantId: grantId ?? '' }).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
     <input type="hidden" name="idempotencyKey" value={operationKey} />
     {operation === 'grant' ? <fieldset className="min-w-0">

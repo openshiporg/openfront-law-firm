@@ -18,7 +18,7 @@ function AuthShell({ title, label = 'Your appointments', tabs, children, foot }:
       {tabs}
       <div className="sf-card">
         <div className="sf-card__body grid gap-6">
-          <header className="grid gap-2"><p className="sf-label">{label}</p><h1 className="sf-h2">{title}</h1></header>
+          <header className="grid gap-2"><h1 className="sf-h2">{title}</h1><p className="sf-label">{label}</p></header>
           {children}
         </div>
         {foot ? <div className="sf-card__foot text-sm">{foot}</div> : null}
@@ -56,7 +56,7 @@ export async function AccountPage({ searchParams }: { searchParams: Promise<{ af
   const { appointments: rows, nextCursor } = result.data
   return <PublicPage><div className="sf-shell sf-page">
     <header className="sf-page__head sf-page__head--split">
-      <div className="grid gap-3"><p className="sf-label">Your account</p><h1 className="sf-title">Appointments</h1></div>
+      <div className="grid gap-3"><h1 className="sf-title">Appointments</h1><p className="sf-label">Your account</p></div>
       <div className="sf-track">
         {settings.bookingEnabled ? <Link className="sf-pill sf-pill--primary" href="/practice-areas">New request</Link> : null}
         <form action={customerSignOut}><button className="sf-pill">Sign out</button></form>

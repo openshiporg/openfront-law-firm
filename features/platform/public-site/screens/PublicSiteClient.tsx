@@ -26,10 +26,10 @@ function Result({ state }: { state: PublicSiteState }) {
 
 function Switch({ name, label, defaultChecked, detail }: { name: string; label: string; defaultChecked: boolean; detail?: string }) {
   return (
-    <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-background px-3 py-2">
+    <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 rounded-[4px] border border-border bg-background px-3 py-2">
       <span className="min-w-0"><span className="block text-sm font-medium">{label}</span>{detail ? <span className="block text-xs text-muted-foreground">{detail}</span> : null}</span>
       <input type="checkbox" name={name} defaultChecked={defaultChecked} className="peer sr-only" />
-      <span aria-hidden="true" className="relative h-6 w-10 shrink-0 rounded-full bg-muted shadow-[inset_0_1px_2px_rgb(0_0_0/0.15)] transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-background after:shadow-sm after:transition-transform peer-checked:bg-emerald-600 peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50" />
+      <span aria-hidden="true" className="relative h-6 w-10 shrink-0 rounded-[4px] bg-muted shadow-[inset_0_1px_2px_rgb(0_0_0/0.15)] transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-[4px] after:bg-background after:shadow-sm after:transition-transform peer-checked:bg-emerald-600 peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50" />
     </label>
   )
 }

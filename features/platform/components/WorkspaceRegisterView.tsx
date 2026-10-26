@@ -6,8 +6,8 @@ import { FormSelect } from '@/components/ui/form-select'
 import type { WorkspaceRegister } from '../operations/actions/getWorkspaceRegister'
 import { registerHref } from '../operations/lib/workspaceRegister'
 import type { PracticeOverviewQueueItem } from '../operations/types'
-import { QueueRow } from './PracticeSurface'
-import { EmptyState, Pager, Track, fieldClass, labelClass, pillPrimaryClass, trackClass, trackItemClass } from './ui'
+import { RecordTable } from './PracticeSurface'
+import { EmptyState, Pager, fieldClass, labelClass, pillPrimaryClass, trackClass, trackItemClass } from './ui'
 
 const words = (value: string) => value.replaceAll('_', ' ')
 
@@ -38,17 +38,17 @@ export function WorkspaceRegisterView({
           <span className="truncate">{params.scope === "history" ? "History and current records" : register.title}</span>
           <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{register.total.toLocaleString()}</span>
         </h2>
-        <Track><Link href={backHref} className={trackItemClass(true)}><ArrowLeft className="size-4" aria-hidden="true" />{backLabel}</Link></Track>
+        <Link href={backHref} className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />{backLabel}</Link>
       </div>
 
-      <form method="get" action={action} role="search" aria-label={`Filter ${register.title.toLowerCase()}`} className="grid min-w-0 gap-3 rounded-xl border border-border bg-card p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto] lg:items-end">
+      <form method="get" action={action} role="search" aria-label={`Filter ${register.title.toLowerCase()}`} className="grid min-w-0 gap-3 border-y border-border bg-[var(--lf-manila)] px-4 py-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto] lg:items-end">
         <input type="hidden" name="view" value={register.key} />
         {register.searchable ? (
           <label className={labelClass} htmlFor="register-q">
             Search
             <span className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <input id="register-q" name="q" type="search" defaultValue={params.q} maxLength={100} className={`${fieldClass} rounded-full pl-9`} />
+              <input id="register-q" name="q" type="search" defaultValue={params.q} maxLength={100} className={`${fieldClass} pl-9`} />
             </span>
           </label>
         ) : <p className="text-xs text-muted-foreground lg:self-center">No text search for this register</p>}
@@ -82,15 +82,23 @@ export function WorkspaceRegisterView({
       </p>
 
       {register.items.length ? (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-          {register.items.map((item) => {
-            const destination = rowHref ? rowHref(item) : item.href
-            // Preview anchors are not object destinations: late-page rows must
-            // not navigate to an unrelated first-twelve preview without this ID.
-            const href = destination?.startsWith(`/dashboard/platform/${register.category}#`) ? null : destination
-            return <QueueRow key={`${item.kind}-${item.id}`} item={item} href={href} actionPath={`/dashboard/platform/${register.category}`} timeZone={timeZone} anchor={register.key} />
-          })}
-        </ul>
+        <div className="min-w-0 rounded-[6px] border border-border bg-card">
+          <RecordTable
+            items={register.items}
+            rowHref={(item) => {
+              const destination = rowHref ? rowHref(item) : item.href
+              // Preview anchors are not object destinations: late-page rows must
+              // not navigate to an unrelated first-twelve preview without this ID.
+              return destination?.startsWith(`/dashboard/platform/${register.category}#`) ? null : destination
+            }}
+            actionPath={`/dashboard/platform/${register.category}`}
+            timeZone={timeZone}
+            anchor={register.key}
+            empty="No records"
+            showKind={new Set(register.items.map((item) => item.kind)).size > 1}
+            label={register.title}
+          />
+        </div>
       ) : (
         <EmptyState title={filtered ? 'No matches' : 'Nothing needs attention'} />
       )}

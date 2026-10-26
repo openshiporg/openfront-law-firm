@@ -102,8 +102,8 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
   }
   const heading = check.intake ? `${check.intake.intakeNumber} · ${check.intake.title}` : check.matter ? `${check.matter.matterNumber} · ${check.matter.title}` : check.checkNumber
   return (
-    <article id={`conflict-${check.id}`} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3">
+    <article id={`conflict-${check.id}`} className="min-w-0 scroll-mt-20 overflow-hidden rounded-[6px] border border-border bg-card">
+      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5 bg-[var(--lf-manila)]">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <StatusDot tone={statusTone(status)} />
           <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{heading}</h3>
@@ -241,7 +241,7 @@ function ColumnHeading({ label, count }: { label: string; count: number }) {
 
 function DispositionForm({ checkId, match, form, pending }: { checkId: string; match: ConflictReviewSetup['conflictChecks'][number]['matches'][number]; form: ReturnType<typeof useKeptForm>; pending: boolean }) {
   return (
-    <form {...form} className="grid min-w-0 gap-3 rounded-lg border border-border bg-background p-3">
+    <form {...form} className="grid min-w-0 gap-3 rounded-[4px] border border-border bg-background p-3">
       <input type="hidden" name="operation" value="disposition" /><input type="hidden" name="checkId" value={checkId} /><input type="hidden" name="matchId" value={match.id} />
       <p className="truncate text-xs font-semibold text-foreground">{match.dispositionsCount > 0 ? 'Follow-up decision' : 'First decision'}</p>
       <Select id={`outcome-${match.id}`} name="outcome" label="Disposition" options={[['clear', 'Clear'], ['conflict', 'Conflict'], ['needs_more_information', 'Needs more information'], ['approved_exception', 'Approved exception']]} />

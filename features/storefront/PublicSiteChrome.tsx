@@ -19,7 +19,7 @@ export function PublicSiteHeader({ settings }: { settings: StorefrontSettings })
         <StorefrontNav />
         <div className="sf-header__actions">
           <div className="sf-track">
-            <Link href="/account" className="sf-pill">Appointments</Link>
+            <Link href="/account" className="sf-pill">Your appointments</Link>
             <Link href="/portal" className="sf-pill">Client portal</Link>
             {settings.bookingEnabled ? <Link href="/practice-areas" className="sf-pill sf-pill--primary">Request a consultation</Link> : null}
           </div>

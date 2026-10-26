@@ -44,33 +44,38 @@ export async function HomePage() {
   const catalog = published ? await getConsultationCatalog(null) : null
   const services = catalog?.status === 'ok' ? catalog.data.services.slice(0, 6) : []
   const about = settings.publication.aboutStatement?.split(/\n{2,}/)[0] ?? null
+  const name = settings.firmName
   return <PublicPage dock={settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link href="/practice-areas" className="sf-pill sf-pill--primary sf-pill--lg">Request a consultation</Link></div> : undefined}>
     <section className="sf-shell sf-hero" aria-labelledby="home-title">
       <div className="sf-hero__grid">
         <div className="sf-hero__body">
-          <p className="sf-label">{settings.isLocalFictional ? 'Fictional local workspace' : published ? 'Law firm' : 'Public information'}</p>
-          <h1 id="home-title" className="sf-display">{published ? settings.firmName : 'Firm information is not yet published.'}</h1>
-          {published && settings.tagline ? <p className="sf-lede">{settings.tagline}</p> : null}
-          <div className="flex flex-wrap gap-3">
-            {settings.bookingEnabled ? <div className="sf-track"><Link href="/practice-areas" className="sf-pill sf-pill--primary sf-pill--lg">Request a consultation</Link><Link href="/account" className="sf-pill sf-pill--lg">Your appointments</Link></div> : <div className="sf-track"><Link href="/contact" className="sf-pill sf-pill--raised sf-pill--lg">Contact</Link></div>}
+          <h1 id="home-title" className="sf-display">{name ?? 'Firm information is not yet published.'}</h1>
+          {published && settings.tagline ? <p className="sf-lede">{settings.tagline}</p> : name && !published ? <p className="sf-lede">Practice areas and attorney profiles are not yet published.</p> : null}
+          {settings.isLocalFictional ? <p className="sf-fine">Fictional local workspace</p> : null}
+          <dl className="sf-hero__facts">
+            <div><dt>Consultations</dt><dd>{settings.bookingEnabled ? 'Request a time online' : 'Not taken online'}</dd></div>
+            {settings.supportEmail ? <div><dt>Email</dt><dd><a className="sf-link" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a></dd></div> : null}
+            <div><dt>Clients</dt><dd><Link className="sf-link" href="/portal">Client portal</Link></dd></div>
+          </dl>
+          <div className="sf-track">
+            {settings.bookingEnabled ? <><Link href="/practice-areas" className="sf-pill sf-pill--primary sf-pill--lg">Request a consultation</Link><Link href="/account" className="sf-pill sf-pill--raised sf-pill--lg">Your appointments</Link></> : <Link href="/contact" className="sf-pill sf-pill--primary sf-pill--lg">Contact the firm</Link>}
           </div>
         </div>
-        <aside className="sf-hero__seal" aria-label="Existing clients">
-          <div className="flex items-center gap-3"><StoreLogo icon={settings.logoIcon} hue={settings.logoColor} /><p className="sf-label">Existing clients</p></div>
-          <p className="sf-h3">Client portal</p>
-          <p className="sf-muted text-sm">Documents, invoices and messages shared by the firm.</p>
-          <div className="sf-track sf-track--block"><Link href="/portal" className="sf-pill sf-pill--raised">Open portal</Link><Link href="/portal/accept" className="sf-pill">Use invitation</Link></div>
+        <aside className="sf-hero__seal" aria-labelledby="home-portal">
+          <div className="flex items-center gap-3"><StoreLogo icon={settings.logoIcon} hue={settings.logoColor} /><h2 id="home-portal" className="sf-h3">Client portal</h2></div>
+          <p className="sf-muted text-sm leading-6">Documents, invoices and messages your attorney has shared with you.</p>
+          <div className="sf-track"><Link href="/portal" className="sf-pill sf-pill--raised">Open portal</Link><Link href="/portal/accept" className="sf-pill">Use an invitation</Link></div>
         </aside>
       </div>
     </section>
 
-    {published ? <div className="sf-shell">
-      <section className="sf-section" aria-labelledby="home-practice">
+    <div className="sf-shell">
+      {published ? <section className="sf-section" aria-labelledby="home-practice">
         <div className="sf-section__head"><h2 id="home-practice" className="sf-h2">Practice areas</h2><Link href="/practice-areas" className="sf-link inline-flex min-h-11 items-center gap-1 text-sm">All practice areas <ArrowUpRight className="size-4" aria-hidden="true" /></Link></div>
         {catalog?.status !== 'ok' ? <p role="alert" className="sf-notice sf-notice--plain">Practice areas could not be loaded. <Link href="/" className="sf-link">Try again</Link></p>
           : services.length ? <PracticeIndex services={services} bookingEnabled={settings.bookingEnabled} />
           : <p role="status" className="sf-muted">No practice areas are published.</p>}
-      </section>
+      </section> : null}
 
       {about ? <section className="sf-section" aria-labelledby="home-about">
         <div className="sf-section__head"><h2 id="home-about" className="sf-h2">About the firm</h2><Link href="/about" className="sf-link inline-flex min-h-11 items-center gap-1 text-sm">About <ArrowUpRight className="size-4" aria-hidden="true" /></Link></div>
@@ -81,16 +86,15 @@ export async function HomePage() {
         <div className="sf-card sf-card--ink">
           <div className="sf-card__body grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div className="grid gap-2">
-              <p className="sf-label">Contact</p>
-              <h2 id="home-contact" className="sf-h2">{settings.firmName || NEUTRAL_FIRM_NAME}</h2>
+              <h2 id="home-contact" className="sf-h2">Contact {settings.firmName || NEUTRAL_FIRM_NAME}</h2>
               {settings.supportEmail ? <a className="text-base underline underline-offset-4" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : null}
               <p className="sf-muted text-sm">Not for emergencies or deadline protection.</p>
             </div>
-            <div className="sf-track" style={{ background: 'color-mix(in oklab, var(--color-paper) 12%, transparent)', boxShadow: 'none' }}><Link href="/contact" className="sf-pill sf-pill--raised">Contact details</Link></div>
+            <div className="sf-track"><Link href="/contact" className="sf-pill sf-pill--raised">Contact details</Link></div>
           </div>
         </div>
       </section>
-    </div> : <div className="sf-shell"><p role="status" className="sf-notice sf-notice--plain max-w-xl">Public consultation services are not configured.</p></div>}
+    </div>
   </PublicPage>
 }
 
@@ -103,7 +107,7 @@ export async function ServicesPage({ searchParams }: { searchParams: Promise<{ a
   const { services, nextCursor } = catalog.data
   return <PublicPage><div className="sf-shell sf-page">
     <header className="sf-page__head">
-      <p className="sf-label">Consultation appointments</p><h1 className="sf-title">Practice areas</h1>
+      <h1 className="sf-title">Practice areas</h1><p className="sf-label">Consultation appointments</p>
     </header>
     {services.length ? <PracticeIndex services={services} bookingEnabled={settings.bookingEnabled} /> : <div className="sf-empty"><p role="status">{cursor ? 'No more practice areas.' : 'Practice areas are not published.'}</p>{cursor ? null : <Link className="sf-link" href="/contact">Contact the firm</Link>}</div>}
     {cursor || nextCursor ? <nav aria-label="Practice area pages" className="sf-track mt-8">{cursor ? <Link className="sf-pill" href="/practice-areas">First page</Link> : null}{nextCursor ? <Link className="sf-pill sf-pill--raised" href={`/practice-areas?after=${encodeURIComponent(nextCursor)}`}>More practice areas</Link> : null}</nav> : null}
@@ -126,8 +130,8 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
     <nav aria-label="Breadcrumb" className="mb-8"><Link className="sf-link text-sm" href="/practice-areas">Practice areas</Link></nav>
     <div className="sf-split">
       <article className="grid gap-6">
-        <p className="sf-label">{settings.isLocalFictional ? 'Fictional local appointment' : 'Consultation appointment'}</p>
         <h1 className="sf-title">{service.name}</h1>
+        <p className="sf-label">{settings.isLocalFictional ? 'Fictional local appointment' : 'Consultation appointment'}</p>
         {service.description ? <div className="sf-prose sf-prose--lead">{service.description.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : null}
       </article>
       <aside className="sf-split__aside">
@@ -179,14 +183,13 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
     <div className="sf-split sf-split--wide-aside">
       <div className="grid gap-8">
         <header className="grid gap-3">
-          <p className="sf-label">{settings.isLocalFictional ? 'Fictional local appointment' : 'Appointment request'}</p>
           <h1 className="sf-title">Request a consultation</h1>
+          <p className="sf-label">{settings.isLocalFictional ? 'Fictional local appointment' : 'Appointment request'}</p>
         </header>
         <ConsultationBookingForm service={service} slots={slots} requestKey={randomUUID()} timezone={availability.data.timezone} notice={notice} acknowledgmentVersion={acknowledgmentVersion} />
       </div>
       <aside className="sf-split__aside order-first lg:order-none">
         <div className="sf-card"><div className="sf-card__body grid gap-4">
-          <p className="sf-label">Appointment</p>
           <p className="sf-h3">{service.name}</p>
           <dl className="sf-facts">
             <div><dt>Length</dt><dd className="sf-num">{service.consultationMinutes} minutes</dd></div>

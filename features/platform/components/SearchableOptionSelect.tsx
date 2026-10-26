@@ -103,7 +103,7 @@ export function SearchableOptionSelect({
             onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search() } }}
             maxLength={100}
             placeholder={total === undefined ? 'Search' : `Search all ${total.toLocaleString()}`}
-            className={cn(fieldClass, 'rounded-full')}
+            className={cn(fieldClass, 'rounded-[4px]')}
           />
           <div className={cn(trackClass, 'shrink-0 overflow-visible')}>
             <button type="button" className={trackItemClass(true)} onClick={() => search()} disabled={searching}>

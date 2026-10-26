@@ -54,7 +54,7 @@ function RequestRefundForm({ payments, onDone }: { payments: RefundSetup['paymen
   const runForm = useKeptForm(run, state)
 
   return (
-    <form key={formKey} {...runForm} className="min-w-0 rounded-xl border border-border">
+    <form key={formKey} {...runForm} className="min-w-0 rounded-[6px] border border-border">
       <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
         <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Request refund</legend>
         <div className={cn(labelClass, 'sm:col-span-2')}>

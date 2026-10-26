@@ -176,9 +176,9 @@ function WallRow({ matterId, wall }: { matterId: string; wall: EthicalWallEntry 
         </Track> : null}
       </div>
       {wall.reason ? <p className="pl-4 text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{wall.reason}</p> : null}
-      {open === 'transition' && editable ? <div className="rounded-lg bg-muted/30 p-3"><WallTransitionForm matterId={matterId} wall={wall} /></div> : null}
-      {open === 'member' && editable ? <div className="rounded-lg bg-muted/30 p-3"><WallMemberForm matterId={matterId} wallId={wall.id} /></div> : null}
-      {wall.members.length ? <ul className="ml-4 divide-y divide-border rounded-lg border border-border">
+      {open === 'transition' && editable ? <div className="rounded-[4px] bg-muted/30 p-3"><WallTransitionForm matterId={matterId} wall={wall} /></div> : null}
+      {open === 'member' && editable ? <div className="rounded-[4px] bg-muted/30 p-3"><WallMemberForm matterId={matterId} wallId={wall.id} /></div> : null}
+      {wall.members.length ? <ul className="ml-4 divide-y divide-border rounded-[4px] border border-border">
         {wall.members.map((member) => <li key={member.id} className="px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <StatusDot tone={member.status !== 'active' ? 'zinc' : member.decision === 'blocked' ? 'rose' : 'emerald'} />

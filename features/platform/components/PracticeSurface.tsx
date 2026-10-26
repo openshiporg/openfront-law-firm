@@ -1,45 +1,100 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, CircleAlert } from 'lucide-react'
+import { ArrowRight, CircleAlert } from 'lucide-react'
 
 export { PracticePage } from './PracticePageFrame'
+export { SectionTabs as SectionJumps } from './SectionTabs'
 import { cn } from '@/lib/utils'
 
 import type { PracticeOverviewQueueItem, PracticeWorkspaceSection } from '../operations/types'
 import { formatInstant, isTimeSensitiveKind } from '../lib/datetime'
 import type { WorkspaceLink } from '../workspaces/config'
 import { PracticeRowAction } from './PracticeRowAction'
-import { EmptyState, Pager, StatusDot, StatusText, pillClass, statusLabel, statusTone } from './ui'
+import { FileLabel, Pager, StatusText, actionLinkClass, splitFileNumber } from './ui'
 
-/** Status as a dot and label; place it on the record's title line. */
+/** Status as a mark and label, for a header's status slot. */
 export function PracticeStatus({ status }: { status: string }) {
   return <StatusText status={status} />
 }
 
-/** One queue row: kind and date on the left rail, title line with its status dot, row action. */
-export function QueueRow({ item, href, actionPath, timeZone, anchor }: { item: PracticeOverviewQueueItem; href: string | null; actionPath: string; timeZone: string; anchor?: string }) {
-  const when = item.at ? formatInstant(item.at, timeZone, { includeTime: isTimeSensitiveKind(item.kind) }) : 'No date'
-  const title = (
-    <>
-      <span className="flex min-w-0 items-center gap-2">
-        <StatusDot tone={statusTone(item.status)} />
-        <span className="min-w-0 truncate text-sm font-semibold text-foreground group-hover:underline group-hover:underline-offset-4">{item.title}</span>
-        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{statusLabel(item.status)}</span>
-      </span>
-      <span className="mt-0.5 block truncate pl-4 text-xs text-muted-foreground">{item.subtitle}</span>
-    </>
-  )
+const cellClass = 'px-3 py-2.5 align-middle first:pl-4 last:pr-4'
+
+/** Ledger table of practice records: record, kind, status, date and the row's next action.
+ * Below `sm` each row stacks: record line, then kind, status and date on one line. */
+export function RecordTable({ items, rowHref, actionPath, timeZone, anchor, empty, showKind = true, label }: {
+  items: PracticeOverviewQueueItem[]
+  rowHref?: (item: PracticeOverviewQueueItem) => string | null
+  actionPath: string
+  timeZone: string
+  anchor?: string
+  empty: string
+  showKind?: boolean
+  label?: string
+}) {
+  if (!items.length) return <p role="status" className="px-4 py-4 text-sm text-muted-foreground">{empty}</p>
   return (
-    <li id={anchor ? `${anchor}-${item.id}` : undefined} className="grid min-w-0 scroll-mt-24 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
-      <span className="col-span-2 flex min-w-0 flex-wrap items-baseline gap-x-2 overflow-hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:col-span-1 sm:flex-col sm:items-start sm:gap-0.5">
-        <span className="max-w-full truncate">{item.kind}</span>
-        <span className="max-w-full font-mono normal-case leading-4 tracking-normal tabular-nums">{when}</span>
-      </span>
-      {href ? <Link href={href} className="group min-w-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">{title}</Link> : <div className="min-w-0">{title}</div>}
-      <div className="justify-self-end">
+    <table aria-label={label} className="w-full min-w-0 border-collapse text-sm">
+      <thead className="max-sm:sr-only">
+        <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground [&>th]:bg-[var(--lf-manila)] [&>th:first-child]:rounded-tl-[5px] [&>th:last-child]:rounded-tr-[5px]">
+          <th scope="col" className={cn(cellClass, 'py-2 font-medium')}>Record</th>
+          {showKind ? <th scope="col" className={cn(cellClass, 'w-36 py-2 font-medium max-lg:hidden')}>Type</th> : null}
+          <th scope="col" className={cn(cellClass, 'w-36 py-2 font-medium')}>Status</th>
+          <th scope="col" className={cn(cellClass, 'w-40 py-2 font-medium')}>Date</th>
+          <th scope="col" className={cn(cellClass, 'w-px py-2 text-right font-medium')}><span className="sr-only">Action</span></th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-border">
+        {items.map((item) => (
+          <RecordRow key={`${item.kind}-${item.id}`} item={item} href={rowHref ? rowHref(item) : item.href} actionPath={actionPath} timeZone={timeZone} anchor={anchor} showKind={showKind} />
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+export function RecordRow({ item, href, actionPath, timeZone, anchor, showKind = true }: { item: PracticeOverviewQueueItem; href: string | null; actionPath: string; timeZone: string; anchor?: string; showKind?: boolean }) {
+  const when = item.at ? formatInstant(item.at, timeZone, { includeTime: isTimeSensitiveKind(item.kind) }) : 'No date'
+  const { number, rest } = splitFileNumber(item.subtitle ?? '')
+  const title = <span className="block truncate font-medium text-foreground group-hover:text-[var(--lf-rust-ink)] group-hover:underline group-hover:underline-offset-4">{item.title}</span>
+  return (
+    <tr id={anchor ? `${anchor}-${item.id}` : undefined} className="scroll-mt-28 transition-colors hover:bg-muted/40 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-x-3 max-sm:px-4 max-sm:py-3">
+      <td className={cn(cellClass, 'min-w-0 max-w-0 max-sm:col-span-2 max-sm:max-w-none max-sm:p-0')}>
+        {href ? <Link href={href} className="group block min-w-0 rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--lf-rust)]/40">{title}</Link> : <span className="block min-w-0">{title}</span>}
+        <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          {number ? <FileLabel>{number}</FileLabel> : null}
+          <span className="truncate">{rest}</span>
+        </span>
+      </td>
+      {showKind ? <td className={cn(cellClass, 'whitespace-nowrap text-xs text-muted-foreground max-lg:hidden')}>{item.kind}</td> : null}
+      <td className={cn(cellClass, 'max-sm:mt-2 max-sm:p-0')}><StatusText status={item.status} /></td>
+      <td className={cn(cellClass, 'lf-figures whitespace-nowrap font-mono text-xs text-muted-foreground max-sm:hidden')}>{when}</td>
+      <td className={cn(cellClass, 'text-right max-sm:col-span-2 max-sm:mt-2 max-sm:p-0 max-sm:text-left')}>
+        <span className="lf-figures mr-3 font-mono text-xs text-muted-foreground sm:hidden">{when}</span>
         <PracticeRowAction id={item.id} kind={item.kind} status={item.status} path={actionPath} canAct={item.canAct} timeZone={timeZone} />
+      </td>
+    </tr>
+  )
+}
+
+/** A heading row and the range in view above a framed ledger table. */
+export function RecordSection({ id, title, count, range, actions, children, footer, className }: { id?: string; title: ReactNode; count?: number; range?: ReactNode; actions?: ReactNode; children: ReactNode; footer?: ReactNode; className?: string }) {
+  return (
+    <section id={id} aria-labelledby={id ? `${id}-heading` : undefined} className={cn('min-w-0 scroll-mt-28', className)}>
+      <header className="mb-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id={id ? `${id}-heading` : undefined} className="flex min-w-0 items-baseline gap-2 text-[15px] font-semibold tracking-tight text-foreground">
+          <span className="truncate">{title}</span>
+          {typeof count === 'number' ? <span className="lf-figures text-sm font-normal text-muted-foreground">{count.toLocaleString()}</span> : null}
+        </h2>
+        <div className="flex min-w-0 items-baseline gap-4">
+          {range ? <span className="lf-figures text-xs text-muted-foreground">{range}</span> : null}
+          {actions}
+        </div>
+      </header>
+      <div className="min-w-0 rounded-[6px] border border-border bg-card">
+        {children}
+        {footer ? <div className="border-t border-border px-4 py-2.5">{footer}</div> : null}
       </div>
-    </li>
+    </section>
   )
 }
 
@@ -56,6 +111,8 @@ export function QueuePanel({
   actionPath,
   timeZone = 'UTC',
   count,
+  showKind,
+  className,
 }: {
   title: string
   description: string
@@ -70,67 +127,52 @@ export function QueuePanel({
   actionPath?: string
   timeZone?: string
   count?: number
+  showKind?: boolean
+  className?: string
 }) {
   const rowAnchor = anchor ?? viewAllHref.split('#')[1] ?? 'item'
   const rowActionPath = actionPath ?? viewAllHref.split('#')[0].split('?')[0]
+  const paged = Boolean(pagination && paginationHrefs)
   return (
-    <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <h2 className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground">
-          <span className="truncate">{title}</span>
-          {typeof count === 'number' ? <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{count.toLocaleString()}</span> : null}
-        </h2>
-        {pagination && paginationHrefs ? (
-          <span className="shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground">{pagination.page} / {pagination.pageCount}</span>
-        ) : showViewAll ? (
-          <Link href={viewAllHref} className={cn(pillClass, 'h-7 px-3 text-xs')}>View all <ArrowUpRight className="size-3.5" aria-hidden="true" /></Link>
-        ) : null}
-      </header>
-
-      {items.length ? (
-        <ul className="divide-y divide-border">
-          {items.map((item) => (
-            <QueueRow key={`${item.kind}-${item.id}`} item={item} href={item.href} actionPath={rowActionPath} timeZone={timeZone} anchor={rowAnchor} />
-          ))}
-        </ul>
-      ) : (
-        <div className="p-4"><EmptyState title={empty} /></div>
-      )}
-      {pagination && paginationHrefs ? (
-        <div className="border-t border-border px-4 py-3">
-          <Pager
-            label={`${title} pages`}
-            previous={paginationHrefs.previous}
-            next={paginationHrefs.next}
-            summary={pagination.loadedCount
-              ? `${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()} of ${(authorizedTotal ?? 0).toLocaleString()}`
-              : `0 of ${(authorizedTotal ?? 0).toLocaleString()}`}
-          />
-        </div>
-      ) : null}
-    </section>
+    <RecordSection
+      title={title}
+      count={count}
+      className={className}
+      range={paged && pagination ? `Page ${pagination.page} of ${pagination.pageCount}` : undefined}
+      actions={!paged && showViewAll ? <Link href={viewAllHref} className={actionLinkClass}>View all<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : undefined}
+      footer={pagination && paginationHrefs ? (
+        <Pager
+          label={`${title} pages`}
+          previous={paginationHrefs.previous}
+          next={paginationHrefs.next}
+          summary={pagination.loadedCount
+            ? `${pagination.firstItem.toLocaleString()}–${pagination.lastItem.toLocaleString()} of ${(authorizedTotal ?? 0).toLocaleString()}`
+            : `0 of ${(authorizedTotal ?? 0).toLocaleString()}`}
+        />
+      ) : undefined}
+    >
+      <RecordTable items={items} actionPath={rowActionPath} timeZone={timeZone} anchor={rowAnchor} empty={empty} showKind={showKind} label={title} />
+    </RecordSection>
   )
 }
 
 export function WorkspaceIndex({ links }: { links: WorkspaceLink[] }) {
   return (
-    <nav aria-label="Workspace tools" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <nav aria-label="Workspace tools" className="grid overflow-hidden rounded-[6px] border border-border bg-card sm:grid-cols-2 xl:grid-cols-3">
       {links.map((link) => {
         const Icon = link.icon
         return (
           <Link
             key={link.href}
             href={link.href}
-            className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-xs outline-none transition-colors hover:border-foreground/20 focus-visible:ring-2 focus-visible:ring-ring"
+            className="group -mb-px -mr-px flex min-w-0 items-center gap-3 border-b border-r border-border p-4 outline-none transition-colors hover:bg-[var(--lf-manila)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lf-rust)]/40"
           >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)]">
-              <Icon className="size-4" aria-hidden="true" />
-            </span>
+            <Icon className="size-4 shrink-0 text-muted-foreground group-hover:text-[var(--lf-rust-ink)]" aria-hidden="true" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-foreground">{link.title}</span>
               <span className="mt-0.5 block truncate text-xs text-muted-foreground">{link.action}</span>
             </span>
-            <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+            <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
           </Link>
         )
       })}
@@ -140,27 +182,12 @@ export function WorkspaceIndex({ links }: { links: WorkspaceLink[] }) {
 
 export function PracticeLoadError({ message }: { message: string }) {
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm">
+    <div role="alert" className="flex items-start gap-3 rounded-[4px] border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
       <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
       <div className="min-w-0">
         <p className="font-semibold text-destructive">Workspace unavailable</p>
         <p className="mt-0.5 text-muted-foreground [overflow-wrap:anywhere]">{message}</p>
       </div>
     </div>
-  )
-}
-
-/** In-page section jumps for long workspaces, as a recessed track. */
-export function SectionJumps({ sections }: { sections: Array<{ key: string; title: string; total?: number }> }): ReactNode {
-  if (sections.length < 2) return null
-  return (
-    <nav aria-label="Sections" className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)] [scrollbar-width:none] dark:shadow-[inset_0_1px_2px_rgb(0_0_0/0.4)]">
-      {sections.map((section) => (
-        <a key={section.key} href={`#${section.key}`} className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-background hover:text-foreground hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring/50">
-          {section.title}
-          {typeof section.total === 'number' ? <span className="font-mono text-xs tabular-nums opacity-70">{section.total.toLocaleString()}</span> : null}
-        </a>
-      ))}
-    </nav>
   )
 }

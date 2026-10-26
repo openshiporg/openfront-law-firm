@@ -43,7 +43,7 @@ export function LegalAiWorkflowsPage() {
               <TitleLine as="h2" status={workflow.status} tone={workflow.status === 'source ready' ? 'emerald' : 'zinc'} headingClassName="text-sm">{workflow.name}</TitleLine>
               <p className="mt-1 pl-4 text-sm leading-6 text-muted-foreground">{workflow.purpose}</p>
             </div>
-            <p className="col-start-2 mt-2 rounded-lg bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground md:col-start-3 md:mt-0 md:self-start">{workflow.boundary}</p>
+            <p className="col-start-2 mt-2 rounded-[4px] bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground md:col-start-3 md:mt-0 md:self-start">{workflow.boundary}</p>
           </li>
         ))}
       </RowList>

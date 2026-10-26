@@ -50,7 +50,7 @@ function NewPolicyForm({ practiceAreas, onDone }: { practiceAreas: GovernanceSet
   const [state, run, pending] = useRefreshingAction(createRetentionPolicy, onDone)
   const runForm = useKeptForm(run, state)
   return (
-    <form {...runForm} className="min-w-0 rounded-xl border border-border">
+    <form {...runForm} className="min-w-0 rounded-[6px] border border-border">
       <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
         <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">New retention policy</legend>
         <label className={labelClass}>Name<input name="name" required minLength={2} maxLength={200} autoComplete="off" className={fieldClass} /></label>
@@ -200,7 +200,7 @@ function TargetPicker({ kind }: { kind: HoldTargetKind }) {
           onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search(query) } }}
           maxLength={100}
           placeholder="Search"
-          className={cn(fieldClass, 'rounded-full')}
+          className={cn(fieldClass, 'rounded-[4px]')}
         />
         <Track className="shrink-0">
           <button type="button" className={trackItemClass(true)} onClick={() => search(query)} disabled={searching}><Search className="size-3.5" aria-hidden="true" />Find</button>

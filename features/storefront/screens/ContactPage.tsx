@@ -7,16 +7,14 @@ export async function generateMetadata() { return firmMetadata('Contact') }
 export default async function ContactPage() {
   const settings = await getStorefrontSettings()
   return <PublicPage><div className="sf-shell sf-page">
-    <header className="sf-page__head"><p className="sf-label">{settings.firmName || 'Contact'}</p><h1 className="sf-title">Contact</h1></header>
+    <header className="sf-page__head"><h1 className="sf-title">Contact</h1><p className="sf-label">{settings.firmName || 'Contact'}</p></header>
     <div className="grid gap-4 lg:grid-cols-3">
       <section className="sf-card" aria-labelledby="contact-new"><div className="sf-card__body grid h-full content-start gap-4">
-        <p className="sf-label">Prospective clients</p>
-        <h2 id="contact-new" className="sf-h3">Consultation appointments</h2>
-        {settings.bookingEnabled ? <div className="sf-track"><Link href="/practice-areas" className="sf-pill sf-pill--primary">Request a consultation</Link></div> : <p className="sf-muted text-sm">Public consultation services are not configured.</p>}
+        <h2 id="contact-new" className="sf-h3">Consultations</h2>
+        {settings.bookingEnabled ? <div className="sf-track"><Link href="/practice-areas" className="sf-pill sf-pill--primary">Request a consultation</Link></div> : <p className="sf-muted text-sm">Consultations are not booked online. Write to the firm using the public contact.</p>}
       </div></section>
       <section id="existing-clients" className="sf-card scroll-mt-24" aria-labelledby="contact-existing"><div className="sf-card__body grid h-full content-start gap-4">
-        <p className="sf-label">Existing clients</p>
-        <h2 id="contact-existing" className="sf-h3">Client portal</h2>
+        <h2 id="contact-existing" className="sf-h3">Existing clients</h2>
         <div className="sf-track"><Link href="/portal" className="sf-pill sf-pill--raised">Open portal</Link><Link href="/portal/accept" className="sf-pill">Use invitation</Link></div>
         <div className="grid gap-1 text-sm leading-6">
           <p className="font-medium">New invitation</p>
@@ -24,7 +22,6 @@ export default async function ContactPage() {
         </div>
       </div></section>
       <section className="sf-card" aria-labelledby="contact-public"><div className="sf-card__body grid h-full content-start gap-4">
-        <p className="sf-label">General</p>
         <h2 id="contact-public" className="sf-h3">Public contact</h2>
         {settings.supportEmail ? <a className="sf-link break-all text-base" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : <p className="sf-muted text-sm">No public phone or email is configured.</p>}
       </div></section>

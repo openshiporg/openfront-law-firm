@@ -22,7 +22,7 @@ export function IntakeConversionPanel({ setup, pageHrefs }: { setup: IntakeSetup
         <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{setup.decisionIntakesCount.toLocaleString()}</span>
       </h2>
       {opened ? (
-        <div role="status" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card px-4 py-3 shadow-xs">
+        <div role="status" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-[6px] border border-border bg-card px-4 py-3">
           <span className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-foreground">
             <StatusDot tone="emerald" />
             <span className="min-w-0 truncate">Matter {opened.matterNumber} opened</span>
@@ -61,9 +61,9 @@ function ConversionForm({ intake, setup, onOpened }: { intake: IntakeSetup['deci
     if (state.ok) router.refresh()
   }, [state, router])
   return (
-    <form {...actionForm} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+    <form {...actionForm} className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-card">
       <input type="hidden" name="intakeId" value={intake.id} />
-      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3">
+      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5 bg-[var(--lf-manila)]">
         <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{intake.title}</h3>
         <span className="min-w-0 truncate text-xs text-muted-foreground">{intake.primaryContact.displayName}</span>
         <span className="font-mono text-xs text-muted-foreground">{intake.intakeNumber}</span>

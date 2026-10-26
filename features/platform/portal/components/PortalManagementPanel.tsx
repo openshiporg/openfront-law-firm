@@ -103,7 +103,7 @@ export function PortalManagementPanel({
       <SectionHeader id="portal-controls-title" title="Client portal" />
       <EmailDeliveryStatus configured={emailConfigured} context="portal" />
 
-      <div className="grid min-w-0 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-xs md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid min-w-0 gap-px overflow-hidden rounded-[6px] border border-border bg-border md:grid-cols-2 xl:grid-cols-4">
         <form {...formActionForm} className={card}>
           <input type="hidden" name="operation" value="invite" />
           <CardTitle icon={<UserPlus className="size-4" />}>Invite a client</CardTitle>
@@ -146,7 +146,7 @@ export function PortalManagementPanel({
         </form>
       </div>
 
-      {state.message ? <p role="status" className={state.ok ? 'rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground' : 'rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive'}>{state.message}</p> : null}
+      {state.message ? <p role="status" className={state.ok ? 'rounded-[4px] border border-border bg-card px-3 py-2 text-sm text-foreground' : 'rounded-[4px] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive'}>{state.message}</p> : null}
       {state.inviteToken ? (
         <Panel title={state.invitationEmailed ? 'Invitation link (backup)' : 'Invitation link'}>
           <a href={acceptPath} className="block break-all font-mono text-xs leading-5 underline-offset-4 hover:underline">{acceptPath}</a>

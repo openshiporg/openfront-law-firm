@@ -84,7 +84,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <aside aria-label="Storefront preview" className="min-w-0 lg:sticky lg:top-20 lg:order-last">
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+          <div className="overflow-hidden rounded-[6px] border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">Storefront preview</p>
               <Link href="/dashboard/platform/public-site" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><StatusDot tone={!firm ? 'zinc' : publication === 'unpublished' ? 'amber' : 'emerald'} />{!firm ? 'No firm' : publication === 'unpublished' ? 'Site not published' : publication === 'booking' ? 'Published · booking open' : 'Published'}</Link>
@@ -99,7 +99,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
               </div>
               <div className="mt-6 h-px w-full" style={{ backgroundColor: theme['--sf-accent'] }} />
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                {publication === 'booking' ? <span className="inline-flex h-8 items-center rounded-full px-3.5 text-xs font-medium text-white" style={{ backgroundColor: theme['--sf-accent'] }}>Request a consultation</span> : null}
+                {publication === 'booking' ? <span className="inline-flex h-8 items-center rounded-[4px] px-3.5 text-xs font-medium text-white" style={{ backgroundColor: theme['--sf-accent'] }}>Request a consultation</span> : null}
                 {publication === 'unpublished' ? <span className="text-xs opacity-70">Firm information is not yet published.</span> : <span className="text-xs font-medium underline underline-offset-4" style={{ color: theme['--sf-accent'] }}>Practice areas</span>}
               </div>
             </div>
@@ -152,7 +152,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
                       <input type="radio" name="accentId" value={preset.id} defaultChecked={selectedAccent === preset.id} className="sr-only" />
                       <span
                         aria-hidden="true"
-                        className={cn('size-3 rounded-full ring-1 ring-black/10', !preset.hex && 'bg-[conic-gradient(from_0deg,#f87171,#facc15,#4ade80,#60a5fa,#c084fc,#f87171)]')}
+                        className={cn('size-3 rounded-[4px] ring-1 ring-black/10', !preset.hex && 'bg-[conic-gradient(from_0deg,#f87171,#facc15,#4ade80,#60a5fa,#c084fc,#f87171)]')}
                         style={preset.hex ? { backgroundColor: preset.hex } : undefined}
                       />
                       {preset.label}

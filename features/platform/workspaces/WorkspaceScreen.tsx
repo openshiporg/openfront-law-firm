@@ -1,3 +1,4 @@
+import { CommandDeck, type CommandDeckPanel } from '@/features/platform/components/CommandDeck'
 import {
   PracticeLoadError,
   PracticePage,
@@ -85,6 +86,61 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
     ? describePortalContactPreview(eligiblePortalContacts.items.length, eligiblePortalContacts.total)
     : null
 
+  const sectionItems = (key: string) => (response.success ? response.data.sections.find((section) => section.key === key)?.items ?? [] : [])
+  const commandPanels: CommandDeckPanel[] = !response.success ? [] : [
+    ...(category === 'intake' ? [{ key: 'intake-desk', label: 'Intake and conflicts', content: <IntakeOperationsPanel reviewPage={conflictReviewPage} decisionPage={decisionPage} pageHref={(page) => `/dashboard/platform/intake?intakePage=${activeIntakePage}&conflictPage=${activeConflictPage}&reviewPage=${page}&decisionPage=${decisionPage ?? 1}#conflict-review`} decisionPageHref={(page) => `/dashboard/platform/intake?intakePage=${activeIntakePage}&conflictPage=${activeConflictPage}&reviewPage=${conflictReviewPage ?? 1}&decisionPage=${page}#intake-conversion`} /> }] : []),
+    ...(category === 'billing' ? [
+      { key: 'draft-invoice', label: 'Draft invoice', content: <BillingOperationsPanel /> },
+      { key: 'record-payment', label: 'Record payment', content: <BillingPaymentPanel /> },
+      { key: 'refunds', label: 'Refunds', content: <BillingRefundsPanel /> },
+      { key: 'rates', label: 'Rates', content: <BillingRatesPanel /> },
+    ] : []),
+    ...(category === 'governance' ? [{ key: 'governance-desk', label: 'Holds and retention', content: <GovernanceManagementPanel /> }] : []),
+    ...(category === 'reports' ? [{ key: 'reports-desk', label: 'Reports', content: <PracticeReportsPanel auditPage={auditPage} reportDeadlinePage={reportDeadlinePage} /> }] : []),
+    ...(category === 'data' ? [{ key: 'data-desk', label: 'Import and export', content: (
+      <DataTransferPanel
+        connectionTotal={response.data.sections.find((section) => section.key === 'connections')?.total}
+        connections={sectionItems('connections').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle }))}
+      />
+    ) }] : []),
+    ...(category === 'accounting' ? [
+      { key: 'post-to-trust', label: 'Post to trust', content: (
+        <TrustPostingPanel
+          accounts={trustOptions(response.data.sections, 'accounts')}
+          accountTotal={response.data.sections.find((section) => section.key === 'accounts')?.total}
+          ledgers={trustOptions(response.data.sections, 'ledgers')}
+          ledgerTotal={response.data.sections.find((section) => section.key === 'ledgers')?.total}
+        />
+      ) },
+      { key: 'reconcile', label: 'Reconcile', content: <ReconciliationPreparationPanel accounts={trustOptions(response.data.sections, 'accounts')} accountTotal={response.data.sections.find((section) => section.key === 'accounts')?.total} /> },
+      { key: 'trust-accounts', label: 'Trust accounts', content: <TrustSetupPanel accounts={sectionItems('accounts').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))} /> },
+    ] : []),
+    ...(category === 'integrations' ? [
+      { key: 'connections', label: 'Connections', content: <IntegrationAccessPanel /> },
+      { key: 'email', label: 'Email delivery', content: <div className="rounded-[6px] border border-border bg-card p-4"><EmailDeliveryStatus configured={emailConfigured} /></div> },
+    ] : []),
+    ...(category === 'portal' ? [
+      { key: 'share', label: 'Share with a client', content: (
+        <PortalManagementPanel
+          emailConfigured={emailConfigured}
+          contacts={(eligiblePortalContacts?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
+          contactPreviewNote={portalContactPreview?.selectorNote}
+          accounts={sectionItems('accounts').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
+          matters={sectionItems('eligible-matters').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
+          grants={sectionItems('grants').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
+          shares={sectionItems('shares').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
+          resources={[
+            ...sectionItems('shareable-documents').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status, resourceType: 'document' as const })),
+            ...sectionItems('shareable-invoices').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status, resourceType: 'invoice' as const })),
+            ...sectionItems('shareable-threads').map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status, resourceType: 'communication_thread' as const })),
+          ]}
+        />
+      ) },
+      { key: 'policies', label: 'Access by matter', content: <PortalPolicyDirectory params={portalParams} /> },
+    ] : []),
+  ]
+  const panelFirst = (['intake', 'reports', 'data', 'integrations'] as WorkspaceCategory[]).includes(category)
+
   return (
     <PracticePage title={definition.title} description={definition.description}>
       {!response.success ? (
@@ -93,61 +149,22 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
         // Billing and accounting end in pagers and form footers; the bottom padding keeps the
         // last control clear of the shell's floating assistant button.
         <div className={category === 'billing' || category === 'accounting' ? 'space-y-6 pb-24' : 'space-y-6'}>
-          <SectionJumps sections={response.data.sections.map((section) => ({ key: section.key, title: section.title, total: section.total }))} />
-          {category === 'intake' ? <IntakeOperationsPanel reviewPage={conflictReviewPage} decisionPage={decisionPage} pageHref={(page) => `/dashboard/platform/intake?intakePage=${activeIntakePage}&conflictPage=${activeConflictPage}&reviewPage=${page}&decisionPage=${decisionPage ?? 1}#conflict-review`} decisionPageHref={(page) => `/dashboard/platform/intake?intakePage=${activeIntakePage}&conflictPage=${activeConflictPage}&reviewPage=${conflictReviewPage ?? 1}&decisionPage=${page}#intake-conversion`} /> : null}
-          {category === 'billing' ? <BillingOperationsPanel /> : null}
-          {category === 'billing' ? <BillingRatesPanel /> : null}
-          {category === 'billing' ? <BillingPaymentPanel /> : null}
-          {category === 'billing' ? <BillingRefundsPanel /> : null}
-          {category === 'governance' ? <GovernanceManagementPanel /> : null}
-          {category === 'reports' ? <PracticeReportsPanel auditPage={auditPage} reportDeadlinePage={reportDeadlinePage} /> : null}
-          {category === 'data' ? (
-            <DataTransferPanel
-              connectionTotal={response.data.sections.find((section) => section.key === 'connections')?.total}
-              connections={(response.data.sections.find((section) => section.key === 'connections')?.items ?? []).map((item) => ({
-                id: item.id,
-                title: item.title,
-                subtitle: item.subtitle,
-              }))}
+          <SectionJumps sections={[
+            ...(panelFirst ? [{ key: 'actions', title: deckTitle(category) }] : []),
+            ...(category === 'billing' && invoiceMetadataRegister ? [{ key: 'invoice-metadata-register', title: 'Invoices' }] : []),
+            ...response.data.sections.map((section) => ({ key: section.key, title: portalSectionCopy[section.key] && category === 'portal' ? portalSectionCopy[section.key].title : section.title, total: section.total })),
+            ...(!panelFirst && commandPanels.length ? [{ key: 'actions', title: deckTitle(category) }] : []),
+          ]} />
+          {panelFirst ? <CommandDeck title={deckTitle(category)} panels={commandPanels} /> : null}
+          {category === 'billing' && invoiceMetadataRegister ? (
+            <InvoiceMetadataRegister
+              register={invoiceMetadataRegister}
+              timeZone={timeZone}
+              paginationHrefs={invoiceMetadataRegister.success
+                ? getBillingInvoicePageHrefs(invoiceMetadataRegister.pagination, activePaymentPage)
+                : undefined}
             />
           ) : null}
-          {category === 'accounting' ? (
-            <TrustSetupPanel accounts={(response.data.sections.find((section) => section.key === 'accounts')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))} />
-          ) : null}
-          {category === 'accounting' ? (
-            <div className="grid gap-6 xl:grid-cols-2">
-              <TrustPostingPanel
-                accounts={trustOptions(response.data.sections, 'accounts')}
-                accountTotal={response.data.sections.find((section) => section.key === 'accounts')?.total}
-                ledgers={trustOptions(response.data.sections, 'ledgers')}
-                ledgerTotal={response.data.sections.find((section) => section.key === 'ledgers')?.total}
-              />
-              <ReconciliationPreparationPanel
-                accounts={trustOptions(response.data.sections, 'accounts')}
-                accountTotal={response.data.sections.find((section) => section.key === 'accounts')?.total}
-              />
-            </div>
-          ) : null}
-          {category === 'integrations' ? <div className="rounded-xl border border-border bg-card p-4 shadow-xs"><EmailDeliveryStatus configured={emailConfigured} /></div> : null}
-          {category === 'integrations' ? <IntegrationAccessPanel /> : null}
-          {category === 'portal' ? <PortalPolicyDirectory params={portalParams} /> : null}
-          {category === 'portal' ? (
-            <PortalManagementPanel
-              emailConfigured={emailConfigured}
-              contacts={(eligiblePortalContacts?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
-              contactPreviewNote={portalContactPreview?.selectorNote}
-              accounts={(response.data.sections.find((section) => section.key === 'accounts')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
-              matters={(response.data.sections.find((section) => section.key === 'eligible-matters')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
-              grants={(response.data.sections.find((section) => section.key === 'grants')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
-              shares={(response.data.sections.find((section) => section.key === 'shares')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status }))}
-              resources={[
-                ...(response.data.sections.find((section) => section.key === 'shareable-documents')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status, resourceType: 'document' as const })),
-                ...(response.data.sections.find((section) => section.key === 'shareable-invoices')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status, resourceType: 'invoice' as const })),
-                ...(response.data.sections.find((section) => section.key === 'shareable-threads')?.items ?? []).map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, status: item.status, resourceType: 'communication_thread' as const })),
-              ]}
-            />
-          ) : null}
-
           <div className="space-y-6">
             {response.data.sections.map((section) => {
               const isContactDirectoryPreview = category === 'contacts' && section.key === 'directory'
@@ -222,19 +239,26 @@ export async function WorkspaceScreen({ category, intakePage, conflictPage, invo
             })}
           </div>
 
-          {category === 'billing' && invoiceMetadataRegister ? (
-            <InvoiceMetadataRegister
-              register={invoiceMetadataRegister}
-              timeZone={timeZone}
-              paginationHrefs={invoiceMetadataRegister.success
-                ? getBillingInvoicePageHrefs(invoiceMetadataRegister.pagination, activePaymentPage)
-                : undefined}
-            />
-          ) : null}
+          {!panelFirst ? <CommandDeck title={deckTitle(category)} panels={commandPanels} /> : null}
         </div>
       )}
     </PracticePage>
   )
+}
+
+const deckTitles: Partial<Record<WorkspaceCategory, string>> = {
+  intake: 'Intake desk',
+  billing: 'Billing actions',
+  accounting: 'Trust actions',
+  portal: 'Client sharing',
+  governance: 'Holds and retention',
+  reports: 'Reports',
+  data: 'Import and export',
+  integrations: 'Connections',
+}
+
+function deckTitle(category: WorkspaceCategory) {
+  return deckTitles[category] ?? 'Actions'
 }
 
 // Trust account and ledger subtitles carry the currency as their second segment

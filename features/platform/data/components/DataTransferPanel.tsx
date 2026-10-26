@@ -32,7 +32,7 @@ type ImportResult = { importedCount: number; replayed: boolean }
 
 function Message({ state }: { state: DataTransferState }) {
   if (!state.message) return null
-  return <p role="status" className={cn('rounded-lg border px-3 py-2 text-sm', state.ok ? 'border-border bg-muted/40 text-foreground' : 'border-destructive/30 bg-destructive/5 text-destructive')}>{state.message}</p>
+  return <p role="status" className={cn('rounded-[4px] border px-3 py-2 text-sm', state.ok ? 'border-border bg-muted/40 text-foreground' : 'border-destructive/30 bg-destructive/5 text-destructive')}>{state.message}</p>
 }
 
 function ExportResult({ state }: { state: DataTransferState }) {
@@ -79,7 +79,7 @@ function PreviewTable({ result }: { result: PreviewResult }) {
       <p className={cn('text-sm font-medium', result.valid ? 'text-foreground' : 'text-destructive')}>
         {result.valid ? `${result.rowCount.toLocaleString()} ${result.rowCount === 1 ? 'contact' : 'contacts'} ready to import.` : `${result.errorCount.toLocaleString()} of ${result.rowCount.toLocaleString()} rows need fixing before import.`}
       </p>
-      <div className="max-h-80 overflow-auto rounded-lg border border-border">
+      <div className="max-h-80 overflow-auto rounded-[4px] border border-border">
         <table className="w-full min-w-[30rem] text-xs">
           <thead className="sticky top-0 border-b border-border bg-muted/60 text-left text-muted-foreground"><tr><th className="px-2 py-1.5 font-medium">Row</th><th className="px-2 py-1.5 font-medium">Name</th><th className="px-2 py-1.5 font-medium">Email</th><th className="px-2 py-1.5 font-medium">Phone</th><th className="px-2 py-1.5 font-medium">Problem</th></tr></thead>
           <tbody className="divide-y divide-border">
@@ -156,8 +156,8 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
     setCsvText(await file.text())
   }
 
-  const step = 'flex size-5 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[11px] font-semibold tabular-nums text-muted-foreground'
-  const card = 'min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs'
+  const step = 'flex size-5 shrink-0 items-center justify-center rounded-[4px] bg-muted font-mono text-[11px] font-semibold tabular-nums text-muted-foreground'
+  const card = 'min-w-0 overflow-hidden rounded-[6px] border border-border bg-card'
   const cardHead = 'flex min-w-0 items-center gap-2 border-b border-border px-4 py-3 text-sm font-semibold text-foreground'
 
   return (
@@ -173,7 +173,7 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
             <div className="flex items-center gap-2 text-xs font-medium text-foreground"><span className={step}>1</span>Choose a CSV file</div>
             <label htmlFor="import-file" className={labelClass}>
               CSV file
-              <input id="import-file" type="file" accept=".csv,text/csv" onChange={(event) => void readFile(event.target.files?.[0])} className={cn(fieldClass, 'py-2 file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1 file:text-xs file:font-medium')} />
+              <input id="import-file" type="file" accept=".csv,text/csv" onChange={(event) => void readFile(event.target.files?.[0])} className={cn(fieldClass, 'py-2 file:mr-3 file:rounded-[4px] file:border-0 file:bg-muted file:px-3 file:py-1 file:text-xs file:font-medium')} />
             </label>
             <details className="group" open={Boolean(csvText && !fileName)}>
               <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden"><span className="group-open:hidden">Or paste CSV</span><span className="hidden group-open:inline">Hide pasted CSV</span></summary>

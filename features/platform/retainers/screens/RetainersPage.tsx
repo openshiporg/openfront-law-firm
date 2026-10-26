@@ -71,7 +71,7 @@ export async function RetainersPage({ searchParams }: { searchParams: Promise<Pa
           </Track>
           <form action={BASE} method="get" role="search" className="flex min-w-0 items-center gap-2 lg:w-80">
             {status ? <input type="hidden" name="status" value={status} /> : null}
-            <input name="q" defaultValue={q} maxLength={100} placeholder="Agreement number or client" aria-label="Search agreements" className={cn(fieldClass, 'rounded-full')} />
+            <input name="q" defaultValue={q} maxLength={100} placeholder="Agreement number or client" aria-label="Search agreements" className={cn(fieldClass, 'rounded-[4px]')} />
             <Track><button type="submit" className={trackItemClass(true)}>Search</button></Track>
           </form>
         </div>

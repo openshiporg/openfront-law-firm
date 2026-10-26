@@ -48,7 +48,7 @@ export function ConflictCheckRegisterPreview({
           ))}
         </RowList>
       ) : (
-        <p role="status" className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">No pending conflict checks</p>
+        <p role="status" className="rounded-[6px] border  border-border px-4 py-8 text-center text-sm text-muted-foreground">No pending conflict checks</p>
       )}
 
       {pagination ? (

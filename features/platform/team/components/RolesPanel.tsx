@@ -33,14 +33,14 @@ function PermissionToggles({ granted, disabled }: { granted: readonly string[]; 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {PERMISSION_GROUPS.map((group) => (
-        <fieldset key={group.id} disabled={disabled} className="min-w-0 rounded-lg border border-border bg-background p-3">
+        <fieldset key={group.id} disabled={disabled} className="min-w-0 rounded-[4px] border border-border bg-background p-3">
           <legend className="px-1 text-xs font-semibold text-foreground">{group.title}</legend>
           <div className="grid gap-1">
             {group.items.map((item) => (
               <label key={item.key} className="flex min-h-9 cursor-pointer items-center justify-between gap-3 text-sm">
                 <span className="min-w-0">{item.label}</span>
                 <input type="checkbox" name="permission" value={item.key} defaultChecked={set.has(item.key)} className="peer sr-only" />
-                <span aria-hidden="true" className="relative h-5 w-9 shrink-0 rounded-full bg-muted shadow-[inset_0_1px_2px_rgb(0_0_0/0.15)] transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-background after:shadow-sm after:transition-transform peer-checked:bg-emerald-600 peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50 peer-disabled:opacity-60" />
+                <span aria-hidden="true" className="relative h-5 w-9 shrink-0 rounded-[4px] bg-muted shadow-[inset_0_1px_2px_rgb(0_0_0/0.15)] transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-[4px] after:bg-background after:shadow-sm after:transition-transform peer-checked:bg-emerald-600 peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50 peer-disabled:opacity-60" />
               </label>
             ))}
           </div>

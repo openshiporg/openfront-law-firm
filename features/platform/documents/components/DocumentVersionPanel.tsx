@@ -26,7 +26,7 @@ export function DocumentVersionPanel({ documentId, storage, currentVersionId, ve
       {storage ? (
         <form key={state.ok ? state.revision : 'form'} {...actionForm} className="grid gap-3 border-b border-border p-4">
           <input type="hidden" name="documentId" value={documentId} />
-          <label className={labelClass}>Upload a new version<input type="file" name="file" required className={cn(fieldClass, 'py-1.5 file:mr-3 file:rounded-full file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm')} /></label>
+          <label className={labelClass}>Upload a new version<input type="file" name="file" required className={cn(fieldClass, 'py-1.5 file:mr-3 file:rounded-[4px] file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm')} /></label>
           <label className={labelClass}>Notes<input name="notes" maxLength={2000} className={fieldClass} /></label>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="makeCurrent" defaultChecked className="size-4 accent-foreground" />Make current</label>

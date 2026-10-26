@@ -85,7 +85,7 @@ export function BillingAssemblyForm({ setup }: { setup: BillingAssemblySetup }) 
 
         {!options.length ? (
           <div className="space-y-2 p-4">
-            <p role="status" className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">No matter with approved, unbilled work</p>
+            <p role="status" className="rounded-[6px] border  border-border px-4 py-8 text-center text-sm text-muted-foreground">No matter with approved, unbilled work</p>
             {errors}
           </div>
         ) : (
@@ -167,7 +167,7 @@ function SourceList({ title, count, empty, sources, bordered = false }: { title:
       {!sources.length ? <p className="clear-both pt-3 text-sm text-muted-foreground">{empty}</p> : (
         <div className="clear-both mt-2 max-h-72 divide-y divide-border overflow-y-auto">
           {sources.map((source) => (
-            <div key={source.id} className={cn('flex min-w-0 items-start gap-3 py-2.5 text-sm', source.flagged && '-mx-2 rounded-lg bg-destructive/5 px-2')}>
+            <div key={source.id} className={cn('flex min-w-0 items-start gap-3 py-2.5 text-sm', source.flagged && '-mx-2 rounded-[4px] bg-destructive/5 px-2')}>
               <input id={`source-${source.id}`} type="checkbox" name="source" value={source.id} className="mt-0.5 size-4 shrink-0 cursor-pointer accent-foreground" />
               <label htmlFor={`source-${source.id}`} className="min-w-0 flex-1 cursor-pointer">
                 <span className="block truncate font-medium text-foreground">{source.title}</span>

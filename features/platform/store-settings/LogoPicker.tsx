@@ -39,14 +39,14 @@ export function LogoPicker({ initialIcon, initialColor, onChange }: { initialIco
     <legend className="mb-3 text-sm font-semibold text-foreground">Store logo</legend>
 
     <div className="flex min-w-0 items-center gap-3">
-      <span data-store-logo="preview" className="block size-12 shrink-0 rounded-lg border border-border bg-background p-1.5 [&>svg]:size-full" role="img" aria-label="Current logo preview" style={hueFilter} dangerouslySetInnerHTML={{ __html: icon }} />
+      <span data-store-logo="preview" className="block size-12 shrink-0 rounded-[4px] border border-border bg-background p-1.5 [&>svg]:size-full" role="img" aria-label="Current logo preview" style={hueFilter} dangerouslySetInnerHTML={{ __html: icon }} />
       <div className="min-w-0 text-sm">
         <p className="truncate font-medium text-foreground">{editing || !selected ? 'Custom SVG' : selected.name}</p>
         <p className="text-xs text-muted-foreground">{HUE_PRESETS.find(preset => String(preset.value) === normalizeStoreLogoColor(hue))?.name ?? 'Custom colour'}</p>
       </div>
     </div>
 
-    <div role="radiogroup" aria-label="Logo library" className="grid max-h-64 grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1.5 overflow-y-auto rounded-xl bg-muted p-1.5 shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)] dark:shadow-[inset_0_1px_2px_rgb(0_0_0/0.4)]">
+    <div role="radiogroup" aria-label="Logo library" className="grid max-h-64 grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1.5 overflow-y-auto rounded-[6px] bg-muted p-1.5  ">
       {LOGO_ICONS.map(item => {
         const active = activeId === item.id
         return <button
@@ -58,7 +58,7 @@ export function LogoPicker({ initialIcon, initialColor, onChange }: { initialIco
           title={item.name}
           onClick={() => choose(item.id)}
           className={cn(
-            'flex aspect-square min-h-11 items-center justify-center rounded-lg bg-background p-2 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/60 dark:bg-zinc-900',
+            'flex aspect-square min-h-11 items-center justify-center rounded-[4px] bg-background p-2 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/60 dark:bg-zinc-900',
             active ? 'ring-2 ring-foreground ring-offset-2 ring-offset-muted' : 'ring-1 ring-black/5 hover:ring-black/20 dark:ring-white/10 dark:hover:ring-white/30',
           )}
         >
@@ -69,7 +69,7 @@ export function LogoPicker({ initialIcon, initialColor, onChange }: { initialIco
 
     {!editing ? <Track>
       <button type="button" className={pillClass} aria-controls={editorId} aria-expanded={false} onClick={startEditing}>{selected ? 'Edit as custom SVG' : 'Edit custom SVG'}</button>
-    </Track> : <div id={editorId} className="grid gap-3 rounded-xl border border-border bg-muted/30 p-3">
+    </Track> : <div id={editorId} className="grid gap-3 rounded-[6px] border border-border bg-muted/30 p-3">
       <label className={labelClass}>Custom SVG
         <textarea className={cn(textareaClass, 'min-h-32 font-mono text-xs')} value={draft} onChange={e => setDraft(e.target.value)} aria-invalid={!safeDraft} aria-describedby={`${editorId}-help`} maxLength={100000} spellCheck={false} />
       </label>
@@ -83,11 +83,11 @@ export function LogoPicker({ initialIcon, initialColor, onChange }: { initialIco
     <div className="grid min-w-0 gap-2">
       <span className="text-xs font-medium text-muted-foreground" id={`${editorId}-hue`}>Logo hue</span>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Track label="Logo hue presets" className="min-w-0 max-w-full flex-wrap overflow-visible rounded-2xl">
+        <Track label="Logo hue presets" className="min-w-0 max-w-full flex-wrap overflow-visible rounded-[6px]">
           {HUE_PRESETS.map(preset => {
             const active = normalizeStoreLogoColor(hue) === String(preset.value)
             return <button key={preset.name} type="button" aria-pressed={active} className={trackItemClass(active)} onClick={() => setHue(String(preset.value))}>
-              <span aria-hidden="true" className="size-3 rounded-full ring-1 ring-black/10" style={{ backgroundColor: `oklch(0.6 0.15 ${preset.hue})` }} />
+              <span aria-hidden="true" className="size-3 rounded-[4px] ring-1 ring-black/10" style={{ backgroundColor: `oklch(0.6 0.15 ${preset.hue})` }} />
               {preset.name}
             </button>
           })}

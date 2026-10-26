@@ -82,7 +82,7 @@ export async function PortalPolicyDirectory({ params = {} }: { params?: PortalDi
   const accessSummary = (grant: Grant) => [grant.canReadDocuments && 'documents', grant.canUploadDocuments && 'uploads', grant.canReadInvoices && 'invoices', grant.canReadMessages && 'messages'].filter(Boolean).join(', ') || 'nothing yet'
   return <section id="portal-policy" aria-labelledby="portal-policy-title" className="min-w-0 scroll-mt-20 space-y-5">
     <SectionHeader id="portal-policy-title" title="Who can see this matter" />
-    <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="rounded-[6px] border border-border bg-card p-4">
       <MetaGrid>
         <Meta label="Sharing rules">{data.policy ? 'Set' : <span className="text-destructive">Not set; set them below before giving access</span>}</Meta>
         <Meta label="Matters that can be shared">{data.policy ? data.policy.statuses.map(statusName).join(', ') : '—'}</Meta>
@@ -104,7 +104,7 @@ export async function PortalPolicyDirectory({ params = {} }: { params?: PortalDi
     </div>
     {data.canConfigure ? <PortalPolicyForm revision={data.latestRevision} /> : null}
     {data.state !== 'ready' ? <Notice>{data.state === 'matter_read_denied' ? 'Your role can’t view matters, so it can’t give clients access to them.' : data.state === 'portal_read_denied' ? 'Your role can’t view client portal access.' : 'Set the sharing rules before giving clients access to matters.'}</Notice> : <>
-      <form method="get" className="grid min-w-0 gap-3 rounded-xl border border-border bg-card p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+      <form method="get" className="grid min-w-0 gap-3 rounded-[6px] border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
         {account ? <div className="grid min-w-0 gap-1.5"><span className="text-xs font-medium text-muted-foreground">Client</span><input type="hidden" name="portalAccountId" value={account.id} /><div className="flex min-h-10 min-w-0 items-center gap-2"><span className="min-w-0 truncate text-sm font-medium text-foreground">{clientLabel}</span><Link href="/dashboard/platform/portal#portal-policy" className="shrink-0 text-xs font-medium text-muted-foreground underline-offset-4 hover:underline">Change</Link></div></div> : <div className="min-w-0"><SearchableOptionSelect id="portal-directory-account" name="portalAccountId" label="Client" emptyLabel="Choose a client" kind="portalAccount" options={[...new Map([...data.accounts.map((item) => ({ value: item.id, label: accountLabel(labels.get(item.id), item.id) })), ...(selectedId && exactAccount ? [{ value: selectedId, label: accountLabel(exactAccount, selectedId) }] : [])].map((option) => [option.value, option])).values()]} /></div>}
         <label className={labelClass}>Matter number<input name="search" type="search" defaultValue={params.search} maxLength={100} className={fieldClass} /></label>
         <label className={labelClass}>Matter status<FormSelect name="status" defaultValue={params.status ?? ''} className={fieldClass}><option value="">Any shareable status</option>{data.policy?.statuses.map((status) => <option key={status} value={status}>{statusName(status)}</option>)}</FormSelect></label>
@@ -128,7 +128,7 @@ export async function PortalPolicyDirectory({ params = {} }: { params?: PortalDi
           {selectionGrantable ? <PortalGrantForm key={`grant-${latest?.id ?? 'new'}-${latest?.version ?? 0}`} accountLabel={clientLabel} matterLabel={data.selection?.matterNumber ?? params.matterId} operation="grant" intentKey={randomUUID()} policyRevision={data.policy.revision} expectedVersion={latest?.version ?? 0} portalAccountId={account.id} contactId={account.contactId} matterId={params.matterId} grantId={latest?.id ?? null} /> : null}
           {latest && ['active', 'expired'].includes(latest.status) ? <PortalGrantForm key={`revoke-${latest.id}-${latest.version}`} accountLabel={clientLabel} matterLabel={data.selection?.matterNumber ?? params.matterId} operation="revoke" intentKey={randomUUID()} policyRevision={data.policy.revision} expectedVersion={latest.version} portalAccountId={account.id} contactId={account.contactId} matterId={params.matterId} grantId={latest.id} /> : null}
         </div> : <Notice>Your role can view client access but can’t change it.</Notice>}
-        <details className="group rounded-xl border border-border bg-card p-4 shadow-xs">
+        <details className="group rounded-[6px] border border-border bg-card p-4">
           <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden"><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span> access history</summary>
           <div className="mt-3 space-y-3">
             {data.grants.length ? <RowList label="Access records">{data.grants.map((grant) => <li key={grant.id} className="min-w-0 space-y-3 px-4 py-3">
@@ -141,7 +141,7 @@ export async function PortalPolicyDirectory({ params = {} }: { params?: PortalDi
                 <Meta label="Expires">{grant.expiresAt ?? 'Never'}</Meta>
               </MetaGrid>
             </li>)}</RowList> : <EmptyState title="No access records for this client and matter." />}
-            {data.history.length ? <div className="overflow-x-auto rounded-xl border border-border">
+            {data.history.length ? <div className="overflow-x-auto rounded-[6px] border border-border">
               <table className="w-full min-w-[30rem] text-sm tabular-nums">
                 <thead className="border-b border-border bg-muted/40"><tr className="text-left text-xs text-muted-foreground"><th className="px-3 py-2 font-medium">Change</th><th className="px-3 py-2 text-right font-medium">Version</th><th className="px-3 py-2 font-medium">When</th><th className="px-3 py-2 font-medium">Reference</th></tr></thead>
                 <tbody className="divide-y divide-border">{data.history.map((item) => <tr key={item.id}><td className="px-3 py-2 font-medium">{item.operation === 'grant' ? 'Access given' : item.operation === 'revoke' ? 'Access removed' : statusName(item.operation)}</td><td className="px-3 py-2 text-right">{item.resultVersion}</td><td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.completedAt}</td><td className="max-w-[14rem] truncate px-3 py-2 font-mono text-xs text-muted-foreground">{item.id}</td></tr>)}</tbody>

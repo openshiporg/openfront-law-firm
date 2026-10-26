@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
 import { initialCommandState, type CommandState } from './commandState'
-import { fieldClass, labelClass, pillDangerClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass } from './ui'
+import { fieldClass, labelClass, pillDangerClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass, segmentClass, segmentItemClass } from './ui'
 
 type CommandAction = (previous: CommandState, formData: FormData) => Promise<CommandState>
 
@@ -55,11 +55,11 @@ export function ChoiceTrack({ name, label, defaultValue, options, className }: {
   return (
     <fieldset className={cn('grid min-w-0 gap-1.5', className)}>
       <legend className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</legend>
-      <div className={trackClass}>
+      <div className={segmentClass}>
         {options.map(([value, text]) => (
-          <label key={value} className="relative">
+          <label key={value} className="relative flex border-r border-input last:border-r-0">
             <input type="radio" name={name} value={value} defaultChecked={value === defaultValue} required className="peer sr-only" />
-            <span className={cn(trackItemClass(false), 'cursor-pointer peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-black/5 peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50 dark:peer-checked:bg-zinc-800')}>{text}</span>
+            <span className={segmentItemClass}>{text}</span>
           </label>
         ))}
       </div>

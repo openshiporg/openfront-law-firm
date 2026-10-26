@@ -79,7 +79,7 @@ export function CreateDocketPanel({ courts, timeZone }: { courts: CourtRow[]; ti
   const actionForm = useKeptForm(action, state)
   const activeCourts = courts.filter((court) => court.status !== 'inactive').map((court) => [court.id, `${court.name} · ${court.jurisdiction}`] as const)
   return (
-    <section aria-labelledby="new-docket-heading" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+    <section aria-labelledby="new-docket-heading" className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-card">
       <header className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
         <h2 id="new-docket-heading" className="text-sm font-semibold">New docket</h2>
         <Track><button type="button" onClick={() => setOpen(!open)} aria-pressed={open} className={trackItemClass(open)}><Plus className="size-3.5" aria-hidden="true" />Docket</button></Track>
@@ -109,7 +109,7 @@ export function DocketStatusControl({ docketId, status }: { docketId: string; st
     <div className="relative">
       <Track><button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={trackItemClass(true)}>Change status</button></Track>
       {open ? (
-        <form {...actionForm} className="absolute right-0 z-20 mt-2 grid w-72 max-w-[calc(100vw-2rem)] gap-3 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+        <form {...actionForm} className="absolute right-0 z-20 mt-2 grid w-72 max-w-[calc(100vw-2rem)] gap-3 rounded-[6px] border border-border bg-popover p-3 text-popover-foreground shadow-lg">
           <input type="hidden" name="docketId" value={docketId} />
           <ChoiceTrack name="toStatus" label="New status" defaultValue={targets[0]} options={targets.map((value) => [value, statusLabel(value)] as const)} />
           <FormFooter state={state} pending={pending} label="Save" />
@@ -124,7 +124,7 @@ export function RecordEntryForm({ docketId, timeZone, versions }: { docketId: st
   const [state, action, pending] = useCommand(recordEntry, () => setOpen(false))
   const actionForm = useKeptForm(action, state)
   return (
-    <section aria-labelledby="record-entry-heading" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+    <section aria-labelledby="record-entry-heading" className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-card">
       <header className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
         <h2 id="record-entry-heading" className="text-sm font-semibold">Record entry</h2>
         <Track><button type="button" onClick={() => setOpen(!open)} aria-pressed={open} className={trackItemClass(open)}><Plus className="size-3.5" aria-hidden="true" />Entry</button></Track>
@@ -188,7 +188,7 @@ export function EntryTimeline({ docketId, entries, timeZone, canRecord }: { dock
             {entry.documentVersion ? <span>{entry.documentVersion.fileName || 'Document'} v{entry.documentVersion.versionNumber ?? '?'}</span> : null}
             {entry.isVerified ? <span>Verified{entry.verifiedBy?.name ? ` by ${entry.verifiedBy.name}` : ''}{entry.verifiedAt ? ` · ${format(entry.verifiedAt)}` : ''}</span> : null}
           </p> : null}
-          {open === entry.id ? <div className="mt-2 rounded-lg bg-muted/30 p-3"><VerifyEntryForm docketId={docketId} entry={entry} onDone={() => setOpen(null)} /></div> : null}
+          {open === entry.id ? <div className="mt-2 rounded-[4px] bg-muted/30 p-3"><VerifyEntryForm docketId={docketId} entry={entry} onDone={() => setOpen(null)} /></div> : null}
         </li>)}
       </ol> : <div className="p-4"><EmptyState title="No entries recorded" /></div>}
     </Panel>

@@ -1,9 +1,9 @@
 import Link from 'next/link'
-import { ArrowUpRight, Settings2 } from 'lucide-react'
+import { ArrowRight, Plus } from 'lucide-react'
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 
-import { PracticeLoadError, PracticePage, QueueRow, SectionJumps } from '@/features/platform/components/PracticeSurface'
-import { EmptyState, Pager, Track, trackItemClass } from '@/features/platform/components/ui'
+import { PracticeLoadError, PracticePage, RecordSection, RecordTable, SectionJumps } from '@/features/platform/components/PracticeSurface'
+import { Pager, Track, actionLinkClass, pillClass, pillPrimaryClass } from '@/features/platform/components/ui'
 import { WorkspaceRegisterView } from '@/features/platform/components/WorkspaceRegisterView'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 import { platformDestinationTitle } from '@/features/platform/lib/navigation'
@@ -115,70 +115,68 @@ export async function OperatingDesk({
     <PracticePage
       title={definition.title}
       description={definition.description}
-      actions={<Track><Link href="/dashboard/models" className={trackItemClass(true)}><Settings2 className="size-4" aria-hidden="true" /> Data model</Link></Track>}
+      actions={desk === 'matters' ? (
+        <Track label="Open a matter">
+          <Link href="/dashboard/platform/intake#intake-conversion" className={pillClass}>From a cleared intake</Link>
+          <Link href="/dashboard/platform/intake#new-intake-heading" className={pillPrimaryClass}><Plus className="size-4" aria-hidden="true" />Start client intake</Link>
+        </Track>
+      ) : undefined}
     >
       {!response.success ? <PracticeLoadError message={response.error} /> : registerResult ? (
         registerResult.success
           ? <WorkspaceRegisterView register={registerResult.data} backHref={`/dashboard/platform/${desk}`} backLabel={definition.title} timeZone={timeZone} rowHref={(item) => deskItemHref(desk, item)} />
           : <PracticeLoadError message={registerResult.error} />
       ) : (
-        <div className="space-y-6 pb-24 sm:pb-0">
-          <SectionJumps sections={response.data.sections.map((section) => ({ key: section.key, title: section.title, total: section.total }))} />
-          <div className="grid items-start gap-6 lg:grid-cols-2">
-            <DeskCreatePanel desk={desk} timeZone={timeZone} />
-            {desk === 'time-expenses' ? <LocalTimer /> : null}
-          </div>
-          <div className="space-y-6">
-            {response.data.sections.map((section) => (
-              <DeskLane
-                key={section.key}
-                desk={desk}
-                section={section}
-                label={definition.sectionLabels[section.key] ?? 'Scope · state · activity'}
-                timeZone={timeZone}
-                paginationHrefs={getPaginationHrefs(desk, section, response.data.sections)}
-              />
-            ))}
-          </div>
+        <div className="space-y-8 pb-24 sm:pb-0">
+          <SectionJumps sections={[
+            ...(desk === 'time-expenses' ? [{ key: 'capture', title: 'Capture' }] : []),
+            ...response.data.sections.map((section) => ({ key: section.key, title: section.title, total: section.total })),
+            ...(desk !== 'time-expenses' && desk !== 'matters' ? [{ key: 'capture', title: 'New' }] : []),
+          ]} />
+          {desk === 'time-expenses' ? (
+            <div id="capture" className="grid scroll-mt-28 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+              <LocalTimer />
+              <DeskCreatePanel desk={desk} timeZone={timeZone} />
+            </div>
+          ) : null}
+          {response.data.sections.map((section) => (
+            <DeskLane
+              key={section.key}
+              desk={desk}
+              section={section}
+              timeZone={timeZone}
+              paginationHrefs={getPaginationHrefs(desk, section, response.data.sections)}
+            />
+          ))}
+          {desk !== 'time-expenses' && desk !== 'matters' ? <div id="capture" className="scroll-mt-28"><DeskCreatePanel desk={desk} timeZone={timeZone} /></div> : null}
         </div>
       )}
     </PracticePage>
   )
 }
 
-function DeskLane({ desk, section, label, timeZone, paginationHrefs }: { desk: DeskKind; section: PracticeWorkspaceSection; label: string; timeZone: string; paginationHrefs?: { previous: string | null; next: string | null } }) {
+function DeskLane({ desk, section, timeZone, paginationHrefs }: { desk: DeskKind; section: PracticeWorkspaceSection; timeZone: string; paginationHrefs?: { previous: string | null; next: string | null } }) {
+  const kinds = new Set(section.items.map((item) => item.kind))
   return (
-    <section id={section.key} className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-labelledby={`${section.key}-heading`}>
-      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0">
-          <h2 id={`${section.key}-heading`} className="flex min-w-0 items-baseline gap-2 text-sm font-semibold text-foreground">
-            <span className="truncate">{section.title}</span>
-            <span className="font-mono text-xs font-normal tabular-nums text-muted-foreground">{section.total.toLocaleString()}</span>
-          </h2>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{label}</p>
-        </div>
-        {section.total ? <Track><Link href={registerHref(desk, { view: section.key })} className={trackItemClass(true)}>Search all <ArrowUpRight className="size-3.5" aria-hidden="true" /></Link></Track> : null}
-      </header>
-      {!section.items.length ? <div className="p-4"><EmptyState title={`No ${section.title.toLowerCase()}`} /></div> : (
-        <ul className="divide-y divide-border">
-          {section.items.map((item) => (
-            <QueueRow key={`${item.kind}-${item.id}`} item={item} href={deskItemHref(desk, item)} actionPath={`/dashboard/platform/${desk}`} timeZone={timeZone} />
-          ))}
-        </ul>
-      )}
-      {section.pagination && paginationHrefs ? (
-        <div className="border-t border-border px-4 py-3">
-          <Pager
-            label={`${section.title} pages`}
-            previous={paginationHrefs.previous}
-            next={paginationHrefs.next}
-            summary={section.pagination.loadedCount
-              ? `${section.pagination.firstItem.toLocaleString()}–${section.pagination.lastItem.toLocaleString()} of ${section.total.toLocaleString()} · page ${section.pagination.page} of ${section.pagination.pageCount}`
-              : `0 of ${section.total.toLocaleString()} · page ${section.pagination.page} of ${section.pagination.pageCount}`}
-          />
-        </div>
-      ) : null}
-    </section>
+    <RecordSection
+      id={section.key}
+      title={section.title}
+      count={section.total}
+      range={section.pagination ? `Page ${section.pagination.page} of ${section.pagination.pageCount}` : undefined}
+      actions={section.total ? <Link href={registerHref(desk, { view: section.key })} className={actionLinkClass}>Search all<ArrowRight className="size-3.5" aria-hidden="true" /></Link> : undefined}
+      footer={section.pagination && paginationHrefs ? (
+        <Pager
+          label={`${section.title} pages`}
+          previous={paginationHrefs.previous}
+          next={paginationHrefs.next}
+          summary={section.pagination.loadedCount
+            ? `${section.pagination.firstItem.toLocaleString()}–${section.pagination.lastItem.toLocaleString()} of ${section.total.toLocaleString()}`
+            : `0 of ${section.total.toLocaleString()}`}
+        />
+      ) : undefined}
+    >
+      <RecordTable items={section.items} rowHref={(item) => deskItemHref(desk, item)} actionPath={`/dashboard/platform/${desk}`} timeZone={timeZone} anchor={section.key} empty={`No ${section.title.toLowerCase()}`} showKind={kinds.size > 1} label={section.title} />
+    </RecordSection>
   )
 }
 
@@ -236,7 +234,7 @@ function getWorkPageHrefs(section: PracticeWorkspaceSection, sections: PracticeW
 async function LocalTimer() {
   const response = await keystoneClient<{ authenticatedItem: { id: string; status: string; activeFirm: { id: string; status: string } | null } | null }>(`query TimerScope { authenticatedItem { ... on User { id status activeFirm { id status } } } }`)
   const viewer = response.success ? response.data.authenticatedItem : null
-  if (!viewer || viewer.status !== "active" || viewer.activeFirm?.status !== "active") return <p role="status" className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">Timer unavailable. Sign in to your firm and reload.</p>
+  if (!viewer || viewer.status !== "active" || viewer.activeFirm?.status !== "active") return <p role="status" className="rounded-[6px] border border-border px-4 py-4 text-sm text-muted-foreground">Timer unavailable. Sign in to your firm and reload.</p>
   const scopeKey = `${viewer.id}:${viewer.activeFirm.id}`
-  return <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs" aria-labelledby="local-timer-heading"><header className="border-b border-border px-4 py-3"><h2 id="local-timer-heading" className="text-sm font-semibold">Timer</h2></header><div className="p-4"><LocalTimerClient key={scopeKey} scopeKey={scopeKey} /></div></section>
+  return <section className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-card" aria-labelledby="local-timer-heading"><header className="border-b border-border bg-[var(--lf-manila)] px-4 py-2.5"><h2 id="local-timer-heading" className="text-sm font-semibold">Timer</h2></header><div className="p-4"><LocalTimerClient key={scopeKey} scopeKey={scopeKey} /></div></section>
 }
