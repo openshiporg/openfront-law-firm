@@ -99,7 +99,7 @@ export function BillingRatesForm({ setup }: { setup: BillingRatesSetup }) {
         <div className="grid min-w-0 lg:grid-cols-2 lg:divide-x lg:divide-border">
           <form {...cardActionForm} className="min-w-0">
             <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-              <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">New rate card</legend>
+              <legend className="mb-1 text-xs font-semibold text-muted-foreground sm:col-span-2">New rate card</legend>
               <label className={cn(labelClass, 'sm:col-span-2')}>Name<input name="name" required minLength={2} maxLength={200} className={fieldClass} autoComplete="off" /></label>
               <div className="min-w-0 sm:col-span-2">
                 <SearchableOptionSelect id="rate-card-matter" name="matterId" label="Matter (blank for firm-wide)" kind="matter" options={[]} emptyLabel="Firm-wide" />
@@ -115,7 +115,7 @@ export function BillingRatesForm({ setup }: { setup: BillingRatesSetup }) {
 
           <form {...ruleActionForm} className="min-w-0 border-t border-border lg:border-t-0">
             <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-              <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Hourly rate</legend>
+              <legend className="mb-1 text-xs font-semibold text-muted-foreground sm:col-span-2">Hourly rate</legend>
               <div className={cn(labelClass, 'sm:col-span-2')}>
                 <label htmlFor="rate-rule-card">Rate card</label>
                 <FormSelect id="rate-rule-card" name="rateCardId" required defaultValue="" className={cn(fieldClass, 'text-foreground')}>

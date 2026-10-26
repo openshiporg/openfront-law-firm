@@ -72,7 +72,7 @@ export function TrustSetupForm({ accounts, suggestedLedgerNumber }: { accounts: 
       <div className="grid min-w-0 xl:grid-cols-2 xl:divide-x xl:divide-border">
         <form {...accountActionForm} className="min-w-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-            <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Open trust account</legend>
+            <legend className="mb-1 text-xs font-semibold text-muted-foreground sm:col-span-2">Open trust account</legend>
             <label className={cn(labelClass, 'sm:col-span-2')}>Account name<input name="name" required minLength={2} maxLength={200} autoComplete="off" className={fieldClass} /></label>
             <div className={labelClass}>
               <label htmlFor="trust-account-type">Type</label>
@@ -98,7 +98,7 @@ export function TrustSetupForm({ accounts, suggestedLedgerNumber }: { accounts: 
 
         <form {...ledgerActionForm} className="min-w-0 border-t border-border xl:border-t-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-            <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Open client ledger</legend>
+            <legend className="mb-1 text-xs font-semibold text-muted-foreground sm:col-span-2">Open client ledger</legend>
             <div className={cn(labelClass, 'sm:col-span-2')}>
               <label htmlFor="trust-ledger-account">Trust account</label>
               <FormSelect id="trust-ledger-account" name="trustAccountId" required defaultValue="" className={cn(fieldClass, 'text-foreground')}>

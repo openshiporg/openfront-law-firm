@@ -1,15 +1,7 @@
-/* Hallmark · macrostructure: Long Document · tone: austere · anchor hue: 35 (warm walnut)
- * genre: editorial · theme: Newsprint-derived (light paper band · roman-serif display · warm russet accent)
- * nav: N6 Newspaper masthead (letterhead variant) · footer: Ft4 Dense typographic colophon
- * pre-emit critique: P5 H4 E5 S5 R5 V4
- *
- * Openfront Law Firm — public storefront tokens.
- * The public storefront renders inside a .storefront scope (see features/storefront/storefront.css)
- * so the dashboard/platform (Quiet theme) is untouched.
- *
- * Colour holds the "file is a legal document" register: warm paper, walnut ink,
- * russet accent used only as a highlighter (underline / focus / small mark).
- */
+/* Openfront Law Firm: public storefront tokens.
+ * The public site is the legal pad (see features/storefront/legal-pad.css, which overrides the
+ * paper and ink here inside `.storefront`). Type: Libre Franklin for display and body, Geist Mono
+ * for codes. The dashboard and platform keep their own tokens. */
 :root {
   /* Paper band — warm cream, never pure white */
   --color-paper:    oklch(0.955 0.010 78);

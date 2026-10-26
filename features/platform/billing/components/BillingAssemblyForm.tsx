@@ -161,7 +161,7 @@ type Source = { id: string; title: string; meta: string; amount: string; unprice
 function SourceList({ title, count, empty, sources, bordered = false }: { title: string; count: number; empty: string; sources: Source[]; bordered?: boolean }) {
   return (
     <fieldset className={cn('min-w-0 px-4 py-4', bordered && 'border-t border-border lg:border-t-0')}>
-      <legend className="float-left flex w-full items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <legend className="float-left flex w-full items-baseline gap-2 text-xs font-semibold text-muted-foreground">
         {title}<span className="font-mono font-normal tabular-nums">{count.toLocaleString()}</span>
       </legend>
       {!sources.length ? <p className="clear-both pt-3 text-sm text-muted-foreground">{empty}</p> : (

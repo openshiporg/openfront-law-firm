@@ -233,7 +233,7 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
 
 function ColumnHeading({ label, count }: { label: string; count: number }) {
   return (
-    <h4 className="flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <h4 className="flex items-baseline gap-2 text-xs font-semibold text-muted-foreground">
       {label}<span className="font-mono font-normal tabular-nums">{count.toLocaleString()}</span>
     </h4>
   )

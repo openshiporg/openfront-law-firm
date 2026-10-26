@@ -1,0 +1,664 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T07:22:36.259692+00:00",
+  "title": "Design System: Openfront Law Firm",
+  "extensions": {
+    "colorMeta": {
+      "lf-rust": {
+        "role": "primary",
+        "displayName": "Redweld Rust",
+        "canonical": "oklch(0.47 0.135 36)",
+        "tonalRamp": [
+          "oklch(0.150 0.109 36)",
+          "oklch(0.264 0.133 36)",
+          "oklch(0.379 0.135 36)",
+          "oklch(0.493 0.135 36)",
+          "oklch(0.607 0.135 36)",
+          "oklch(0.721 0.135 36)",
+          "oklch(0.836 0.133 36)",
+          "oklch(0.950 0.109 36)"
+        ],
+        "dark": "oklch(0.71 0.125 46)"
+      },
+      "lf-rust-hover": {
+        "role": "primary",
+        "displayName": "Rust Hover",
+        "canonical": "oklch(0.415 0.13 36)",
+        "tonalRamp": [
+          "oklch(0.150 0.107 36)",
+          "oklch(0.264 0.130 36)",
+          "oklch(0.379 0.130 36)",
+          "oklch(0.493 0.130 36)",
+          "oklch(0.607 0.130 36)",
+          "oklch(0.721 0.130 36)",
+          "oklch(0.836 0.130 36)",
+          "oklch(0.950 0.107 36)"
+        ],
+        "dark": "oklch(0.77 0.115 46)"
+      },
+      "lf-rust-ink": {
+        "role": "primary",
+        "displayName": "Rust Ink",
+        "canonical": "oklch(0.46 0.135 36)",
+        "tonalRamp": [
+          "oklch(0.150 0.109 36)",
+          "oklch(0.264 0.133 36)",
+          "oklch(0.379 0.135 36)",
+          "oklch(0.493 0.135 36)",
+          "oklch(0.607 0.135 36)",
+          "oklch(0.721 0.135 36)",
+          "oklch(0.836 0.133 36)",
+          "oklch(0.950 0.109 36)"
+        ],
+        "dark": "oklch(0.77 0.115 46)"
+      },
+      "lf-on-rust": {
+        "role": "primary",
+        "displayName": "Rust-Paper White",
+        "canonical": "oklch(0.99 0.005 80)",
+        "tonalRamp": [
+          "oklch(0.150 0.005 80)",
+          "oklch(0.264 0.005 80)",
+          "oklch(0.379 0.005 80)",
+          "oklch(0.493 0.005 80)",
+          "oklch(0.607 0.005 80)",
+          "oklch(0.721 0.005 80)",
+          "oklch(0.836 0.005 80)",
+          "oklch(0.950 0.005 80)"
+        ],
+        "dark": "oklch(0.2 0.02 40)"
+      },
+      "lf-manila": {
+        "role": "tertiary",
+        "displayName": "Manila",
+        "canonical": "oklch(0.968 0.026 86)",
+        "tonalRamp": [
+          "oklch(0.150 0.026 86)",
+          "oklch(0.264 0.026 86)",
+          "oklch(0.379 0.026 86)",
+          "oklch(0.493 0.026 86)",
+          "oklch(0.607 0.026 86)",
+          "oklch(0.721 0.026 86)",
+          "oklch(0.836 0.026 86)",
+          "oklch(0.950 0.026 86)"
+        ],
+        "dark": "oklch(0.235 0.016 70)"
+      },
+      "lf-manila-strong": {
+        "role": "tertiary",
+        "displayName": "Manila Strong",
+        "canonical": "oklch(0.935 0.042 84)",
+        "tonalRamp": [
+          "oklch(0.150 0.042 84)",
+          "oklch(0.264 0.042 84)",
+          "oklch(0.379 0.042 84)",
+          "oklch(0.493 0.042 84)",
+          "oklch(0.607 0.042 84)",
+          "oklch(0.721 0.042 84)",
+          "oklch(0.836 0.042 84)",
+          "oklch(0.950 0.042 84)"
+        ],
+        "dark": "oklch(0.28 0.022 70)"
+      },
+      "lf-manila-line": {
+        "role": "tertiary",
+        "displayName": "Manila Line",
+        "canonical": "oklch(0.86 0.05 78)",
+        "tonalRamp": [
+          "oklch(0.150 0.050 78)",
+          "oklch(0.264 0.050 78)",
+          "oklch(0.379 0.050 78)",
+          "oklch(0.493 0.050 78)",
+          "oklch(0.607 0.050 78)",
+          "oklch(0.721 0.050 78)",
+          "oklch(0.836 0.050 78)",
+          "oklch(0.950 0.050 78)"
+        ],
+        "dark": "oklch(0.38 0.03 70)"
+      },
+      "pen-default": {
+        "role": "primary",
+        "displayName": "Firm Pen (default)",
+        "canonical": "oklch(0.460 0.100 30)",
+        "tonalRamp": [
+          "oklch(0.150 0.096 30)",
+          "oklch(0.264 0.100 30)",
+          "oklch(0.379 0.100 30)",
+          "oklch(0.493 0.100 30)",
+          "oklch(0.607 0.100 30)",
+          "oklch(0.721 0.100 30)",
+          "oklch(0.836 0.100 30)",
+          "oklch(0.950 0.096 30)"
+        ],
+        "note": "Default of --color-accent; overridden per firm by --sf-accent from presets Walnut #8a5a33, Oxblood #6e2b2f, Forest #2f5d50, Slate #35556b, or logo hue."
+      },
+      "focus-default": {
+        "role": "primary",
+        "displayName": "Focus Pen",
+        "canonical": "oklch(0.540 0.140 32)",
+        "tonalRamp": [
+          "oklch(0.150 0.110 32)",
+          "oklch(0.264 0.136 32)",
+          "oklch(0.379 0.140 32)",
+          "oklch(0.493 0.140 32)",
+          "oklch(0.607 0.140 32)",
+          "oklch(0.721 0.140 32)",
+          "oklch(0.836 0.136 32)",
+          "oklch(0.950 0.110 32)"
+        ]
+      },
+      "margin-red": {
+        "role": "secondary",
+        "displayName": "Margin Red",
+        "canonical": "oklch(0.58 0.175 24)",
+        "tonalRamp": [
+          "oklch(0.150 0.123 24)",
+          "oklch(0.264 0.155 24)",
+          "oklch(0.379 0.175 24)",
+          "oklch(0.493 0.175 24)",
+          "oklch(0.607 0.175 24)",
+          "oklch(0.721 0.175 24)",
+          "oklch(0.836 0.155 24)",
+          "oklch(0.950 0.123 24)"
+        ]
+      },
+      "binding": {
+        "role": "secondary",
+        "displayName": "Oxblood Binding",
+        "canonical": "oklch(0.33 0.085 24)",
+        "tonalRamp": [
+          "oklch(0.150 0.085 24)",
+          "oklch(0.264 0.085 24)",
+          "oklch(0.379 0.085 24)",
+          "oklch(0.493 0.085 24)",
+          "oklch(0.607 0.085 24)",
+          "oklch(0.721 0.085 24)",
+          "oklch(0.836 0.085 24)",
+          "oklch(0.950 0.085 24)"
+        ]
+      },
+      "pad": {
+        "role": "neutral",
+        "displayName": "Canary Pad",
+        "canonical": "oklch(0.958 0.072 101)",
+        "tonalRamp": [
+          "oklch(0.150 0.072 101)",
+          "oklch(0.264 0.072 101)",
+          "oklch(0.379 0.072 101)",
+          "oklch(0.493 0.072 101)",
+          "oklch(0.607 0.072 101)",
+          "oklch(0.721 0.072 101)",
+          "oklch(0.836 0.072 101)",
+          "oklch(0.950 0.072 101)"
+        ]
+      },
+      "pad-2": {
+        "role": "neutral",
+        "displayName": "Pad Under-sheet",
+        "canonical": "oklch(0.935 0.082 99)",
+        "tonalRamp": [
+          "oklch(0.150 0.082 99)",
+          "oklch(0.264 0.082 99)",
+          "oklch(0.379 0.082 99)",
+          "oklch(0.493 0.082 99)",
+          "oklch(0.607 0.082 99)",
+          "oklch(0.721 0.082 99)",
+          "oklch(0.836 0.082 99)",
+          "oklch(0.950 0.082 99)"
+        ]
+      },
+      "sheet": {
+        "role": "neutral",
+        "displayName": "Bond Sheet",
+        "canonical": "oklch(0.993 0.006 100)",
+        "tonalRamp": [
+          "oklch(0.150 0.006 100)",
+          "oklch(0.264 0.006 100)",
+          "oklch(0.379 0.006 100)",
+          "oklch(0.493 0.006 100)",
+          "oklch(0.607 0.006 100)",
+          "oklch(0.721 0.006 100)",
+          "oklch(0.836 0.006 100)",
+          "oklch(0.950 0.006 100)"
+        ]
+      },
+      "pad-rule": {
+        "role": "neutral",
+        "displayName": "Pad Rule",
+        "canonical": "oklch(0.7 0.075 236 / 0.55)",
+        "tonalRamp": [
+          "oklch(0.150 0.075 236)",
+          "oklch(0.264 0.075 236)",
+          "oklch(0.379 0.075 236)",
+          "oklch(0.493 0.075 236)",
+          "oklch(0.607 0.075 236)",
+          "oklch(0.721 0.075 236)",
+          "oklch(0.836 0.075 236)",
+          "oklch(0.950 0.075 236)"
+        ]
+      },
+      "pad-rule-strong": {
+        "role": "neutral",
+        "displayName": "Strong Pad Rule",
+        "canonical": "oklch(0.6 0.09 240 / 0.8)",
+        "tonalRamp": [
+          "oklch(0.150 0.090 240)",
+          "oklch(0.264 0.090 240)",
+          "oklch(0.379 0.090 240)",
+          "oklch(0.493 0.090 240)",
+          "oklch(0.607 0.090 240)",
+          "oklch(0.721 0.090 240)",
+          "oklch(0.836 0.090 240)",
+          "oklch(0.950 0.090 240)"
+        ]
+      },
+      "chipboard": {
+        "role": "neutral",
+        "displayName": "Chipboard",
+        "canonical": "oklch(0.79 0.03 78)",
+        "tonalRamp": [
+          "oklch(0.150 0.030 78)",
+          "oklch(0.264 0.030 78)",
+          "oklch(0.379 0.030 78)",
+          "oklch(0.493 0.030 78)",
+          "oklch(0.607 0.030 78)",
+          "oklch(0.721 0.030 78)",
+          "oklch(0.836 0.030 78)",
+          "oklch(0.950 0.030 78)"
+        ]
+      },
+      "chipboard-2": {
+        "role": "neutral",
+        "displayName": "Chipboard Edge",
+        "canonical": "oklch(0.72 0.032 76)",
+        "tonalRamp": [
+          "oklch(0.150 0.032 76)",
+          "oklch(0.264 0.032 76)",
+          "oklch(0.379 0.032 76)",
+          "oklch(0.493 0.032 76)",
+          "oklch(0.607 0.032 76)",
+          "oklch(0.721 0.032 76)",
+          "oklch(0.836 0.032 76)",
+          "oklch(0.950 0.032 76)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Navy Ink",
+        "canonical": "oklch(0.21 0.035 262)",
+        "tonalRamp": [
+          "oklch(0.150 0.035 262)",
+          "oklch(0.264 0.035 262)",
+          "oklch(0.379 0.035 262)",
+          "oklch(0.493 0.035 262)",
+          "oklch(0.607 0.035 262)",
+          "oklch(0.721 0.035 262)",
+          "oklch(0.836 0.035 262)",
+          "oklch(0.950 0.035 262)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Navy Ink 2",
+        "canonical": "oklch(0.32 0.035 260)",
+        "tonalRamp": [
+          "oklch(0.150 0.035 260)",
+          "oklch(0.264 0.035 260)",
+          "oklch(0.379 0.035 260)",
+          "oklch(0.493 0.035 260)",
+          "oklch(0.607 0.035 260)",
+          "oklch(0.721 0.035 260)",
+          "oklch(0.836 0.035 260)",
+          "oklch(0.950 0.035 260)"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "oklch(0.43 0.04 255)",
+        "tonalRamp": [
+          "oklch(0.150 0.040 255)",
+          "oklch(0.264 0.040 255)",
+          "oklch(0.379 0.040 255)",
+          "oklch(0.493 0.040 255)",
+          "oklch(0.607 0.040 255)",
+          "oklch(0.721 0.040 255)",
+          "oklch(0.836 0.040 255)",
+          "oklch(0.950 0.040 255)"
+        ]
+      },
+      "destructive": {
+        "role": "error",
+        "displayName": "Error Red",
+        "canonical": "oklch(0.520 0.180 27)",
+        "tonalRamp": [
+          "oklch(0.150 0.125 27)",
+          "oklch(0.264 0.158 27)",
+          "oklch(0.379 0.180 27)",
+          "oklch(0.493 0.180 27)",
+          "oklch(0.607 0.180 27)",
+          "oklch(0.721 0.180 27)",
+          "oklch(0.836 0.158 27)",
+          "oklch(0.950 0.125 27)"
+        ]
+      },
+      "mark-amber": {
+        "role": "status",
+        "displayName": "Pending Mark",
+        "canonical": "oklch(0.66 0.15 65)",
+        "tonalRamp": [
+          "oklch(0.150 0.114 65)",
+          "oklch(0.264 0.141 65)",
+          "oklch(0.379 0.150 65)",
+          "oklch(0.493 0.150 65)",
+          "oklch(0.607 0.150 65)",
+          "oklch(0.721 0.150 65)",
+          "oklch(0.836 0.141 65)",
+          "oklch(0.950 0.114 65)"
+        ]
+      },
+      "mark-green": {
+        "role": "status",
+        "displayName": "Done Mark",
+        "canonical": "oklch(0.55 0.13 150)",
+        "tonalRamp": [
+          "oklch(0.150 0.107 150)",
+          "oklch(0.264 0.130 150)",
+          "oklch(0.379 0.130 150)",
+          "oklch(0.493 0.130 150)",
+          "oklch(0.607 0.130 150)",
+          "oklch(0.721 0.130 150)",
+          "oklch(0.836 0.130 150)",
+          "oklch(0.950 0.107 150)"
+        ]
+      },
+      "mark-slate": {
+        "role": "status",
+        "displayName": "Quiet Mark",
+        "canonical": "oklch(0.55 0.03 250)",
+        "tonalRamp": [
+          "oklch(0.150 0.030 250)",
+          "oklch(0.264 0.030 250)",
+          "oklch(0.379 0.030 250)",
+          "oklch(0.493 0.030 250)",
+          "oklch(0.607 0.030 250)",
+          "oklch(0.721 0.030 250)",
+          "oklch(0.836 0.030 250)",
+          "oklch(0.950 0.030 250)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Firm name across the ruled hero; one per site."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Public page titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Public section heads over a 2px ink rule."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "Practice-area rows, portal sheet heading, firm wordmark at 800."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "Tagline under the firm name on the 2rem ruling."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Public prose, 64ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Quiet public line under a title; footer column heads at 700."
+      },
+      "platform-page-title": {
+        "displayName": "Platform Page Title",
+        "purpose": "Platform h1 in the page header."
+      },
+      "platform-section": {
+        "displayName": "Platform Section",
+        "purpose": "Platform record section and actions deck heads."
+      },
+      "platform-body": {
+        "displayName": "Platform Body",
+        "purpose": "Platform table cells and body."
+      },
+      "platform-label": {
+        "displayName": "Platform Label",
+        "purpose": "Platform field labels, table heads, meta."
+      },
+      "platform-figure": {
+        "displayName": "Platform Figure",
+        "purpose": "Obligation counts; zero reads muted."
+      },
+      "file-label": {
+        "displayName": "File Label",
+        "purpose": "Typed matter number."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sheet-on-pad",
+        "value": "0 8px 18px -14px oklch(0.3 0.05 80 / 0.45)",
+        "purpose": "Site cards."
+      },
+      {
+        "name": "portal-sheet",
+        "value": "0 10px 22px -16px oklch(0.3 0.05 80 / 0.5)",
+        "purpose": "Hero client-portal sheet."
+      },
+      {
+        "name": "menu-sheet",
+        "value": "0 18px 30px -18px oklch(0.25 0.04 80 / 0.45)",
+        "purpose": "Site mobile menu."
+      },
+      {
+        "name": "platform-popover",
+        "value": "Tailwind shadow-lg",
+        "purpose": "Floating row-action form over a platform table."
+      }
+    ],
+    "motion": [
+      {
+        "name": "sf-ease",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Site state transitions at 160ms (colour, border); 120ms for the 1px press. Zeroed under prefers-reduced-motion."
+      },
+      {
+        "name": "platform-transition",
+        "value": "Tailwind transition-colors (150ms)",
+        "purpose": "Platform hover and tab state."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sf-mobile",
+        "value": "40rem"
+      },
+      {
+        "name": "sf-practice-index",
+        "value": "48rem"
+      },
+      {
+        "name": "sf-split-head-footer",
+        "value": "52rem"
+      },
+      {
+        "name": "sf-desktop-nav",
+        "value": "60rem"
+      },
+      {
+        "name": "platform-sm",
+        "value": "640px"
+      },
+      {
+        "name": "platform-md",
+        "value": "768px"
+      },
+      {
+        "name": "platform-lg",
+        "value": "1024px"
+      }
+    ],
+    "scopes": {
+      "platform": ":root and .dark (--lf-*), features/platform/components/practice.css; neutrals inherited from the shared dashboard shell",
+      "site": ".storefront, features/storefront/legal-pad.css; font and text tokens from tokens.css"
+    }
+  },
+  "components": [
+    {
+      "name": "Platform Primary Button",
+      "kind": "button",
+      "refersTo": "platform-button-primary",
+      "description": "The one rust action on a platform surface.",
+      "html": "<button class=\"ds-lf-btn-primary\">Record payment</button>",
+      "css": ".ds-lf-btn-primary{display:inline-flex;align-items:center;height:32px;padding:0 12px;border:0;border-radius:4px;background:var(--lf-rust,oklch(0.47 0.135 36));color:var(--lf-on-rust,oklch(0.99 0.005 80));font:500 14px/1 Geist,ui-sans-serif,system-ui,sans-serif;cursor:pointer;transition:background-color .15s}.ds-lf-btn-primary:hover{background:var(--lf-rust-hover,oklch(0.415 0.13 36))}.ds-lf-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px oklch(0.47 0.135 36 / .4)}"
+    },
+    {
+      "name": "Platform Secondary and Destructive Buttons",
+      "kind": "button",
+      "refersTo": "platform-button-secondary",
+      "description": "Outlined secondary; destructive stays outlined and apart.",
+      "html": "<div class=\"ds-lf-row\"><button class=\"ds-lf-btn\">Export</button><span class=\"ds-lf-gap\"></span><button class=\"ds-lf-btn ds-lf-btn-danger\">Void invoice</button></div>",
+      "css": ".ds-lf-row{display:flex;align-items:center;gap:6px}.ds-lf-gap{width:24px}.ds-lf-btn{display:inline-flex;align-items:center;height:32px;padding:0 12px;border:1px solid oklch(0.92 0 0);border-radius:4px;background:#fff;color:oklch(0.145 0 0);font:500 14px/1 Geist,ui-sans-serif,system-ui,sans-serif;cursor:pointer;transition:background-color .15s}.ds-lf-btn:hover{background:oklch(0.97 0 0)}.ds-lf-btn:focus-visible{outline:none;box-shadow:0 0 0 2px oklch(0.47 0.135 36 / .4)}.ds-lf-btn-danger{border-color:oklch(0.577 0.245 27.3 / .4);color:oklch(0.577 0.245 27.3)}.ds-lf-btn-danger:hover{background:oklch(0.577 0.245 27.3 / .05)}"
+    },
+    {
+      "name": "Platform Field",
+      "kind": "input",
+      "refersTo": "platform-field",
+      "description": "Square-cornered field; focus turns rust.",
+      "html": "<label class=\"ds-lf-label\">Amount<input class=\"ds-lf-field\" value=\"1,250.00\"></label>",
+      "css": ".ds-lf-label{display:grid;gap:4px;font:500 12px/1rem Geist,ui-sans-serif,sans-serif;color:oklch(0.556 0 0)}.ds-lf-field{min-height:36px;padding:0 10px;border:1px solid oklch(0.92 0 0);border-radius:4px;background:#fff;color:oklch(0.145 0 0);font:400 14px Geist,ui-sans-serif,sans-serif;font-variant-numeric:tabular-nums slashed-zero;outline:none;transition:border-color .15s,box-shadow .15s}.ds-lf-field:focus-visible{border-color:oklch(0.47 0.135 36);box-shadow:0 0 0 2px oklch(0.47 0.135 36 / .2)}"
+    },
+    {
+      "name": "Underline Tabs",
+      "kind": "nav",
+      "description": "Section index and actions deck: the current tab carries the rust rule.",
+      "html": "<nav class=\"ds-lf-tabs\"><a href=\"#\" class=\"is-current\">Deadlines <span>3</span></a><a href=\"#\">Conflicts <span>0</span></a><a href=\"#\">Unbilled <span>12</span></a></nav>",
+      "css": ".ds-lf-tabs{display:flex;gap:20px;border-bottom:1px solid oklch(0.92 0 0);font:400 14px Geist,ui-sans-serif,sans-serif}.ds-lf-tabs a{display:flex;align-items:center;gap:6px;height:40px;margin-bottom:-1px;border-bottom:2px solid transparent;color:oklch(0.556 0 0);text-decoration:none;transition:color .15s,border-color .15s}.ds-lf-tabs a:hover{color:oklch(0.145 0 0);border-bottom-color:oklch(0.92 0 0)}.ds-lf-tabs a:focus-visible{outline:none;text-decoration:underline;color:oklch(0.145 0 0)}.ds-lf-tabs a.is-current{border-bottom-color:oklch(0.47 0.135 36);color:oklch(0.145 0 0);font-weight:500}.ds-lf-tabs span{font-size:12px;color:oklch(0.556 0 0);font-variant-numeric:tabular-nums slashed-zero}"
+    },
+    {
+      "name": "Ledger Table with File Label",
+      "kind": "custom",
+      "refersTo": "platform-table-head",
+      "description": "Record / Type / Status / Date / Action with a manila head; matter number as a typed file label.",
+      "html": "<table class=\"ds-lf-table\"><thead><tr><th>Record</th><th>Status</th><th>Date</th></tr></thead><tbody><tr><td><a href=\"#\">Answer due</a><div class=\"ds-lf-meta\"><span class=\"ds-lf-file\">2026-001</span>Jordan Lee</div></td><td><span class=\"ds-lf-status\"><i></i>Overdue</span></td><td class=\"ds-lf-num\">Oct 30, 2026</td></tr></tbody></table>",
+      "css": ".ds-lf-table{width:100%;border-collapse:collapse;border:1px solid oklch(0.92 0 0);font:400 14px Geist,ui-sans-serif,sans-serif}.ds-lf-table th{background:oklch(0.968 0.026 86);text-align:left;padding:8px 12px;font-size:12px;font-weight:500;color:oklch(0.556 0 0);border-bottom:1px solid oklch(0.92 0 0)}.ds-lf-table td{padding:10px 12px;vertical-align:middle}.ds-lf-table tr:hover td{background:oklch(0.97 0 0 / .4)}.ds-lf-table a{color:oklch(0.145 0 0);font-weight:500;text-decoration:none}.ds-lf-table a:hover{color:oklch(0.46 0.135 36);text-decoration:underline;text-underline-offset:4px}.ds-lf-table a:focus-visible{outline:none;box-shadow:0 0 0 2px oklch(0.47 0.135 36 / .4)}.ds-lf-meta{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:12px;color:oklch(0.556 0 0)}.ds-lf-file{display:inline-flex;align-items:center;height:20px;padding:0 6px;border:1px solid oklch(0.86 0.05 78);border-radius:2px;background:oklch(0.968 0.026 86);color:oklch(0.145 0 0);font-size:11px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums slashed-zero}.ds-lf-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500}.ds-lf-status i{width:8px;height:8px;border-radius:1px;background:#e11d48}.ds-lf-num{font-size:12px;color:oklch(0.556 0 0);font-variant-numeric:tabular-nums slashed-zero;white-space:nowrap}"
+    },
+    {
+      "name": "Site Primary and Raised Buttons",
+      "kind": "button",
+      "refersTo": "site-button-primary",
+      "description": "Square buttons: the firm pen for the one action, a raised bond sheet beside it.",
+      "html": "<div class=\"ds-sf-track\"><a href=\"#\" class=\"ds-sf-btn ds-sf-primary\">Request a consultation</a><a href=\"#\" class=\"ds-sf-btn ds-sf-raised\">Your appointments</a></div>",
+      "css": ".ds-sf-track{display:flex;flex-wrap:wrap;gap:8px;padding:16px;background:oklch(0.958 0.072 101)}.ds-sf-btn{display:inline-flex;align-items:center;min-height:44px;padding:0 1.1rem;border:1px solid transparent;border-radius:2px;font:600 14px/1 \"Libre Franklin\",ui-sans-serif,sans-serif;text-decoration:none;transition:background-color 160ms cubic-bezier(.23,1,.32,1),color 160ms,border-color 160ms,transform 120ms}.ds-sf-btn:active{transform:translateY(1px)}.ds-sf-btn:focus-visible{outline:2px solid oklch(0.540 0.140 32);outline-offset:2px}.ds-sf-primary{background:oklch(0.460 0.100 30);border-color:oklch(0.460 0.100 30);color:oklch(0.993 0.006 100)}.ds-sf-primary:hover{background:color-mix(in oklab,oklch(0.460 0.100 30) 86%,black)}.ds-sf-raised{background:oklch(0.993 0.006 100);border-color:oklch(0.21 0.035 262);color:oklch(0.21 0.035 262)}.ds-sf-raised:hover{border-color:oklch(0.460 0.100 30);color:oklch(0.460 0.100 30)}"
+    },
+    {
+      "name": "Site Field",
+      "kind": "input",
+      "refersTo": "site-field",
+      "description": "A white slip on the pad with an ink underline.",
+      "html": "<div class=\"ds-sf-pad\"><label class=\"ds-sf-label\">Email<input class=\"ds-sf-field\" placeholder=\"you@example.com\"></label></div>",
+      "css": ".ds-sf-pad{padding:16px;background:oklch(0.958 0.072 101)}.ds-sf-label{display:grid;gap:.4rem;font:600 14px \"Libre Franklin\",ui-sans-serif,sans-serif;color:oklch(0.21 0.035 262)}.ds-sf-field{min-height:46px;padding:0 14px;border:1px solid oklch(0.6 0.09 240 / .8);border-bottom:2px solid oklch(0.32 0.035 260);border-radius:2px;background:oklch(0.993 0.006 100);color:oklch(0.21 0.035 262);font:400 16px/1.4 \"Libre Franklin\",ui-sans-serif,sans-serif;caret-color:oklch(0.460 0.100 30);transition:border-color 160ms,box-shadow 160ms}.ds-sf-field:hover{border-color:oklch(0.43 0.04 255)}.ds-sf-field:focus-visible{outline:none;border-color:oklch(0.540 0.140 32);box-shadow:0 0 0 3px color-mix(in oklab,oklch(0.540 0.140 32) 22%,transparent)}"
+    },
+    {
+      "name": "Site Header",
+      "kind": "nav",
+      "description": "Oxblood binding strip, firm wordmark, plain text links; the current page underlined in pen.",
+      "html": "<header class=\"ds-sf-head\"><a class=\"ds-sf-firm\" href=\"#\">Harbor &amp; Pine</a><nav><a href=\"#\" aria-current=\"page\">Practice areas</a><a href=\"#\">Attorneys</a><a href=\"#\">Contact</a></nav></header>",
+      "css": ".ds-sf-head{display:flex;align-items:center;gap:2rem;padding:0 1.5rem;background:oklch(0.958 0.072 101);border-top:.5rem solid oklch(0.33 0.085 24);border-bottom:1px solid oklch(0.6 0.09 240 / .8);font-family:\"Libre Franklin\",ui-sans-serif,sans-serif}.ds-sf-firm{font-size:1.25rem;font-weight:800;letter-spacing:-.025em;color:oklch(0.21 0.035 262);text-decoration:none}.ds-sf-head nav{display:flex;gap:1.5rem}.ds-sf-head nav a{display:flex;align-items:center;min-height:4rem;border-bottom:2px solid transparent;color:oklch(0.32 0.035 260);font-size:14px;font-weight:500;text-decoration:none}.ds-sf-head nav a:hover{color:oklch(0.21 0.035 262);border-bottom-color:oklch(0.6 0.09 240 / .8)}.ds-sf-head nav a:focus-visible{outline:2px solid oklch(0.540 0.140 32);outline-offset:2px}.ds-sf-head nav a[aria-current=page]{color:oklch(0.21 0.035 262);border-bottom-color:oklch(0.460 0.100 30)}"
+    },
+    {
+      "name": "Ruled Hero with Margin Line",
+      "kind": "custom",
+      "description": "The top sheet: 2rem blue ruling, red double margin, firm name in Franklin 800, ruled facts.",
+      "html": "<section class=\"ds-sf-hero\"><h1>Harbor &amp; Pine</h1><dl><div><dt>Consultations</dt><dd>Online requests open</dd></div><div><dt>Email</dt><dd><a href=\"#\">office@example.com</a></dd></div></dl></section>",
+      "css": ".ds-sf-hero{position:relative;padding:2.5rem 1.5rem 2rem 2.75rem;background-color:oklch(0.958 0.072 101);background-image:repeating-linear-gradient(to bottom,transparent 0 calc(2rem - 1px),oklch(0.7 0.075 236 / .55) calc(2rem - 1px) 2rem);color:oklch(0.21 0.035 262);font-family:\"Libre Franklin\",ui-sans-serif,sans-serif}.ds-sf-hero::before{content:\"\";position:absolute;top:0;bottom:0;left:1.25rem;width:4px;border-inline:1px solid oklch(0.58 0.175 24);opacity:.85}.ds-sf-hero h1{margin:0 0 1.75rem;font-size:clamp(2.75rem,7.2vw + .5rem,6.25rem);font-weight:800;line-height:.95;letter-spacing:-.04em}.ds-sf-hero dl{margin:0;max-width:34rem}.ds-sf-hero dl div{display:grid;grid-template-columns:7.5rem 1fr;gap:1rem;min-height:2rem;align-items:baseline}.ds-sf-hero dt{font-size:14px;color:oklch(0.43 0.04 255)}.ds-sf-hero dd{margin:0;font-weight:600}.ds-sf-hero a{color:oklch(0.460 0.100 30);text-decoration:underline;text-decoration-color:color-mix(in oklab,oklch(0.460 0.100 30) 40%,transparent);text-underline-offset:.22em}.ds-sf-hero a:hover{text-decoration-color:oklch(0.460 0.100 30);text-decoration-thickness:2px}.ds-sf-hero a:focus-visible{outline:2px solid oklch(0.540 0.140 32);outline-offset:2px}"
+    },
+    {
+      "name": "Site Sheet Card",
+      "kind": "card",
+      "refersTo": "site-card",
+      "description": "A bond sheet resting on the pad.",
+      "html": "<div class=\"ds-sf-pad2\"><article class=\"ds-sf-card\"><h3>Client portal</h3><p>Documents, invoices and messages your attorney has shared with you.</p></article></div>",
+      "css": ".ds-sf-pad2{padding:20px;background:oklch(0.958 0.072 101)}.ds-sf-card{padding:clamp(1.25rem,2.5vw,1.75rem);border:1px solid oklch(0.6 0.09 240 / .8);border-radius:2px;background:oklch(0.993 0.006 100);box-shadow:0 8px 18px -14px oklch(0.3 0.05 80 / .45);color:oklch(0.21 0.035 262);font-family:\"Libre Franklin\",ui-sans-serif,sans-serif}.ds-sf-card h3{margin:0 0 .5rem;font-size:1.25rem;font-weight:700;letter-spacing:-.015em}.ds-sf-card p{margin:0;font-size:14px;line-height:1.5rem;color:oklch(0.43 0.04 255)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Attorney's Desk",
+    "overview": "One firm, two objects on the same desk. Staff work in the **Redweld file room** (the platform pages under the shared Openfront dashboard shell): the expanding file jacket's rust is reserved for the one action and the one selection that matter now, manila marks table heads and typed matter labels, and everything else is ink on the shell's white. The public meets the **top sheet of the yellow legal pad**: a canary ground with pale blue rules, the red double margin line down the content's left edge, an oxblood binding strip glued at the head and a chipboard back as the footer, with the firm's name written large in Franklin Gothic.\n\nBoth worlds hold the same discipline. Hierarchy comes from heading scale and rules, not from boxes. Figures, dates and matter numbers are read in aligned columns. Corners stay square or nearly so. Each world has exactly one pen colour for action, and it is never spent on decoration. The shared dashboard shell (sidebar, header, breadcrumbs, its neutral tokens and its Geist face) belongs to Openfront, not to this system; the platform world sits inside it and borrows its neutrals.",
+    "keyCharacteristics": [
+      "Two scoped worlds: platform tokens are `--lf-*` on `:root`/`.dark`; public tokens live only inside `.storefront`.",
+      "One action colour per world: rust on the platform, the firm's pen accent on the site.",
+      "Ledger tables, ruled facts lists and underline tabs instead of card stacks and pill tracks.",
+      "Square status marks (1px corners) carry one fixed status vocabulary.",
+      "Tabular, slashed-zero figures on every count, amount, date and matter number in the platform."
+    ],
+    "rules": [
+      {
+        "name": "The One Rust Rule",
+        "body": "On the platform, rust appears on the primary action and the current selection only. A surface has at most one rust-filled button; everything else is outlined or quiet text.",
+        "section": "colors"
+      },
+      {
+        "name": "The Firm's Pen Rule",
+        "body": "On the site, the accent is the firm's pen: actions, links, current location, checked choices. Never a background wash, a heading colour or an ornament.",
+        "section": "colors"
+      },
+      {
+        "name": "The Margin Is Not An Action Rule",
+        "body": "Margin red and oxblood are the pad's physical parts. They mark notices, risk and the binding; they never colour a button or a link.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight Carries It Rule",
+        "body": "The site uses one family. Hierarchy is weight (800/750/700 against 400 to 600) and size, with negative tracking on display sizes; never a second display face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Slashed Zero Rule",
+        "body": "Every count, amount, date, range and matter number on the platform carries `tabular-nums slashed-zero`. A figure without it is a defect.",
+        "section": "typography"
+      },
+      {
+        "name": "The Range In View Rule",
+        "body": "A paged platform table states its range (\"1–25 of 140\") beside its pager in tabular figures.",
+        "section": "layout"
+      },
+      {
+        "name": "The Records First Rule",
+        "body": "Platform pages open on records that carry an obligation; forms sit behind the actions deck, never as a wall above the tables.",
+        "section": "layout"
+      },
+      {
+        "name": "The Line Weight Rule",
+        "body": "State is carried by line weight: a 2px ink rule over a section, 1px blue rules between rows, a 2px ink underline under a field. Add a rule before adding a box.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep platform tokens on `--lf-*` and public tokens inside `.storefront`; the shared shell keeps its own.",
+      "**Do** give each platform surface at most one rust-filled button, and put rust on the current tab underline.",
+      "**Do** set every platform figure with `tabular-nums slashed-zero` and type matter numbers as file labels.",
+      "**Do** head every site section with a 2px ink rule and separate rows with 1px strong-blue rules.",
+      "**Do** write site hierarchy in Libre Franklin weight: 800 for the firm name and page titles, 400 to 600 for text.",
+      "**Do** keep corners at 2px on the site and 1 to 6px on the platform.",
+      "**Do** keep the red double margin line, the oxblood binding strip and the chipboard footer; they are the pad."
+    ],
+    "donts": [
+      "**Don't** describe or restyle the shared dashboard shell (sidebar, header, breadcrumbs) as part of this system.",
+      "**Don't** stack forms above records on a platform page; put commands in the actions deck.",
+      "**Don't** use pill-shaped buttons, pill segmented tracks or rounded-xl cards in either world.",
+      "**Don't** spend rust or the firm's pen on backgrounds, headings or decoration.",
+      "**Don't** put a box inside a box; a platform empty state is one quiet line.",
+      "**Don't** introduce a second display face or a serif on the public site.",
+      "**Don't** colour actions with margin red or oxblood."
+    ]
+  }
+}

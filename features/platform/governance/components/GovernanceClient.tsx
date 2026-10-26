@@ -52,7 +52,7 @@ function NewPolicyForm({ practiceAreas, onDone }: { practiceAreas: GovernanceSet
   return (
     <form {...runForm} className="min-w-0 rounded-[6px] border border-border">
       <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-        <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">New retention policy</legend>
+        <legend className="mb-1 text-xs font-semibold text-muted-foreground sm:col-span-2">New retention policy</legend>
         <label className={labelClass}>Name<input name="name" required minLength={2} maxLength={200} autoComplete="off" className={fieldClass} /></label>
         <label className={labelClass}>Code<input name="code" required maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" autoComplete="off" className={cn(fieldClass, 'font-mono')} /></label>
         <div className={labelClass}>

@@ -70,7 +70,7 @@ export function BillingPaymentForm({ setup }: { setup: PaymentSetup }) {
       <div className="grid min-w-0 lg:grid-cols-2 lg:divide-x lg:divide-border">
         <form key={record.formKey} {...record.form} className="min-w-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-            <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Client payment</legend>
+            <legend className="mb-1 text-xs font-semibold text-muted-foreground sm:col-span-2">Client payment</legend>
             <div className={cn(labelClass, 'sm:col-span-2')}>
               <label htmlFor="payment-invoice">Invoice</label>
               <FormSelect id="payment-invoice" name="invoiceId" required value={invoiceId} onValueChange={setInvoiceId} className={cn(fieldClass, 'text-foreground')}>
@@ -114,7 +114,7 @@ export function BillingPaymentForm({ setup }: { setup: PaymentSetup }) {
 
         <form key={apply.formKey} {...apply.form} className="min-w-0 border-t border-border lg:border-t-0">
           <fieldset className="grid min-w-0 gap-4 p-4 sm:grid-cols-2">
-            <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-2">Apply unallocated payment</legend>
+            <legend className="mb-1 text-xs font-semibold text-muted-foreground sm:col-span-2">Apply unallocated payment</legend>
             <div className={cn(labelClass, 'sm:col-span-2')}>
               <label htmlFor="allocation-payment">Payment</label>
               <FormSelect id="allocation-payment" name="paymentId" required defaultValue="" className={cn(fieldClass, 'text-foreground')}>
