@@ -68,6 +68,18 @@ function currency(value: string) {
   return normalized;
 }
 
+// Operating and trust (IOLTA) card acceptance use separate Stripe accounts; each reads its own secret env var.
+export function defaultPaymentProviders(firmId: string) {
+  const functions = {
+    createPaymentFunction: "stripe", capturePaymentFunction: "stripe", refundPaymentFunction: "stripe",
+    getPaymentStatusFunction: "stripe", generatePaymentLinkFunction: "stripe", handleWebhookFunction: "stripe",
+  };
+  return [
+    { firmId, name: "Stripe (operating account)", code: "pp_stripe_operating", account: "operating", isInstalled: true, credentials: { secretKeyEnv: "STRIPE_SECRET_KEY" }, ...functions },
+    { firmId, name: "Stripe (trust / IOLTA account)", code: "pp_stripe_trust", account: "trust", isInstalled: true, credentials: { secretKeyEnv: "STRIPE_TRUST_SECRET_KEY" }, ...functions },
+  ];
+}
+
 export async function completeFirmOnboarding(
   _root: unknown,
   args: {
@@ -245,6 +257,7 @@ export async function completeFirmOnboarding(
         },
       }),
       tx.firm.update({ where: { id: firm.id }, data: { status: "active" } }),
+      tx.paymentProvider.createMany({ data: defaultPaymentProviders(firm.id) }),
     ]);
     await recordAuditEvent(tx, {
       firmId: firm.id,

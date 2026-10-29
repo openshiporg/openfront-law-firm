@@ -106,6 +106,7 @@ export const practiceNavGroups: PracticeNavGroup[] = [
       { title: 'People & access', href: '/dashboard/platform/team', description: 'Staff invitations, memberships, firm roles, and office scope.', icon: UsersRound },
       { title: 'Import & export', href: '/dashboard/platform/data', description: 'Staged migrations, validation, and data portability.', icon: ArrowLeftRight },
       { title: 'Integrations', href: '/dashboard/platform/integrations', description: 'Provider connections, webhooks, OAuth, and API keys.', icon: PlugZap },
+      { title: 'Payment providers', href: '/dashboard/platform/payment-providers', description: 'Operating and trust (IOLTA) card acceptance accounts.', icon: PlugZap },
     ],
   },
   {
