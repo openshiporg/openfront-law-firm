@@ -28,7 +28,7 @@ function load(relative, mocks) {
 
 // Fake database holding one payment; the tx exposes only what reconcile touches.
 function fixture({ paymentType = 'operating', status = 'pending', providerAmount = 5000, providerCurrency = 'USD' } = {}) {
-  const state = { payment: { id: 'pay1', firmId: 'f1', payerId: 'c1', paymentType, status, amountMinor: 5000, currencyCode: 'USD', providerPaymentId: 'cs_test_1', paymentNumber: 'PAY-1', invoiceId: 'inv1', trustLedgerAccountId: 'led1', trustAccountId: 'ta1', paymentProvider: { id: 'pp1' } }, allocations: 0, postings: 0 };
+  const state = { payment: { id: 'pay1', firmId: 'f1', payerId: 'c1', paymentType, status, amountMinor: 5000, currencyCode: 'USD', providerPaymentId: 'cs_test_1', idempotencyKey: 'retainer:ret1:5000', paymentNumber: 'PAY-1', invoiceId: 'inv1', trustAccountId: 'ta1', paymentProvider: { id: 'pp1' } }, allocations: 0, postings: 0 };
   const tx = {
     $executeRaw: async () => 0,
     payment: {
@@ -36,6 +36,7 @@ function fixture({ paymentType = 'operating', status = 'pending', providerAmount
       update: async ({ data }) => { Object.assign(state.payment, data); return state.payment; },
     },
     invoice: { findFirst: async () => ({ id: 'inv1', matterId: 'm1', balanceDueMinor: 5000 }) },
+    retainerAgreement: { findFirst: async () => ({ id: 'ret1', trustLedgerAccountId: 'led1' }) },
     trustLedgerAccount: { findFirst: async () => ({ id: 'led1', trustAccountId: 'ta1', trustAccount: { id: 'ta1' } }) },
   };
   const prisma = { payment: tx.payment };

@@ -41,7 +41,7 @@ export async function startPortalPayment(_root: unknown, args: { kind: "invoice"
   if (!provider) throw new Error("The firm's selected payment account is not configured.");
   const key = `${args.kind}:${args.id}:${setup.amount}`;
   let payment = await prisma.payment.findFirst({ where: { firmId: identity.firmId, idempotencyKey: key } });
-  if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustLedgerAccountId: (setup as any).retainer.trustLedgerAccountId, trustAccountId: (setup as any).retainer.trustLedgerAccount?.trustAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
+  if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustAccountId: (setup as any).retainer.trustLedgerAccount?.trustAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
   const resource = args.kind === "invoice" ? { id: args.id, number: (setup as any).invoice.invoiceNumber, title: `Invoice ${(setup as any).invoice.invoiceNumber}`, email: (setup as any).invoice.client?.primaryEmail } : { id: args.id, number: (setup as any).retainer.agreementNumber, title: `Retainer ${(setup as any).retainer.agreementNumber}`, email: (setup as any).retainer.client?.primaryEmail };
   const result = await createPayment({ provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: identity.firmId, idempotencyKey: key, successUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, cancelUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, ...(args.kind === "invoice" ? { invoice: resource } : { retainer: resource }) });
   if (!result?.checkoutUrl) throw new Error("Payment provider did not return a checkout URL.");
@@ -77,7 +77,11 @@ export async function reconcilePaymentByProviderId(prisma: any, paymentId: strin
       await applyInvoiceAllocation(tx, { firmId: current.firmId, paymentId: current.id, invoiceId: invoice.id, amountMinor: Math.min(current.amountMinor, invoice.balanceDueMinor), idempotencyKey: `provider-settlement:${current.id}`, actorUserId: null, note: "Online payment settlement" });
     }
     if (current.paymentType === "trust_deposit") {
-      const ledger = await tx.trustLedgerAccount.findFirst({ where: { id: current.trustLedgerAccountId, firmId: current.firmId, status: "active" }, include: { trustAccount: true } });
+      // The deposit's retainer id is carried in the payment idempotency key (`retainer:<id>:<amount>`).
+      const retainerId = /^retainer:([^:]+):/.exec(current.idempotencyKey ?? "")?.[1];
+      const retainer = retainerId ? await tx.retainerAgreement.findFirst({ where: { id: retainerId, firmId: current.firmId, clientId: current.payerId } }) : null;
+      if (!retainer?.trustLedgerAccountId) throw new Error("Trust deposit retainer ledger was not found.");
+      const ledger = await tx.trustLedgerAccount.findFirst({ where: { id: retainer.trustLedgerAccountId, firmId: current.firmId, status: "active" }, include: { trustAccount: true } });
       if (!ledger || !ledger.trustAccount) throw new Error("Active trust ledger is required for the deposit.");
       if (current.trustAccountId !== ledger.trustAccountId) throw new Error("Payment trust account does not match the trust ledger.");
       await applyTrustPosting(tx, current.firmId, null, {
