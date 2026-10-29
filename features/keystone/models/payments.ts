@@ -92,6 +92,7 @@ export const Payment = list({
     refundedMinor: integer({ defaultValue: 0, validation: { min: 0 } }),
     currencyCode: text({ defaultValue: "USD", validation: { isRequired: true, ...currencyValidation } }),
     providerCode: text(),
+    paymentProvider: relationship({ ref: "PaymentProvider" }),
     integrationConnection: relationship({ ref: "IntegrationConnection" }),
     providerPaymentId: text({ isIndexed: true }),
     authorizedAt: timestamp(),

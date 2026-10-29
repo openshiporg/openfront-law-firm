@@ -46,6 +46,7 @@ import {
   TrustReconciliation,
 } from "./trust";
 import { Payment, PaymentAllocation, Refund } from "./payments";
+import { PaymentProvider } from "./PaymentProvider";
 import { PortalAccount, PortalMatterAccess, PortalShare, PortalSession } from "./portal";
 import { PortalDiscoveryPolicy, PortalGrantIntent } from "./portalPolicy";
 import {
@@ -121,6 +122,7 @@ const modelDefinitions = {
   TrustBalanceSnapshot,
   TrustReconciliation,
   Payment,
+  PaymentProvider,
   PaymentAllocation,
   Refund,
   PortalAccount,
