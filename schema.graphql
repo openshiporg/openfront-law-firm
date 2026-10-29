@@ -6280,6 +6280,7 @@ type Payment {
   refundedMinor: Int
   currencyCode: String
   providerCode: String
+  paymentProvider: PaymentProvider
   integrationConnection: IntegrationConnection
   providerPaymentId: String
   authorizedAt: DateTime
@@ -6335,6 +6336,7 @@ input PaymentWhereInput {
   refundedMinor: IntNullableFilter
   currencyCode: StringFilter
   providerCode: StringFilter
+  paymentProvider: PaymentProviderWhereInput
   integrationConnection: IntegrationConnectionWhereInput
   providerPaymentId: StringFilter
   authorizedAt: DateTimeNullableFilter
@@ -6382,6 +6384,118 @@ input PaymentOrderByInput {
   failureReason: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
+}
+
+type PaymentProvider {
+  id: ID!
+  firm: Firm
+  name: String
+  code: String
+  account: PaymentProviderAccountType
+  isInstalled: Boolean
+  credentials: JSON
+  metadata: JSON
+  createPaymentFunction: String
+  capturePaymentFunction: String
+  refundPaymentFunction: String
+  getPaymentStatusFunction: String
+  generatePaymentLinkFunction: String
+  handleWebhookFunction: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+enum PaymentProviderAccountType {
+  operating
+  trust
+}
+
+input PaymentProviderWhereUniqueInput {
+  id: ID
+}
+
+input PaymentProviderWhereInput {
+  AND: [PaymentProviderWhereInput!]
+  OR: [PaymentProviderWhereInput!]
+  NOT: [PaymentProviderWhereInput!]
+  id: IDFilter
+  firm: FirmWhereInput
+  name: StringFilter
+  code: StringFilter
+  account: PaymentProviderAccountTypeNullableFilter
+  isInstalled: BooleanFilter
+  createPaymentFunction: StringFilter
+  capturePaymentFunction: StringFilter
+  refundPaymentFunction: StringFilter
+  getPaymentStatusFunction: StringFilter
+  generatePaymentLinkFunction: StringFilter
+  handleWebhookFunction: StringFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input PaymentProviderAccountTypeNullableFilter {
+  equals: PaymentProviderAccountType
+  in: [PaymentProviderAccountType!]
+  notIn: [PaymentProviderAccountType!]
+  not: PaymentProviderAccountTypeNullableFilter
+}
+
+input PaymentProviderOrderByInput {
+  id: OrderDirection
+  name: OrderDirection
+  code: OrderDirection
+  account: OrderDirection
+  isInstalled: OrderDirection
+  createPaymentFunction: OrderDirection
+  capturePaymentFunction: OrderDirection
+  refundPaymentFunction: OrderDirection
+  getPaymentStatusFunction: OrderDirection
+  generatePaymentLinkFunction: OrderDirection
+  handleWebhookFunction: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input PaymentProviderUpdateInput {
+  firm: FirmRelateToOneForUpdateInput
+  name: String
+  code: String
+  account: PaymentProviderAccountType
+  isInstalled: Boolean
+  credentials: JSON
+  metadata: JSON
+  createPaymentFunction: String
+  capturePaymentFunction: String
+  refundPaymentFunction: String
+  getPaymentStatusFunction: String
+  generatePaymentLinkFunction: String
+  handleWebhookFunction: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input PaymentProviderUpdateArgs {
+  where: PaymentProviderWhereUniqueInput!
+  data: PaymentProviderUpdateInput!
+}
+
+input PaymentProviderCreateInput {
+  firm: FirmRelateToOneForCreateInput
+  name: String
+  code: String
+  account: PaymentProviderAccountType
+  isInstalled: Boolean
+  credentials: JSON
+  metadata: JSON
+  createPaymentFunction: String
+  capturePaymentFunction: String
+  refundPaymentFunction: String
+  getPaymentStatusFunction: String
+  generatePaymentLinkFunction: String
+  handleWebhookFunction: String
+  createdAt: DateTime
+  updatedAt: DateTime
 }
 
 type PaymentAllocation {
@@ -8896,6 +9010,12 @@ type Mutation {
   deleteTrustLedgerAccounts(where: [TrustLedgerAccountWhereUniqueInput!]!): [TrustLedgerAccount]
   updateTrustReconciliation(where: TrustReconciliationWhereUniqueInput!, data: TrustReconciliationUpdateInput!): TrustReconciliation
   updateTrustReconciliations(data: [TrustReconciliationUpdateArgs!]!): [TrustReconciliation]
+  createPaymentProvider(data: PaymentProviderCreateInput!): PaymentProvider
+  createPaymentProviders(data: [PaymentProviderCreateInput!]!): [PaymentProvider]
+  updatePaymentProvider(where: PaymentProviderWhereUniqueInput!, data: PaymentProviderUpdateInput!): PaymentProvider
+  updatePaymentProviders(data: [PaymentProviderUpdateArgs!]!): [PaymentProvider]
+  deletePaymentProvider(where: PaymentProviderWhereUniqueInput!): PaymentProvider
+  deletePaymentProviders(where: [PaymentProviderWhereUniqueInput!]!): [PaymentProvider]
   createIntegrationConnection(data: IntegrationConnectionCreateInput!): IntegrationConnection
   createIntegrationConnections(data: [IntegrationConnectionCreateInput!]!): [IntegrationConnection]
   updateIntegrationConnection(where: IntegrationConnectionWhereUniqueInput!, data: IntegrationConnectionUpdateInput!): IntegrationConnection
@@ -8984,6 +9104,8 @@ type Mutation {
   assembleDraftInvoice(idempotencyKey: String!, invoiceNumber: String!, matterId: ID!, clientId: ID!, timeEntryIds: [ID!], expenseIds: [ID!], retainerId: ID): DraftInvoiceAssemblyResult!
   transitionInvoice(invoiceId: ID!, toStatus: InvoiceCommandTarget!, reason: String, dueAt: DateTime): InvoiceTransitionResult!
   transitionPayment(paymentId: ID!, toStatus: String!, eventId: String!, providerPaymentId: String, failureReason: String): PaymentTransitionResult!
+  startPortalPayment(kind: String!, id: ID!, token: String!): PortalPaymentStartResult!
+  reconcilePortalPayment(paymentId: ID!, token: String!): PortalPaymentReconcileResult!
   recordManualPayment(idempotencyKey: String!, payerId: ID!, invoiceId: ID, amountMinor: Int!, currencyCode: String!, method: String!, receivedAt: DateTime!, reference: String): PaymentTransitionResult!
   allocatePayment(paymentId: ID!, invoiceId: ID!, amountMinor: Int!, idempotencyKey: String!, note: String): PaymentAllocationResult!
   reversePaymentAllocation(allocationId: ID!, idempotencyKey: String!, reason: String!): PaymentAllocationResult!
@@ -9234,6 +9356,9 @@ type Query {
   payment(where: PaymentWhereUniqueInput!): Payment
   payments(where: PaymentWhereInput! = {}, orderBy: [PaymentOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: PaymentWhereUniqueInput): [Payment!]
   paymentsCount(where: PaymentWhereInput! = {}): Int
+  paymentProvider(where: PaymentProviderWhereUniqueInput!): PaymentProvider
+  paymentProviders(where: PaymentProviderWhereInput! = {}, orderBy: [PaymentProviderOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: PaymentProviderWhereUniqueInput): [PaymentProvider!]
+  paymentProvidersCount(where: PaymentProviderWhereInput! = {}): Int
   paymentAllocation(where: PaymentAllocationWhereUniqueInput!): PaymentAllocation
   paymentAllocations(where: PaymentAllocationWhereInput! = {}, orderBy: [PaymentAllocationOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: PaymentAllocationWhereUniqueInput): [PaymentAllocation!]
   paymentAllocationsCount(where: PaymentAllocationWhereInput! = {}): Int
@@ -9808,6 +9933,17 @@ type DraftInvoiceAssemblyResult {
 type InvoiceTransitionResult {
   invoice: InvoiceProjection!
   replayed: Boolean!
+}
+
+type PortalPaymentStartResult {
+  url: String!
+  paymentId: ID!
+}
+
+type PortalPaymentReconcileResult {
+  status: String!
+  paymentId: ID!
+  replayed: Boolean
 }
 
 type PaymentTransitionResult {

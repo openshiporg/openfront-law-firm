@@ -227,6 +227,7 @@ model Firm {
   from_TrustBalanceSnapshot_firm     TrustBalanceSnapshot[]     @relation("TrustBalanceSnapshot_firm")
   from_TrustReconciliation_firm      TrustReconciliation[]      @relation("TrustReconciliation_firm")
   from_Payment_firm                  Payment[]                  @relation("Payment_firm")
+  from_PaymentProvider_firm          PaymentProvider[]          @relation("PaymentProvider_firm")
   from_PaymentAllocation_firm        PaymentAllocation[]        @relation("PaymentAllocation_firm")
   from_Refund_firm                   Refund[]                   @relation("Refund_firm")
   from_PortalAccount_firm            PortalAccount[]            @relation("PortalAccount_firm")
@@ -1954,6 +1955,8 @@ model Payment {
   refundedMinor                   Int?                   @default(0)
   currencyCode                    String                 @default("USD")
   providerCode                    String                 @default("")
+  paymentProvider                 PaymentProvider?       @relation("Payment_paymentProvider", fields: [paymentProviderId], references: [id])
+  paymentProviderId               String?                @map("paymentProvider")
   integrationConnection           IntegrationConnection? @relation("Payment_integrationConnection", fields: [integrationConnectionId], references: [id])
   integrationConnectionId         String?                @map("integrationConnection")
   providerPaymentId               String                 @default("")
@@ -1982,9 +1985,35 @@ model Payment {
   @@index([payerId])
   @@index([paymentNumber])
   @@index([idempotencyKey])
+  @@index([paymentProviderId])
   @@index([integrationConnectionId])
   @@index([providerPaymentId])
   @@index([receivedById])
+}
+
+model PaymentProvider {
+  id                           String                     @id @default(cuid())
+  firm                         Firm                       @relation("PaymentProvider_firm", fields: [firmId], references: [id])
+  firmId                       String                     @map("firm")
+  name                         String                     @default("")
+  code                         String                     @default("")
+  account                      PaymentProviderAccountType
+  isInstalled                  Boolean                    @default(false)
+  credentials                  Json?                      @default("{}")
+  metadata                     Json?                      @default("{}")
+  createPaymentFunction        String                     @default("")
+  capturePaymentFunction       String                     @default("")
+  refundPaymentFunction        String                     @default("")
+  getPaymentStatusFunction     String                     @default("")
+  generatePaymentLinkFunction  String                     @default("")
+  handleWebhookFunction        String                     @default("")
+  createdAt                    DateTime                   @default(now())
+  updatedAt                    DateTime                   @default(now()) @updatedAt
+  from_Payment_paymentProvider Payment[]                  @relation("Payment_paymentProvider")
+
+  @@unique([firmId, code])
+  @@index([firmId])
+  @@index([code])
 }
 
 model PaymentAllocation {
@@ -3441,6 +3470,11 @@ enum PaymentStatusType {
   settled
   failed
   cancelled
+}
+
+enum PaymentProviderAccountType {
+  operating
+  trust
 }
 
 enum PaymentAllocationAllocationTypeType {
