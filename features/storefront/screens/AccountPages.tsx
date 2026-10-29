@@ -12,7 +12,7 @@ import { customerSignOut } from '../actions/customer-account'
 import { formatMinorUnits } from '@/features/platform/lib/money'
 
 /** Centered account card shared by sign in, create account and password reset. */
-function AuthShell({ title, label = 'Your appointments', tabs, children, foot }: { title: string; label?: string; tabs?: ReactNode; children: ReactNode; foot?: ReactNode }) {
+function AuthShell({ title, label = 'Consultation requests and appointments', tabs, children, foot }: { title: string; label?: string; tabs?: ReactNode; children: ReactNode; foot?: ReactNode }) {
   return <PublicPage><div className="sf-shell sf-page grid justify-items-center">
     <div className="grid w-full max-w-md gap-6">
       {tabs}

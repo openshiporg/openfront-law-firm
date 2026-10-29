@@ -397,6 +397,12 @@
   box-shadow: 0 8px 18px -14px oklch(0.3 0.05 80 / 0.45);
 }
 .sf-card__body { padding: clamp(1.25rem, 2.5vw, 1.75rem); }
+.sf-card__foot .sf-link { display: inline-flex; align-items: center; }
+.sf-field-label .sf-link { display: inline-flex; align-items: center; }
+@media (max-width: 639px) {
+  /* Keep the 44px phone hit box without pushing the field below its label. */
+  .sf-field-label .sf-link { margin-block: -0.375rem; }
+}
 .sf-card__foot {
   display: flex;
   flex-wrap: wrap;
