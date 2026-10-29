@@ -230,17 +230,13 @@ export function assertExactTrustSourcePosting(args: {
   }
 }
 
-export async function postTrustTransaction(
-  _root: unknown,
-  { data }: PostTrustTransactionArgs,
-  context: Context,
+export async function applyTrustPosting(
+  tx: any,
+  firmId: string,
+  userId: string | null,
+  data: PostTrustTransactionArgs["data"],
+  actor?: { agentPrincipalId?: string | null; audit?: Record<string, unknown> },
 ) {
-  const session = context.session as any;
-  const firmId = activeFirmId(session);
-  if (!firmId || !session?.itemId || !permissions.canManageTrust({ session })) {
-    throw new Error("You do not have permission to post trust transactions.");
-  }
-
   const description = requiredText(data.description, "Description", 2000);
   if (!transactionTypes.has(data.transactionType)) throw new Error("Unsupported trust transaction type.");
   if (data.sourcePaymentId && data.sourceRefundId) {
@@ -275,10 +271,7 @@ export async function postTrustTransaction(
   const ledgerIds = [...new Set(data.entries.flatMap((entry) =>
     entry.ledgerAccountId ? [entry.ledgerAccountId] : [],
   ))];
-  const prisma = context.prisma as any;
 
-  return runSerializableTransaction(prisma, async (tx: any) => {
-    await assertCurrentCommandActor(tx, context, "canManageTrust");
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storedIdempotencyKey}))`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-account:${firmId}:${data.trustAccountId}`}))`;
 
@@ -290,7 +283,7 @@ export async function postTrustTransaction(
       if (replay.postingDigest !== postingDigest) {
         throw new Error("Idempotency key was already used for a different trust posting.");
       }
-      await assertTrustReplayMatterAccess(tx, firmId, session.itemId, replay.entries);
+      if (userId) await assertTrustReplayMatterAccess(tx, firmId, userId, replay.entries);
       return { transaction: replay, replayed: true };
     }
 
@@ -322,7 +315,7 @@ export async function postTrustTransaction(
             trustAccountId: account.id,
             currencyCode: data.currencyCode,
             status: "active",
-            ...matterAccessWhere(session.itemId),
+            ...(userId ? matterAccessWhere(userId) : {}),
           },
           select: { id: true, matterId: true },
         })
@@ -361,7 +354,7 @@ export async function postTrustTransaction(
     if (data.sourcePaymentId) {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-source-payment:${firmId}:${data.sourcePaymentId}`}))`;
       const payment = await tx.payment.findFirst({
-        where: { id: data.sourcePaymentId, firmId, ...matterAccessWhere(session.itemId) },
+        where: { id: data.sourcePaymentId, firmId, ...(userId ? matterAccessWhere(userId) : {}) },
         select: {
           id: true, matterId: true, paymentType: true, status: true, amountMinor: true,
           currencyCode: true, trustAccountId: true, trustTransactions: { select: { id: true } },
@@ -377,7 +370,7 @@ export async function postTrustTransaction(
     if (data.sourceRefundId) {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-source-refund:${firmId}:${data.sourceRefundId}`}))`;
       const refund = await tx.refund.findFirst({
-        where: { id: data.sourceRefundId, firmId, ...matterAccessWhere(session.itemId) },
+        where: { id: data.sourceRefundId, firmId, ...(userId ? matterAccessWhere(userId) : {}) },
         select: {
           id: true, matterId: true, status: true, amountMinor: true, currencyCode: true,
           trustTransactions: { select: { id: true } },
@@ -421,8 +414,8 @@ export async function postTrustTransaction(
         description,
         occurredAt,
         postedAt: new Date(),
-        postedById: session.itemId,
-        postedByAgentId: session.agentPrincipalId ?? null,
+        postedById: userId,
+        postedByAgentId: actor?.agentPrincipalId ?? null,
         sourcePaymentId: data.sourcePaymentId ?? null,
         sourceRefundId: data.sourceRefundId ?? null,
         reversesTransactionId: data.reversesTransactionId ?? null,
@@ -462,7 +455,7 @@ export async function postTrustTransaction(
         eventType: "trust.transaction_posted",
         category: "financial",
         outcome: "succeeded",
-        ...workflowActor(context, session.itemId),
+        ...(actor?.audit ?? (userId ? { actorUserId: userId, actorType: "user" } : { actorUserId: null, actorType: "system" })),
         trustTransactionId: posted.id,
         matterId: postedMatterIds.length === 1 ? String(postedMatterIds[0]) : null,
         occurredAt: new Date(),
@@ -476,5 +469,25 @@ export async function postTrustTransaction(
       },
     });
     return { transaction: posted, replayed: false };
+}
+
+export async function postTrustTransaction(
+  _root: unknown,
+  { data }: PostTrustTransactionArgs,
+  context: Context,
+) {
+  const session = context.session as any;
+  const firmId = activeFirmId(session);
+  if (!firmId || !session?.itemId || !permissions.canManageTrust({ session })) {
+    throw new Error("You do not have permission to post trust transactions.");
+  }
+
+  const prisma = context.prisma as any;
+  return runSerializableTransaction(prisma, async (tx: any) => {
+    await assertCurrentCommandActor(tx, context, "canManageTrust");
+    return applyTrustPosting(tx, firmId, session.itemId, data, {
+      agentPrincipalId: session.agentPrincipalId ?? null,
+      audit: workflowActor(context, session.itemId),
+    });
   });
 }

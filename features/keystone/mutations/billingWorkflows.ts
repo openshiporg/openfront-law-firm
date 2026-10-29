@@ -263,6 +263,128 @@ function invoiceStatusAfterPayment(invoice: any, paidMinor: number, now: Date) {
   return invoice.dueAt && invoice.dueAt < now ? "overdue" : "issued";
 }
 
+export async function applyInvoiceAllocation(
+  tx: any,
+  input: {
+    firmId: string;
+    paymentId: string;
+    invoiceId: string;
+    amountMinor: number;
+    idempotencyKey: string;
+    actorUserId: string | null;
+    note?: string | null;
+  },
+) {
+  const { firmId, paymentId, invoiceId, amountMinor, idempotencyKey: key, actorUserId: userId } = input;
+  const note = input.note ?? undefined;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`allocation:${firmId}:${key}`}))`;
+    const replay = await tx.paymentAllocation.findFirst({
+      where: { firmId, idempotencyKey: key },
+      include: {
+        invoice: { select: { matterId: true } },
+        payment: { select: { matterId: true } },
+      },
+    });
+    if (replay) {
+      if (
+        replay.paymentId !== paymentId ||
+        replay.invoiceId !== invoiceId ||
+        replay.amountMinor !== amountMinor ||
+        replay.allocationType !== "invoice" ||
+        replay.note !== (note ?? "")
+      ) {
+        throw new Error("Payment allocation idempotency key was reused with a different payload.");
+      }
+      if (!replay.invoice) throw new Error("Payment allocation replay invoice is unavailable.");
+      if (userId) {
+        await assertMatterAccess(tx, firmId, replay.invoice.matterId, userId);
+        await assertMatterTeamCapability(tx, firmId, replay.invoice.matterId, userId, "canBill");
+        if (replay.payment?.matterId) {
+          await assertMatterAccess(tx, firmId, replay.payment.matterId, userId);
+          await assertMatterTeamCapability(tx, firmId, replay.payment.matterId, userId, "canBill");
+        }
+      }
+      return { allocation: replay, replayed: true };
+    }
+    const [payment, invoice] = await Promise.all([
+      tx.payment.findFirst({ where: { id: paymentId, firmId } }),
+      tx.invoice.findFirst({ where: { id: invoiceId, firmId } }),
+    ]);
+    if (!payment || !invoice) throw new Error("Payment and invoice must exist in the active firm.");
+    if (payment.matterId && payment.matterId !== invoice.matterId) {
+      throw new Error("Payment and invoice must use the same matter scope.");
+    }
+    if (userId) {
+      await assertMatterAccess(tx, firmId, invoice.matterId, userId);
+      await assertMatterTeamCapability(tx, firmId, invoice.matterId, userId, "canBill");
+    }
+    if (!new Set(["captured", "settled"]).has(payment.status)) {
+      throw new Error("Only a captured or settled payment can be allocated.");
+    }
+    if (payment.paymentType !== "operating") {
+      throw new Error("Trust deposits require a controlled trust-funds application and cannot use operating payment allocation.");
+    }
+    if (!new Set(["issued", "partially_paid", "overdue"]).has(invoice.status)) {
+      throw new Error("Payment can be allocated only to an open issued invoice.");
+    }
+    if (payment.currencyCode !== invoice.currencyCode) throw new Error("Payment and invoice currencies must match.");
+    const sums = await tx.paymentAllocation.groupBy({
+      by: ["allocationType"],
+      where: { paymentId: payment.id },
+      _sum: { amountMinor: true },
+    });
+    const allocated = sums.reduce((total: number, row: any) =>
+      total + (row.allocationType === "reversal" ? -(row._sum.amountMinor ?? 0) : (row._sum.amountMinor ?? 0)), 0);
+    const available = payment.amountMinor - payment.refundedMinor - allocated;
+    if (amountMinor > available) throw new Error("Payment allocation exceeds the unallocated payment amount.");
+    if (amountMinor > invoice.balanceDueMinor) throw new Error("Payment allocation exceeds the invoice balance.");
+
+    const now = new Date();
+    const allocation = await tx.paymentAllocation.create({
+      data: {
+        firmId,
+        matterId: invoice.matterId,
+        paymentId: payment.id,
+        invoiceId: invoice.id,
+        idempotencyKey: key,
+        allocationType: "invoice",
+        amountMinor: amountMinor,
+        currencyCode: payment.currencyCode,
+        allocatedById: userId ?? null,
+        allocatedAt: now,
+        note: note ?? "",
+      },
+    });
+    const paidMinor = invoice.paidMinor + amountMinor;
+    const balanceDueMinor = invoice.totalMinor - paidMinor;
+    if (!isGraphqlInt(paidMinor) || !isGraphqlInt(balanceDueMinor) || balanceDueMinor < 0) {
+      throw new Error("Payment allocation exceeds the invoice integer range.");
+    }
+    const status = invoiceStatusAfterPayment(invoice, paidMinor, now);
+    assertLifecycleTransition("invoice", invoice.status, status);
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        paidMinor,
+        balanceDueMinor,
+        status,
+        ...(status === "paid" ? { paidAt: now } : {}),
+      },
+    });
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "payment.allocated",
+      category: "financial",
+      actorUserId: userId ?? null,
+      ...(userId ? {} : { actorType: "system" }),
+      matterId: invoice.matterId,
+      invoiceId: invoice.id,
+      paymentId: payment.id,
+      metadata: { allocationId: allocation.id, amountMinor: amountMinor, currencyCode: payment.currencyCode, ...(userId ? {} : { source: "online" }) },
+    });
+  return { allocation, replayed: false };
+}
+
 export async function allocatePayment(
   _root: unknown,
   args: {
@@ -284,107 +406,15 @@ export async function allocatePayment(
 
   return runSerializableTransaction(prisma, async (tx: any) => {
     await assertCurrentCommandActor(tx, context, "canManagePayments");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`allocation:${firmId}:${key}`}))`;
-    const replay = await tx.paymentAllocation.findFirst({
-      where: { firmId, idempotencyKey: key },
-      include: {
-        invoice: { select: { matterId: true } },
-        payment: { select: { matterId: true } },
-      },
-    });
-    if (replay) {
-      if (
-        replay.paymentId !== args.paymentId ||
-        replay.invoiceId !== args.invoiceId ||
-        replay.amountMinor !== args.amountMinor ||
-        replay.allocationType !== "invoice" ||
-        replay.note !== (note ?? "")
-      ) {
-        throw new Error("Payment allocation idempotency key was reused with a different payload.");
-      }
-      if (!replay.invoice) throw new Error("Payment allocation replay invoice is unavailable.");
-      await assertMatterAccess(tx, firmId, replay.invoice.matterId, userId);
-      await assertMatterTeamCapability(tx, firmId, replay.invoice.matterId, userId, "canBill");
-      if (replay.payment?.matterId) {
-        await assertMatterAccess(tx, firmId, replay.payment.matterId, userId);
-        await assertMatterTeamCapability(tx, firmId, replay.payment.matterId, userId, "canBill");
-      }
-      return { allocation: replay, replayed: true };
-    }
-    const [payment, invoice] = await Promise.all([
-      tx.payment.findFirst({ where: { id: args.paymentId, firmId } }),
-      tx.invoice.findFirst({ where: { id: args.invoiceId, firmId } }),
-    ]);
-    if (!payment || !invoice) throw new Error("Payment and invoice must exist in the active firm.");
-    if (payment.matterId && payment.matterId !== invoice.matterId) {
-      throw new Error("Payment and invoice must use the same matter scope.");
-    }
-    await assertMatterAccess(tx, firmId, invoice.matterId, userId);
-    await assertMatterTeamCapability(tx, firmId, invoice.matterId, userId, "canBill");
-    if (!new Set(["captured", "settled"]).has(payment.status)) {
-      throw new Error("Only a captured or settled payment can be allocated.");
-    }
-    if (payment.paymentType !== "operating") {
-      throw new Error("Trust deposits require a controlled trust-funds application and cannot use operating payment allocation.");
-    }
-    if (!new Set(["issued", "partially_paid", "overdue"]).has(invoice.status)) {
-      throw new Error("Payment can be allocated only to an open issued invoice.");
-    }
-    if (payment.currencyCode !== invoice.currencyCode) throw new Error("Payment and invoice currencies must match.");
-    const sums = await tx.paymentAllocation.groupBy({
-      by: ["allocationType"],
-      where: { paymentId: payment.id },
-      _sum: { amountMinor: true },
-    });
-    const allocated = sums.reduce((total: number, row: any) =>
-      total + (row.allocationType === "reversal" ? -(row._sum.amountMinor ?? 0) : (row._sum.amountMinor ?? 0)), 0);
-    const available = payment.amountMinor - payment.refundedMinor - allocated;
-    if (args.amountMinor > available) throw new Error("Payment allocation exceeds the unallocated payment amount.");
-    if (args.amountMinor > invoice.balanceDueMinor) throw new Error("Payment allocation exceeds the invoice balance.");
-
-    const now = new Date();
-    const allocation = await tx.paymentAllocation.create({
-      data: {
-        firmId,
-        matterId: invoice.matterId,
-        paymentId: payment.id,
-        invoiceId: invoice.id,
-        idempotencyKey: key,
-        allocationType: "invoice",
-        amountMinor: args.amountMinor,
-        currencyCode: payment.currencyCode,
-        allocatedById: userId,
-        allocatedAt: now,
-        note: note ?? "",
-      },
-    });
-    const paidMinor = invoice.paidMinor + args.amountMinor;
-    const balanceDueMinor = invoice.totalMinor - paidMinor;
-    if (!isGraphqlInt(paidMinor) || !isGraphqlInt(balanceDueMinor) || balanceDueMinor < 0) {
-      throw new Error("Payment allocation exceeds the invoice integer range.");
-    }
-    const status = invoiceStatusAfterPayment(invoice, paidMinor, now);
-    assertLifecycleTransition("invoice", invoice.status, status);
-    await tx.invoice.update({
-      where: { id: invoice.id },
-      data: {
-        paidMinor,
-        balanceDueMinor,
-        status,
-        ...(status === "paid" ? { paidAt: now } : {}),
-      },
-    });
-    await recordAuditEvent(tx, {
+    return applyInvoiceAllocation(tx, {
       firmId,
-      eventType: "payment.allocated",
-      category: "financial",
+      paymentId: args.paymentId,
+      invoiceId: args.invoiceId,
+      amountMinor: args.amountMinor,
+      idempotencyKey: key,
       actorUserId: userId,
-      matterId: invoice.matterId,
-      invoiceId: invoice.id,
-      paymentId: payment.id,
-      metadata: { allocationId: allocation.id, amountMinor: args.amountMinor, currencyCode: payment.currencyCode },
+      note,
     });
-    return { allocation, replayed: false };
   });
 }
 

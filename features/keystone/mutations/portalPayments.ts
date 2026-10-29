@@ -3,7 +3,8 @@ import { authenticatePortalSession } from "../lib/portal-auth";
 import { portalShareHeaderSelect, boundPortalShare, portalShareIsCurrent } from "../lib/portal-share-binding";
 import { prismaWithoutGraphQLErrorConversion, runSerializableTransaction } from "../lib/transactions";
 import { createPayment, getPaymentStatus } from "../utils/paymentProviderAdapter";
-import { postTrustTransaction } from "./postTrustTransaction";
+import { applyTrustPosting } from "./postTrustTransaction";
+import { applyInvoiceAllocation } from "./billingWorkflows";
 
 function webBase(context: any) {
   const value = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000";
@@ -31,7 +32,7 @@ export async function startPortalPayment(_root: unknown, args: { kind: "invoice"
       if (!invoice || invoice.balanceDueMinor <= 0) throw new Error("Invoice has no payable balance for this client.");
       return { invoice, amount: invoice.balanceDueMinor, account: "operating", paymentType: "operating", matterId: invoice.matterId, payerId: invoice.clientId };
     }
-    const retainer = await tx.retainerAgreement.findFirst({ where: { id: args.id, firmId: identity.firmId, clientId: identity.contactId, status: "active", matter: { firmId: identity.firmId, clientId: identity.contactId, portalMatterAccesses: { some: { portalAccountId: identity.portalAccountId, status: "active", canReadInvoices: true } } } }, select: { id: true, agreementNumber: true, matterId: true, clientId: true, currencyCode: true, initialRetainerMinor: true, trustLedgerAccountId: true, client: { select: { primaryEmail: true } } } });
+    const retainer = await tx.retainerAgreement.findFirst({ where: { id: args.id, firmId: identity.firmId, clientId: identity.contactId, status: "active", matter: { firmId: identity.firmId, clientId: identity.contactId, portalMatterAccesses: { some: { portalAccountId: identity.portalAccountId, status: "active", canReadInvoices: true } } } }, select: { id: true, agreementNumber: true, matterId: true, clientId: true, currencyCode: true, initialRetainerMinor: true, trustLedgerAccountId: true, trustLedgerAccount: { select: { trustAccountId: true } }, client: { select: { primaryEmail: true } } } });
     if (!retainer?.trustLedgerAccountId || !retainer.initialRetainerMinor || retainer.initialRetainerMinor <= 0) throw new Error("An active retainer with a configured trust ledger and deposit amount is required.");
     return { retainer, amount: retainer.initialRetainerMinor, account: "trust", paymentType: "trust_deposit", matterId: retainer.matterId, payerId: retainer.clientId };
   });
@@ -40,7 +41,7 @@ export async function startPortalPayment(_root: unknown, args: { kind: "invoice"
   if (!provider) throw new Error("The firm's selected payment account is not configured.");
   const key = `${args.kind}:${args.id}:${setup.amount}`;
   let payment = await prisma.payment.findFirst({ where: { firmId: identity.firmId, idempotencyKey: key } });
-  if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustLedgerAccountId: (setup as any).retainer.trustLedgerAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
+  if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustLedgerAccountId: (setup as any).retainer.trustLedgerAccountId, trustAccountId: (setup as any).retainer.trustLedgerAccount?.trustAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
   const resource = args.kind === "invoice" ? { id: args.id, number: (setup as any).invoice.invoiceNumber, title: `Invoice ${(setup as any).invoice.invoiceNumber}`, email: (setup as any).invoice.client?.primaryEmail } : { id: args.id, number: (setup as any).retainer.agreementNumber, title: `Retainer ${(setup as any).retainer.agreementNumber}`, email: (setup as any).retainer.client?.primaryEmail };
   const result = await createPayment({ provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: identity.firmId, idempotencyKey: key, successUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, cancelUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, ...(args.kind === "invoice" ? { invoice: resource } : { retainer: resource }) });
   if (!result?.checkoutUrl) throw new Error("Payment provider did not return a checkout URL.");
@@ -69,16 +70,29 @@ export async function reconcilePaymentByProviderId(prisma: any, paymentId: strin
     if (["captured", "settled"].includes(current.status)) return { status: current.status, paymentId: current.id, replayed: true };
     if (current.status !== "pending" && current.status !== "authorized") throw new Error("Payment cannot be reconciled from its current state.");
     await tx.payment.update({ where: { id: current.id }, data: { status: "captured", capturedAt: new Date(), providerPaymentId: payment.providerPaymentId } });
-    if (current.paymentType === "operating" && current.invoiceId) {
+    if (current.paymentType === "operating") {
+      if (!current.invoiceId) throw new Error("Operating payment has no invoice.");
       const invoice = await tx.invoice.findFirst({ where: { id: current.invoiceId, firmId: current.firmId } });
       if (!invoice) throw new Error("Payment invoice was not found.");
-      await tx.paymentAllocation.create({ data: { firmId: current.firmId, matterId: invoice.matterId, paymentId: current.id, invoiceId: invoice.id, idempotencyKey: `provider-settlement:${current.id}`, allocationType: "invoice", amountMinor: Math.min(current.amountMinor, invoice.balanceDueMinor), currencyCode: current.currencyCode, allocatedAt: new Date(), note: "Online payment settlement" } });
+      await applyInvoiceAllocation(tx, { firmId: current.firmId, paymentId: current.id, invoiceId: invoice.id, amountMinor: Math.min(current.amountMinor, invoice.balanceDueMinor), idempotencyKey: `provider-settlement:${current.id}`, actorUserId: null, note: "Online payment settlement" });
     }
     if (current.paymentType === "trust_deposit") {
       const ledger = await tx.trustLedgerAccount.findFirst({ where: { id: current.trustLedgerAccountId, firmId: current.firmId, status: "active" }, include: { trustAccount: true } });
       if (!ledger || !ledger.trustAccount) throw new Error("Active trust ledger is required for the deposit.");
-      const exists = await tx.trustTransaction.findFirst({ where: { sourcePaymentId: current.id } });
-      if (!exists) throw new Error("Canonical trust posting adapter is required before accepting this deposit.");
+      if (current.trustAccountId !== ledger.trustAccountId) throw new Error("Payment trust account does not match the trust ledger.");
+      await applyTrustPosting(tx, current.firmId, null, {
+        idempotencyKey: `online-trust:${current.id}`,
+        trustAccountId: ledger.trustAccountId,
+        transactionType: "deposit",
+        currencyCode: current.currencyCode,
+        occurredAt: new Date().toISOString(),
+        description: `Online retainer deposit ${current.paymentNumber}`,
+        sourcePaymentId: current.id,
+        entries: [
+          { accountingBucket: "bank_control", direction: "debit", amountMinor: current.amountMinor, currencyCode: current.currencyCode, memo: "Online card deposit" },
+          { ledgerAccountId: ledger.id, accountingBucket: "client_liability", direction: "credit", amountMinor: current.amountMinor, currencyCode: current.currencyCode, memo: "Online card deposit" },
+        ],
+      });
     }
     return { status: "captured", paymentId: current.id, replayed: false };
   });
