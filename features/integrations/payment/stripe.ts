@@ -10,6 +10,7 @@ type CreatePaymentInput = {
   successUrl: string;
   cancelUrl: string;
   idempotencyKey: string;
+  provider?: { credentials?: Record<string, unknown> };
 };
 
 type PaymentOperationInput = {
@@ -17,6 +18,7 @@ type PaymentOperationInput = {
   amount?: number;
   idempotencyKey?: string;
   currency?: string;
+  provider?: { credentials?: Record<string, unknown> };
 };
 
 type PaymentWebhookInput = {
@@ -35,14 +37,16 @@ const getStripeClient = (provider?: { credentials?: Record<string, unknown> }) =
   });
 };
 
-export async function createPaymentFunction({ invoice, retainer, paymentId, firmId, amount, currency, successUrl, cancelUrl, idempotencyKey, provider }: CreatePaymentInput & { provider?: { credentials?: Record<string, unknown> } }) {
+export async function createPaymentFunction({ invoice, retainer, paymentId, firmId, amount, currency, successUrl, cancelUrl, idempotencyKey, provider }: CreatePaymentInput) {
   if (!Number.isSafeInteger(amount) || amount < 1 || !idempotencyKey) throw new Error("Invalid payment amount or idempotency key");
   const stripe = getStripeClient(provider);
   const resource = invoice ?? retainer;
   if (!resource) throw new Error("Invoice or retainer details are required");
   const metadata = { firmId, paymentId, ...(invoice ? { invoiceId: invoice.id } : { retainerId: retainer!.id }) };
+  const base = successUrl.replace(/\/portal\/payments\/return(?:\?.*)?$/, "");
+  const returnUrl = `${base}/portal/payments/return?payment=${encodeURIComponent(paymentId)}`;
   const session = await stripe.checkout.sessions.create({
-    mode: "payment", success_url: successUrl, cancel_url: cancelUrl,
+    mode: "payment", success_url: `${returnUrl}&session_id={CHECKOUT_SESSION_ID}`, cancel_url: returnUrl,
     customer_email: resource.email || undefined,
     line_items: [{ quantity: 1, price_data: { currency: currency.toLowerCase(), unit_amount: amount, product_data: { name: resource.title || (invoice ? `Invoice ${resource.number || ""}` : `Retainer ${resource.number || ""}`) } } }],
     metadata, payment_intent_data: { metadata },
@@ -86,22 +90,26 @@ export async function refundPaymentFunction({ paymentId, amount, idempotencyKey,
 export async function getPaymentStatusFunction({ paymentId, provider }: PaymentOperationInput & { provider?: { credentials?: Record<string, unknown> } }) {
   const stripe = getStripeClient(provider);
 
-  const paymentIntent = await stripe.paymentIntents.retrieve(paymentId);
-
+  const session = await stripe.checkout.sessions.retrieve(paymentId, { expand: ["payment_intent"] });
+  const intent = session.payment_intent as Stripe.PaymentIntent | null;
   return {
-    status: paymentIntent.status,
-    amount: paymentIntent.amount_received || paymentIntent.amount,
-    currency: paymentIntent.currency,
-    data: paymentIntent,
+    status: session.payment_status === "paid" ? "succeeded" : session.status,
+    amount: session.amount_total ?? 0,
+    currency: (session.currency ?? "").toUpperCase(),
+    paymentIntentId: intent?.id,
+    data: session,
   };
 }
 
-export async function generatePaymentLinkFunction({ paymentId }: PaymentOperationInput) {
-  return `https://dashboard.stripe.com/payments/${paymentId}`;
+export async function generatePaymentLinkFunction({ paymentId, provider }: PaymentOperationInput) {
+  const stripe = getStripeClient(provider);
+  const session = await stripe.checkout.sessions.retrieve(paymentId);
+  return session.url;
 }
 
 export async function handleWebhookFunction({ event, headers, provider }: PaymentWebhookInput & { provider?: { credentials?: Record<string, unknown> } }) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookEnv = typeof provider?.credentials?.webhookSecretEnv === "string" ? provider.credentials.webhookSecretEnv : "STRIPE_WEBHOOK_SECRET";
+  const webhookSecret = process.env[webhookEnv];
   if (!webhookSecret) {
     throw new Error('Stripe webhook secret is not configured');
   }
