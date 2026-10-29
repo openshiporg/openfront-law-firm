@@ -1,6 +1,10 @@
+<!-- logo -->
+
 # Openfront Law Firm
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fopenshiporg%2Fopenfront-law-firm&env=DATABASE_URL%2CSESSION_SECRET)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/openfront-law-firm)
 
 Openfront Law Firm is a self-hostable legal practice and client-collaboration application. Visitors can explore practice areas and attorneys or request consultations. Firm teams manage intake, conflicts, matters, deadlines, documents, communication, time, expenses, billing, trust records, and scoped client sharing.
 
@@ -8,12 +12,10 @@ Openfront Law Firm is a self-hostable legal practice and client-collaboration ap
 
 ## Demo
 
-Explore the application locally using the setup instructions below.
-
 | | |
 |---|---|
-| **Public application** | `/` on your development URL |
-| **Dashboard** | `/dashboard` on your development URL |
+| **Storefront** | [law-firm.openship.org](https://law-firm.openship.org) |
+| **Dashboard** | [law-firm.openship.org/dashboard](https://law-firm.openship.org/dashboard) |
 
 [Learn more →](https://openship.org/products/openfront-law-firm)
 
