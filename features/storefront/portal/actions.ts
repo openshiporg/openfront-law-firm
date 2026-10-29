@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { keystoneContext } from '@/features/keystone/context'
 import { revokePortalSession } from '@/features/keystone/lib/portal-auth'
 import { acceptPortalInvitation, redeemPortalSignInLink, requestPortalSignInLink } from '@/features/keystone/mutations/portalWorkflows'
+import { startPortalPayment, reconcilePortalPayment } from '@/features/keystone/mutations/portalPayments'
 import { isEmailDeliveryConfigured, sendPortalSignInEmail } from '@/features/keystone/lib/mail'
 import { PORTAL_SESSION_COOKIE, type PortalAcceptState, type PortalSignInState } from './constants'
 
@@ -35,6 +36,19 @@ export async function acceptPortalInvite(
   }
 
   redirect('/portal')
+}
+
+export async function startPortalInvoiceCheckout(formData: FormData) {
+  const token = (await cookies()).get(PORTAL_SESSION_COOKIE)?.value
+  const invoiceId = String(formData.get('invoiceId') ?? '').trim()
+  if (!token || !invoiceId || invoiceId.length > 200) redirect('/portal/signin')
+  try {
+    const result = await startPortalPayment(null, { kind: 'invoice', id: invoiceId, token }, keystoneContext)
+    redirect(result.url)
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('NEXT_REDIRECT')) throw error
+    redirect(`/portal/share/${encodeURIComponent(String(formData.get('shareId') ?? ''))}?paymentError=unavailable`)
+  }
 }
 
 export async function signOutPortal() {

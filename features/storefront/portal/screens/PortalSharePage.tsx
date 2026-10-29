@@ -9,6 +9,7 @@ import { keystoneContext } from '@/features/keystone/context'
 import { PORTAL_INVOICE_LINE_LIMIT, PORTAL_THREAD_MESSAGE_LIMIT, portalFirmBrand, readPortalSharedResource } from '@/features/keystone/lib/portal-auth'
 import { PortalHeader } from '../PortalHeader'
 import { PORTAL_SESSION_COOKIE } from '@/features/portal/constants'
+import { startPortalInvoiceCheckout } from '../actions'
 import { formatMinorUnits } from '@/features/platform/lib/money'
 import { PortalReadError } from '@/features/keystone/lib/portal-read-error'
 import { PortalReadProblem } from '../PortalReadProblem'
@@ -70,7 +71,7 @@ export default async function PortalSharePage({ params }: { params: Promise<{ sh
           <h1 id="portal-share-content" tabIndex={-1} className="sf-title outline-none">{title}</h1>
         </header>
 
-        {invoice ? <div className="sf-card mt-8"><div className="sf-card__body grid gap-1"><p className="sf-label">Balance due</p><p className="sf-display sf-num" style={{ fontSize: 'clamp(2.25rem, 5vw, 3.5rem)' }}>{money(invoice.balanceDueMinor, invoice.currencyCode)}</p><p className="sf-muted sf-num text-sm">Due {day(invoice.dueAt)} · Issued {day(invoice.issuedAt)}</p></div></div> : null}
+        {invoice ? <div className="sf-card mt-8"><div className="sf-card__body grid gap-1"><p className="sf-label">Balance due</p><p className="sf-display sf-num" style={{ fontSize: 'clamp(2.25rem, 5vw, 3.5rem)' }}>{money(invoice.balanceDueMinor, invoice.currencyCode)}</p><p className="sf-muted sf-num text-sm">Due {day(invoice.dueAt)} · Issued {day(invoice.issuedAt)}</p>{invoice.balanceDueMinor > 0 ? <form action={startPortalInvoiceCheckout}><input type="hidden" name="invoiceId" value={invoice.id} /><button className="sf-pill sf-pill--raised mt-4" type="submit">Pay invoice</button></form> : null}</div></div> : null}
 
         <dl className="sf-facts mt-8">
           {document ? <><div><dt>Category</dt><dd>{document.category}</dd></div><div><dt>Status</dt><dd className="capitalize">{document.status}</dd></div></> : null}
@@ -108,7 +109,7 @@ export default async function PortalSharePage({ params }: { params: Promise<{ sh
             </tfoot>
           </table></div> : <p className="sf-muted text-sm">No itemized lines.</p>}
           {invoice.hasMoreLines ? <p className="sf-fine mt-3">First {PORTAL_INVOICE_LINE_LIMIT} lines shown. Ask your firm for the complete invoice.</p> : null}
-          <p role="note" className="sf-notice mt-6">Online payment is not available. Follow the payment instructions sent with this invoice, or <Link href="/contact#existing-clients" className="sf-link">contact the firm</Link>.</p>
+          <p role="note" className="sf-notice mt-6">If you have questions about this invoice, <Link href="/contact#existing-clients" className="sf-link">contact the firm</Link>.</p>
         </section> : null}
       </article>
     </main>
