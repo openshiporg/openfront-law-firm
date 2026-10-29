@@ -2,7 +2,7 @@ import { paymentProviderAdapters } from "../../integrations/payment";
 
 const ADAPTERS = new Set(Object.keys(paymentProviderAdapters));
 const OPERATIONS = new Set(["createPaymentFunction", "capturePaymentFunction", "refundPaymentFunction", "getPaymentStatusFunction", "generatePaymentLinkFunction", "handleWebhookFunction"]);
-const INPUT_KEYS = new Set(["invoice", "retainer", "firmId", "paymentId", "amount", "currency", "idempotencyKey", "successUrl", "cancelUrl", "refundId", "event", "headers"]);
+const INPUT_KEYS = new Set(["invoice", "retainer", "firmId", "paymentId", "amount", "currency", "idempotencyKey", "successUrl", "cancelUrl", "refundId", "event", "headers", "rawBody"]);
 
 export function paymentAdapterPayload(provider: any, args: any) {
   const input: Record<string, unknown> = {};

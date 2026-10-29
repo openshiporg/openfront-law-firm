@@ -62,6 +62,7 @@ import {
   sharePortalResource,
 } from "./portalWorkflows";
 import { postTrustTransaction } from "./postTrustTransaction";
+import { reconcilePortalPayment, startPortalPayment } from "./portalPayments";
 import { executePortalGrant, portalPolicyWorkspace, recordPortalDiscoveryPolicy } from "./portalPolicyWorkflows";
 import {
   prepareTrustReconciliation,
@@ -398,6 +399,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         replayed: Boolean!
       }
 
+      type PortalPaymentStartResult { url: String! paymentId: ID! }
+      type PortalPaymentReconcileResult { status: String! paymentId: ID! replayed: Boolean }
       type PaymentTransitionResult {
         payment: PaymentProjection!
         replayed: Boolean!
@@ -1035,6 +1038,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           providerPaymentId: String
           failureReason: String
         ): PaymentTransitionResult!
+        startPortalPayment(kind: String!, id: ID!, token: String!): PortalPaymentStartResult!
+        reconcilePortalPayment(paymentId: ID!, token: String!): PortalPaymentReconcileResult!
         recordManualPayment(
           idempotencyKey: String!
           payerId: ID!
@@ -1453,6 +1458,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         assembleDraftInvoice,
         transitionInvoice,
         transitionPayment,
+        startPortalPayment,
+        reconcilePortalPayment,
         allocatePayment,
         recordManualPayment,
         reversePaymentAllocation,
