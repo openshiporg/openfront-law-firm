@@ -11,7 +11,7 @@
     "schema:build": "keystone build --no-ui && prisma generate && tsx features/keystone/view-order/generate-view-order.ts",
     "schema:verify:runtime": "tsx scripts/verify-schema-runtime.ts",
     "typecheck": "tsc --noEmit --pretty false",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "node --test tests/*.test.cjs",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "migrate:gen": "keystone build --no-ui && tsx features/keystone/view-order/generate-view-order.ts && prisma migrate dev",
