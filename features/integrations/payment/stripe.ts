@@ -43,7 +43,7 @@ export async function createPaymentFunction({ invoice, retainer, paymentId, firm
   const resource = invoice ?? retainer;
   if (!resource) throw new Error("Invoice or retainer details are required");
   const metadata = { firmId, paymentId, ...(invoice ? { invoiceId: invoice.id } : { retainerId: retainer!.id }) };
-  const base = successUrl.replace(/\/portal\/payments\/return(?:\?.*)?$/, "");
+  const base = new URL(successUrl).origin;
   const returnUrl = `${base}/portal/payments/return?payment=${encodeURIComponent(paymentId)}`;
   const session = await stripe.checkout.sessions.create({
     mode: "payment", success_url: `${returnUrl}&session_id={CHECKOUT_SESSION_ID}`, cancel_url: returnUrl,
