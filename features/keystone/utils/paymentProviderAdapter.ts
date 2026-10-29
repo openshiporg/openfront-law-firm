@@ -12,7 +12,7 @@ export function paymentAdapterPayload(provider: any, args: any) {
     if (record) input[key] = Object.fromEntries(["id", "number", "title", "email"].filter((field) => record[field] !== undefined).map((field) => [field, record[field]]));
   }
   if (input.headers && typeof input.headers === "object") {
-    input.headers = Object.fromEntries(Object.entries(input.headers).filter(([key]) => key.toLowerCase() === "stripe-signature"));
+    input.headers = Object.fromEntries(Object.entries(input.headers).filter(([key]) => key.toLowerCase() === "stripe-signature" || key === "__rawBody"));
   }
   return { ...input, provider: { id: provider.id, code: provider.code, credentials: provider.credentials || {} } };
 }

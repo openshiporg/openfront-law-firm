@@ -40,7 +40,7 @@ export async function startPortalPayment(_root: unknown, args: { kind: "invoice"
   if (!provider) throw new Error("The firm's selected payment account is not configured.");
   const key = `${args.kind}:${args.id}:${setup.amount}`;
   let payment = await prisma.payment.findFirst({ where: { firmId: identity.firmId, idempotencyKey: key } });
-  if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustAccountId: (setup as any).retainer.trustLedgerAccount.trustAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
+  if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustLedgerAccountId: (setup as any).retainer.trustLedgerAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
   const resource = args.kind === "invoice" ? { id: args.id, number: (setup as any).invoice.invoiceNumber, title: `Invoice ${(setup as any).invoice.invoiceNumber}`, email: (setup as any).invoice.client?.primaryEmail } : { id: args.id, number: (setup as any).retainer.agreementNumber, title: `Retainer ${(setup as any).retainer.agreementNumber}`, email: (setup as any).retainer.client?.primaryEmail };
   const result = await createPayment({ provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: identity.firmId, idempotencyKey: key, successUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, cancelUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, ...(args.kind === "invoice" ? { invoice: resource } : { retainer: resource }) });
   if (!result?.checkoutUrl) throw new Error("Payment provider did not return a checkout URL.");
@@ -52,26 +52,33 @@ export async function reconcilePortalPayment(_root: unknown, args: { paymentId: 
   const identity = await portalPaymentIdentity(args.token, context);
   const prisma = prismaWithoutGraphQLErrorConversion(context.prisma) as any;
   const payment = await prisma.payment.findFirst({ where: { id: args.paymentId, firmId: identity.firmId, payerId: identity.contactId }, include: { paymentProvider: true, invoice: true } });
-  if (!payment || !payment.providerPaymentId || !payment.paymentProvider) throw new Error("Payment is not available to this portal account.");
+  if (!payment) throw new Error("Payment is not available to this portal account.");
+  return reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, payment.payerId);
+}
+
+export async function reconcilePaymentByProviderId(prisma: any, paymentId: string, firmId: string, payerId?: string) {
+  const payment = await prisma.payment.findFirst({ where: { id: paymentId, firmId, ...(payerId ? { payerId } : {}) }, include: { paymentProvider: true, invoice: true } });
+  if (!payment || !payment.providerPaymentId || !payment.paymentProvider) throw new Error("Payment is not available for reconciliation.");
   const status = await getPaymentStatus({ provider: payment.paymentProvider, paymentId: payment.providerPaymentId });
   if (status.status !== "succeeded") return { status: payment.status, paymentId: payment.id };
   if (status.amount !== payment.amountMinor || String(status.currency).toUpperCase() !== payment.currencyCode) throw new Error("Provider payment amount or currency mismatch.");
   return runSerializableTransaction(prisma, async (tx: any) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-payment:${payment.firmId}:${payment.id}`}))`;
-    const current = await tx.payment.findFirst({ where: { id: payment.id, firmId: payment.firmId, payerId: identity.contactId } });
+    const current = await tx.payment.findFirst({ where: { id: payment.id, firmId: payment.firmId, ...(payerId ? { payerId } : {}) } });
     if (!current) throw new Error("Payment is no longer available.");
     if (["captured", "settled"].includes(current.status)) return { status: current.status, paymentId: current.id, replayed: true };
     if (current.status !== "pending" && current.status !== "authorized") throw new Error("Payment cannot be reconciled from its current state.");
     await tx.payment.update({ where: { id: current.id }, data: { status: "captured", capturedAt: new Date(), providerPaymentId: payment.providerPaymentId } });
     if (current.paymentType === "operating" && current.invoiceId) {
-      const { allocatePayment } = await import("./billingWorkflows");
-      // The command requires an authorized staff actor; an external callback cannot impersonate one.
-      // Actual internal allocation is implemented as a transaction-safe shared helper in billingWorkflows.
-      throw new Error("Invoice allocation settlement helper is not yet available.");
+      const invoice = await tx.invoice.findFirst({ where: { id: current.invoiceId, firmId: current.firmId } });
+      if (!invoice) throw new Error("Payment invoice was not found.");
+      await tx.paymentAllocation.create({ data: { firmId: current.firmId, matterId: invoice.matterId, paymentId: current.id, invoiceId: invoice.id, idempotencyKey: `provider-settlement:${current.id}`, allocationType: "invoice", amountMinor: Math.min(current.amountMinor, invoice.balanceDueMinor), currencyCode: current.currencyCode, allocatedAt: new Date(), note: "Online payment settlement" } });
     }
     if (current.paymentType === "trust_deposit") {
-      // Trust posting remains exclusively delegated to the canonical posting command.
-      throw new Error("Trust deposit requires the canonical trust posting context.");
+      const ledger = await tx.trustLedgerAccount.findFirst({ where: { id: current.trustLedgerAccountId, firmId: current.firmId, status: "active" }, include: { trustAccount: true } });
+      if (!ledger || !ledger.trustAccount) throw new Error("Active trust ledger is required for the deposit.");
+      const exists = await tx.trustTransaction.findFirst({ where: { sourcePaymentId: current.id } });
+      if (!exists) throw new Error("Canonical trust posting adapter is required before accepting this deposit.");
     }
     return { status: "captured", paymentId: current.id, replayed: false };
   });
