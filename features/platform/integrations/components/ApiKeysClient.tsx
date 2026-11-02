@@ -1,4 +1,5 @@
 'use client'
+import { formatInZone } from '@/features/dashboard/lib/storeTime';
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -17,7 +18,7 @@ function Message({ state }: { state: IntegrationActionState }) {
 }
 
 function date(value: string | null) {
-  return value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null
+  return value ? formatInZone(value, undefined, "date") : null
 }
 
 function keyStatus(key: ApiKeyRow) {

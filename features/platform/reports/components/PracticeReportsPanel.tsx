@@ -1,3 +1,4 @@
+import { ViewerTime } from '@/features/dashboard/components/ViewerTime'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 
@@ -376,4 +377,4 @@ function humanEvent(eventType: string) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Activity'
 }
 function money(value: number, currency: string) { return formatMinorUnits(value, currency) }
-function date(value: unknown) { const parsed = value ? new Date(String(value)) : null; return parsed && !Number.isNaN(parsed.getTime()) ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(parsed) : '—' }
+function date(value: unknown) { return value ? <ViewerTime value={String(value)} style="date" fallback="—" /> : '—' }

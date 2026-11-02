@@ -1,4 +1,5 @@
 'use client'
+import { formatInZone } from '@/features/dashboard/lib/storeTime';
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -34,7 +35,7 @@ function Message({ state }: { state: SignatureActionState }) {
 }
 
 function date(value: string | null) {
-  return value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : null
+  return value ? formatInZone(value, undefined, "date") : null
 }
 
 function RequestForm({ documentId, setup, onDone }: { documentId: string; setup: DocumentSignatureSetup; onDone: () => void }) {
