@@ -264,6 +264,7 @@ model Office {
   timezone                          String                  @default("UTC")
   email                             String                  @default("")
   phone                             String                  @default("")
+  address                           String?
   primaryMemberships                FirmMembership[]        @relation("FirmMembership_primaryOffice")
   allowedMemberships                FirmMembership[]        @relation("FirmMembership_allowedOffices")
   createdAt                         DateTime                @default(now())

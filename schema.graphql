@@ -735,6 +735,7 @@ type Office {
   timezone: String
   email: String
   phone: String
+  address: String
   primaryMemberships(where: FirmMembershipWhereInput! = {}, orderBy: [FirmMembershipOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: FirmMembershipWhereUniqueInput): [FirmMembership!]
   primaryMembershipsCount(where: FirmMembershipWhereInput! = {}): Int
   allowedMemberships(where: FirmMembershipWhereInput! = {}, orderBy: [FirmMembershipOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: FirmMembershipWhereUniqueInput): [FirmMembership!]
@@ -765,6 +766,7 @@ input OfficeWhereInput {
   timezone: StringFilter
   email: StringFilter
   phone: StringFilter
+  address: StringNullableFilter
   primaryMemberships: FirmMembershipManyRelationFilter
   allowedMemberships: FirmMembershipManyRelationFilter
   createdAt: DateTimeFilter
@@ -778,6 +780,21 @@ input OfficeStatusTypeNullableFilter {
   not: OfficeStatusTypeNullableFilter
 }
 
+input StringNullableFilter {
+  equals: String
+  in: [String!]
+  notIn: [String!]
+  lt: String
+  lte: String
+  gt: String
+  gte: String
+  contains: String
+  startsWith: String
+  endsWith: String
+  mode: QueryMode
+  not: StringNullableFilter
+}
+
 input OfficeOrderByInput {
   id: OrderDirection
   name: OrderDirection
@@ -786,6 +803,7 @@ input OfficeOrderByInput {
   timezone: OrderDirection
   email: OrderDirection
   phone: OrderDirection
+  address: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
 }
@@ -798,6 +816,7 @@ input OfficeUpdateInput {
   timezone: String
   email: String
   phone: String
+  address: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -815,6 +834,7 @@ input OfficeCreateInput {
   timezone: String
   email: String
   phone: String
+  address: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -2442,21 +2462,6 @@ input PracticeAreaStatusTypeNullableFilter {
   in: [PracticeAreaStatusType!]
   notIn: [PracticeAreaStatusType!]
   not: PracticeAreaStatusTypeNullableFilter
-}
-
-input StringNullableFilter {
-  equals: String
-  in: [String!]
-  notIn: [String!]
-  lt: String
-  lte: String
-  gt: String
-  gte: String
-  contains: String
-  startsWith: String
-  endsWith: String
-  mode: QueryMode
-  not: StringNullableFilter
 }
 
 input PracticeAreaOrderByInput {

@@ -31,6 +31,8 @@ export type StorefrontSettings = {
   supportEmail: string | null
   /** The active office's saved phone, shown as written (format-checked only). */
   officePhone: string | null
+  /** The active office's saved street address, one entry per line. */
+  officeAddress: string[]
   logoIcon: string
   logoColor: string
   isLocalFictional: boolean
@@ -121,16 +123,18 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
   // Published identity requires active configuration, not legal authority.
   // Onboarding/suspended/closed, or no firm at all, is a truthful unset state.
   if (!firm || firm.status !== "active") {
-    return { firmName: null, tagline: null, accentHex: null, supportEmail: null, officePhone: null, logoIcon: safeStoreLogo(null), logoColor: '0', isLocalFictional: false, isConfigured: false, accountsEnabled: false, bookingEnabled: false, publication: CLOSED_PUBLICATION }
+    return { firmName: null, tagline: null, accentHex: null, supportEmail: null, officePhone: null, officeAddress: [], logoIcon: safeStoreLogo(null), logoColor: '0', isLocalFictional: false, isConfigured: false, accountsEnabled: false, bookingEnabled: false, publication: CLOSED_PUBLICATION }
   }
 
   const firmName = (firm.displayName || firm.name || "").trim() || null
   const candidateEmail = firm.supportEmail?.trim() || ""
   const supportEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail) ? candidateEmail : null
   let officePhone: string | null = null
+  let officeAddress: string[] = []
   try {
-    const office = await keystoneContext.sudo().prisma.office.findFirst({ where: { firmId: firm.id, status: 'active' }, orderBy: [{ code: 'asc' }], select: { phone: true } })
+    const office = await keystoneContext.sudo().prisma.office.findFirst({ where: { firmId: firm.id, status: 'active' }, orderBy: [{ code: 'asc' }], select: { phone: true, address: true } })
     const candidatePhone = office?.phone?.trim() ?? ''
+    officeAddress = (office?.address ?? '').split('\n').map((line: string) => line.trim()).filter(Boolean).slice(0, 5).map((line: string) => line.slice(0, 120))
     if (/^\+?[\d\s().\-]{7,30}$/.test(candidatePhone) && candidatePhone.replace(/\D/g, '').length >= 7) officePhone = candidatePhone
   } catch {}
   const isLocalFictional = await isLocalFixtureFirm(keystoneContext.prisma, firm.id)
@@ -148,6 +152,7 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
     accentHex: resolveStorefrontAccent(firm.brandColor),
     supportEmail,
     officePhone,
+    officeAddress,
     isConfigured: Boolean(firmName),
   }
 }

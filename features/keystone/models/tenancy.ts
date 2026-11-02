@@ -106,6 +106,11 @@ export const Office = list({
     timezone: text({ defaultValue: "UTC", validation: { isRequired: true } }),
     email: text({ access: { read: permissions.canReadPeople } }),
     phone: text({ access: { read: permissions.canReadPeople } }),
+    address: text({
+      db: { isNullable: true },
+      ui: { displayMode: "textarea", description: "Street address, one line per row, e.g. 48 Cedar Street / Portland, ME 04101. Shown on the public site." },
+      validation: { length: { max: 500 } },
+    }),
     primaryMemberships: readOnlyRelationship("FirmMembership.primaryOffice", true),
     allowedMemberships: readOnlyRelationship("FirmMembership.allowedOffices", true),
     ...trackingFields,

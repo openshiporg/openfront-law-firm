@@ -57,6 +57,7 @@ export async function HomePage() {
             {settings.bookingEnabled ? <div><dt>Consultations</dt><dd>Request a time online</dd></div> : null}
             {settings.supportEmail ? <div><dt>Email</dt><dd><a className="sf-link" href={`mailto:${settings.supportEmail}`}><EmailText value={settings.supportEmail} /></a></dd></div> : null}
             {settings.officePhone ? <div><dt>Phone</dt><dd><a className="sf-link" href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`}>{settings.officePhone}</a></dd></div> : null}
+            {settings.officeAddress.length ? <div><dt>Office</dt><dd>{settings.officeAddress.map((line) => <span key={line} className="block">{line}</span>)}</dd></div> : null}
             <div><dt>Clients</dt><dd><Link className="sf-link" href="/portal">Client portal</Link></dd></div>
           </dl>
           <div className="sf-track">
