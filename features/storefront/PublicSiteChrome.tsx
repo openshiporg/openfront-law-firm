@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { EmailText } from './EmailText'
 import type { CSSProperties } from "react"
 
 import {
@@ -41,7 +42,7 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
           <div className="grid content-start gap-3">
             <FirmLink settings={settings} />
             {settings.tagline ? <p className="text-sm opacity-70">{settings.tagline}</p> : null}
-            {settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="text-sm underline underline-offset-4 opacity-90">{settings.supportEmail}</a> : null}
+            {settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="text-sm underline underline-offset-4 opacity-90"><EmailText value={settings.supportEmail} /></a> : null}
           </div>
           <nav className="sf-foot__col" aria-label="Firm">
             <p className="sf-label">Firm</p>

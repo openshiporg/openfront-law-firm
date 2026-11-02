@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { randomUUID } from 'node:crypto'
 import { ArrowUpRight } from 'lucide-react'
+import { EmailText } from '../EmailText'
 import { PublicPage } from '../PublicSiteChrome'
 import { StoreLogo } from '../StoreLogo'
 import { getStorefrontSettings, NEUTRAL_FIRM_NAME } from '../lib/storefront-settings'
@@ -53,8 +54,8 @@ export async function HomePage() {
           {published && settings.tagline ? <p className="sf-lede">{settings.tagline}</p> : name && !published ? <p className="sf-lede">Practice areas and attorney profiles are not yet published.</p> : null}
           {settings.isLocalFictional ? <p className="sf-fine">Fictional local workspace</p> : null}
           <dl className="sf-hero__facts">
-            <div><dt>Consultations</dt><dd>{settings.bookingEnabled ? 'Request a time online' : 'Not taken online'}</dd></div>
-            <div><dt>Email</dt><dd>{settings.supportEmail ? <a className="sf-link" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : <span className="sf-muted">Not listed online</span>}</dd></div>
+            {settings.bookingEnabled ? <div><dt>Consultations</dt><dd>Request a time online</dd></div> : null}
+            {settings.supportEmail ? <div><dt>Email</dt><dd><a className="sf-link" href={`mailto:${settings.supportEmail}`}><EmailText value={settings.supportEmail} /></a></dd></div> : null}
             {settings.officePhone ? <div><dt>Phone</dt><dd><a className="sf-link" href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`}>{settings.officePhone}</a></dd></div> : null}
             <div><dt>Clients</dt><dd><Link className="sf-link" href="/portal">Client portal</Link></dd></div>
           </dl>
@@ -80,7 +81,7 @@ export async function HomePage() {
 
       {about ? <section className="sf-section" aria-labelledby="home-about">
         <div className="sf-section__head"><h2 id="home-about" className="sf-h2">About the firm</h2><Link href="/about" className="sf-link inline-flex min-h-11 items-center gap-1 text-sm">About <ArrowUpRight className="size-4" aria-hidden="true" /></Link></div>
-        <div className="sf-prose sf-prose--lead"><p>{about}</p></div>
+        <div className="sf-prose"><p>{about}</p></div>
       </section> : null}
 
     </div>

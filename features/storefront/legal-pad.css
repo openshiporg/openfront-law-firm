@@ -385,6 +385,7 @@
 .sf-hero__facts > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 1rem; min-height: var(--sf-line); align-items: baseline; }
 .sf-hero__facts dt { font-size: var(--text-sm); color: var(--ink-muted); }
 .sf-hero__facts dd { margin: 0; font-size: var(--text-base); font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 30rem) { .sf-hero__facts > div { grid-template-columns: minmax(0, 1fr); gap: 0; padding-block: 0.375rem; } }
 
 /* ---------------------------------------------------------------- *
  * Sheets (cards), the practice index, rows
@@ -487,6 +488,7 @@ a.sf-row:hover .sf-row__title { color: var(--color-accent); text-decoration: und
 .sf-facts > div:first-child { border-top: 1px solid var(--pad-rule-strong); }
 .sf-facts dt { font-size: var(--text-sm); color: var(--ink-muted); }
 .sf-facts dd { margin: 0; font-size: var(--text-sm); font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 30rem) { .sf-facts > div { grid-template-columns: minmax(0, 1fr); gap: 0.125rem; } }
 
 /* Notices: written in the margin's red */
 .sf-notice {

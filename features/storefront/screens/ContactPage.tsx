@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { EmailText } from '../EmailText'
 import { PublicPage } from '../PublicSiteChrome'
 import { firmMetadata } from '../lib/metadata'
 import { CONSULTATION_HOURS_LABEL } from '../lib/consultation-presentation'
@@ -11,8 +12,8 @@ export default async function ContactPage() {
     <header className="sf-page__head"><h1 className="sf-title">Contact</h1>{settings.firmName ? <p className="sf-label">{settings.firmName}</p> : null}</header>
     <div className="grid max-w-3xl gap-10">
       <dl className="sf-facts" aria-label="How to reach the firm">
-        <div><dt>Consultations</dt><dd>{settings.bookingEnabled ? <Link href="/practice-areas" className="sf-link">Request a consultation</Link> : 'Not booked online'}</dd></div>
-        <div><dt>Email</dt><dd>{settings.supportEmail ? <a className="sf-link break-all" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : <span className="sf-muted">Not listed online</span>}</dd></div>
+        {settings.bookingEnabled ? <div><dt>Consultations</dt><dd><Link href="/practice-areas" className="sf-link">Request a consultation</Link></dd></div> : null}
+        {settings.supportEmail ? <div><dt>Email</dt><dd><a className="sf-link" href={`mailto:${settings.supportEmail}`}><EmailText value={settings.supportEmail} /></a></dd></div> : null}
         {settings.officePhone ? <div><dt>Phone</dt><dd><a className="sf-link" href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`}>{settings.officePhone}</a></dd></div> : null}
         {settings.bookingEnabled ? <div><dt>Consultation hours</dt><dd>{CONSULTATION_HOURS_LABEL}</dd></div> : null}
         <div><dt>Existing clients</dt><dd className="flex flex-wrap gap-x-5 gap-y-1"><Link href="/portal" className="sf-link">Open the client portal</Link><Link href="/portal/accept" className="sf-link">Use an invitation</Link></dd></div>
