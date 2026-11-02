@@ -1,5 +1,5 @@
 'use client'
-import { formatInZone } from '@/features/dashboard/lib/storeTime';
+import { ViewerTime } from '@/features/dashboard/components/ViewerTime';
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -18,7 +18,7 @@ function Message({ state }: { state: IntegrationActionState }) {
 }
 
 function date(value: string | null) {
-  return value ? formatInZone(value, undefined, "date") : null
+  return value ? <ViewerTime value={value} style="date" /> : null
 }
 
 function keyStatus(key: ApiKeyRow) {
@@ -126,7 +126,7 @@ export function ApiKeysClient({ keys, scopes }: { keys: ApiKeyRow[] | null; scop
                 <div className="flex min-w-0 items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="flex min-w-0 items-center gap-2 text-sm font-semibold"><StatusDot tone={statusTone(status)} /><span className="truncate">{key.name}</span><span className="shrink-0 text-xs font-normal text-muted-foreground">{statusLabel(status)}</span></p>
-                    <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground"><span className="font-mono">{key.prefix ?? '—'}</span> · {key.owner?.name || key.owner?.email || 'Owner unknown'} · {expires ? `Expires ${expires}` : 'No expiry'} · {lastUsed ? `Used ${lastUsed}` : 'Never used'}</p>
+                    <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground"><span className="font-mono">{key.prefix ?? '—'}</span> · {key.owner?.name || key.owner?.email || 'Owner unknown'} · {expires ? <>Expires {expires}</> : 'No expiry'} · {lastUsed ? <>Used {lastUsed}</> : 'Never used'}</p>
                     <p className="mt-0.5 truncate pl-4 font-mono text-xs text-muted-foreground">{key.scopes.join(' ') || 'No scopes'}</p>
                   </div>
                   {status === 'active' ? <Track><button type="button" onClick={() => setOpen(open === key.id ? null : key.id)} aria-pressed={open === key.id} aria-label={`Revoke ${key.name}`} className={trackItemClass(open === key.id)}>Revoke</button></Track> : null}

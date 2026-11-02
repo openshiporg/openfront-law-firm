@@ -1,5 +1,5 @@
 'use client'
-import { formatInZone } from '@/features/dashboard/lib/storeTime';
+import { ViewerTime } from '@/features/dashboard/components/ViewerTime';
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -35,7 +35,7 @@ function Message({ state }: { state: SignatureActionState }) {
 }
 
 function date(value: string | null) {
-  return value ? formatInZone(value, undefined, "date") : null
+  return value ? <ViewerTime value={value} style="date" /> : null
 }
 
 function RequestForm({ documentId, setup, onDone }: { documentId: string; setup: DocumentSignatureSetup; onDone: () => void }) {
@@ -123,7 +123,7 @@ function RequestItem({ documentId, request }: { documentId: string; request: Sig
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
         <div className="min-w-0 flex-1">
           <p className="flex min-w-0 items-center gap-2 text-sm font-semibold"><StatusDot tone={statusTone(status)} /><Link href={`/dashboard/platform/documents/signature-request/${encodeURIComponent(request.id)}`} className="truncate underline-offset-4 hover:underline">{request.title ?? 'Signature request'}</Link><StatusText status={status} className="ml-0" /></p>
-          <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground">v{request.versionNumber ?? '?'} · {request.connectionName ?? (request.provider || 'Manual')}{expires ? ` · Expires ${expires}` : ''} · {request.signers.length} {request.signers.length === 1 ? 'signer' : 'signers'}</p>
+          <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground">v{request.versionNumber ?? '?'} · {request.connectionName ?? (request.provider || 'Manual')}{expires ? <> · Expires {expires}</> : ''} · {request.signers.length} {request.signers.length === 1 ? 'signer' : 'signers'}</p>
         </div>
         {canAddSigner || canCancel ? (
           <Track>
