@@ -13,9 +13,9 @@ export default async function PrivacyPage() {
   const notice = settings.publication.privacyNotice
   const firm = settings.firmName || NEUTRAL_FIRM_NAME
   return <PublicPage>
-    <LegalPage title="Privacy notice" meta={notice ? `Version ${settings.publication.privacyNoticeVersion}` : 'Not published'}>
+    <LegalPage title="Privacy notice" meta={notice ? `Version ${settings.publication.privacyNoticeVersion}` : undefined}>
       {notice ? notice.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <>
-        <p>{firm} has not published a privacy notice on this site. Do not enter confidential, sensitive or time-critical information here.</p>
+        <p>For privacy questions, contact {firm}{settings.supportEmail ? <> at <a className="sf-link" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a></> : null}. Do not enter confidential, sensitive or time-critical information here.</p>
         {settings.isLocalFictional ? <p>This is a fictional local workspace: accounts and appointment requests here hold fictional test information only.</p> : null}
       </>}
       <h2>Existing clients</h2>

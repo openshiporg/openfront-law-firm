@@ -22,8 +22,8 @@ export default async function AttorneysPage() {
           <span className="grid gap-1"><span className="sf-h3">{person.name}</span><span className="sf-muted text-sm">{[person.title, person.focus].filter(Boolean).join(' · ')}</span></span>
         </Link></li>)}
       </ul> : <div className="sf-empty">
-        <p role="status" className="sf-h3">Attorney profiles are not published.</p>
-        <p className="sf-muted text-sm">Do not rely on this site to identify counsel or confirm representation.</p>
+        <p className="sf-h3">Contact the firm to arrange a consultation.</p>
+        <p className="sf-track"><Link href="/consultation" className="sf-pill sf-pill--primary">Request a consultation</Link></p>
       </div>}
     </div>
   </PublicPage>
