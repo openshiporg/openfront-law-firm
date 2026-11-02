@@ -1,100 +1,156 @@
-'use client'
+"use client";
 
-import { useEffect, useId, useRef, useState } from 'react'
-import { HUE_PRESETS, LOGO_ICONS } from './lib/untitled-logo-registry'
-import { sanitizeStoreLogoSvg } from '@/features/shared/sanitize-store-logo'
-import { normalizeStoreLogoColor, safeStoreLogo } from '@/features/shared/store-logo'
-import { Track, fieldClass, labelClass, pillClass, pillPrimaryClass, textareaClass, trackItemClass } from '@/features/platform/components/ui'
-import { cn } from '@/lib/utils'
+import { useEffect, useState } from "react";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { Code } from "lucide-react";
 
-/**
- * Logo library / custom SVG picker shared by Store Settings and onboarding. The
- * committed icon is always a sanitized SVG; custom edits stay in a draft until a
- * valid explicit Apply, so choosing "Custom SVG" never erases the current logo.
- * `onChange` reports the committed icon and hue for live previews.
- */
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { HUE_PRESETS, LOGO_ICONS } from "./lib/icon-registry";
+import { normalizeStoreLogoColor, safeStoreLogo } from "@/features/shared/store-logo";
+
+/** E-commerce's Store Settings logo block, posted with the surrounding form as logoIcon/logoColor. */
 export function LogoPicker({ initialIcon, initialColor, onChange }: { initialIcon: string; initialColor: string; onChange?: (value: { icon: string; hue: string }) => void }) {
-  const editorId = useId()
-  const [icon, setIcon] = useState(() => safeStoreLogo(initialIcon))
-  const [hue, setHue] = useState(normalizeStoreLogoColor(initialColor))
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(icon)
-  const selected = LOGO_ICONS.find(item => item.lightSvg === icon)
-  const safeDraft = sanitizeStoreLogoSvg(draft)
-  const startEditing = () => { setDraft(icon); setEditing(true) }
-  const choose = (id: string) => {
-    if (id === 'custom') return startEditing()
-    const found = LOGO_ICONS.find(item => item.id === id)
-    if (!found) return
-    setIcon(found.lightSvg)
-    setEditing(false)
-  }
-  const reported = useRef(onChange)
-  useEffect(() => { reported.current = onChange })
-  useEffect(() => { reported.current?.({ icon, hue }) }, [icon, hue])
-  const hueFilter = { filter: `hue-rotate(${normalizeStoreLogoColor(hue)}deg)` }
-  const activeId = editing || !selected ? 'custom' : selected.id
+  const [logoIcon, setLogoIcon] = useState(() => safeStoreLogo(initialIcon));
+  const [logoColor, setLogoColor] = useState(normalizeStoreLogoColor(initialColor));
+  // Reports the committed icon and hue to the live storefront preview.
+  useEffect(() => { onChange?.({ icon: logoIcon, hue: logoColor }) }, [logoIcon, logoColor]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Find matching preset icon, but don't default to first icon if not found
+  const selectedIcon = LOGO_ICONS.find((icon) => icon.lightSvg === logoIcon);
+  return (
+    <fieldset className="grid min-w-0 gap-6 sm:col-span-2">
+      <legend className="sr-only">Logo</legend>
+      <input type="hidden" name="logoIcon" value={logoIcon} />
+      <input type="hidden" name="logoColor" value={logoColor} />
+      {/* Logo Icon Selector */}
+      <div>
+        <Label>Logo Icon</Label>
+        <div className="mt-2 flex items-center gap-2">
+          <Select
+            value={selectedIcon?.id || ''}
+            onValueChange={(id) => {
+              const icon = LOGO_ICONS.find((i) => i.id === id);
+              if (icon) setLogoIcon(icon.lightSvg);
+            }}
+          >
+            <SelectPrimitive.Trigger
+              className={cn(
+                'flex h-12 w-12 shrink-0 rounded-lg border border-input bg-background focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 p-0 overflow-hidden items-center justify-center'
+              )}
+            >
+              <div
+                dangerouslySetInnerHTML={{ __html: logoIcon }}
+                style={{ filter: `hue-rotate(${logoColor}deg)` }}
+                className="[&>svg]:w-6 [&>svg]:h-6"
+              />
+            </SelectPrimitive.Trigger>
+            <SelectContent className="border-border dark:border-blue-700">
+              {LOGO_ICONS.map((icon) => (
+                <SelectItem key={icon.id} value={icon.id}>
+                  <span className="flex items-center gap-3">
+                    <div
+                      dangerouslySetInnerHTML={{ __html: icon.lightSvg }}
+                      style={{ filter: `hue-rotate(${logoColor}deg)` }}
+                      className="[&>svg]:w-6 [&>svg]:h-6"
+                    />
+                    <span>
+                      <span className="block font-medium text-gray-900 dark:text-gray-100">
+                        {icon.name}
+                      </span>
+                    </span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-  return <fieldset className="min-w-0 space-y-4">
-    <legend className="mb-3 text-sm font-semibold text-foreground">Store logo</legend>
-
-    <div className="flex min-w-0 items-center gap-3">
-      <span data-store-logo="preview" className="block size-12 shrink-0 rounded-[4px] border border-border bg-background p-1.5 [&>svg]:size-full" role="img" aria-label="Current logo preview" style={hueFilter} dangerouslySetInnerHTML={{ __html: icon }} />
-      <div className="min-w-0 text-sm">
-        <p className="truncate font-medium text-foreground">{editing || !selected ? 'Custom SVG' : selected.name}</p>
-        <p className="text-xs text-muted-foreground">{HUE_PRESETS.find(preset => String(preset.value) === normalizeStoreLogoColor(hue))?.name ?? 'Custom colour'}</p>
+          {/* SVG Code Editor Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 shrink-0"
+                type="button"
+              >
+                <Code className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[min(500px,calc(100vw-2rem))]" align="start">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Edit SVG Code</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Edit the SVG code directly. Changes will be reflected in the icon preview.
+                  </p>
+                </div>
+                <Textarea
+                  value={logoIcon}
+                  onChange={(e) => setLogoIcon(e.target.value)}
+                  className="font-mono text-xs min-h-[300px]"
+                  placeholder="<svg>...</svg>"
+                />
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-muted-foreground">Preview:</div>
+                  <div
+                    dangerouslySetInnerHTML={{ __html: logoIcon }}
+                    style={{ filter: `hue-rotate(${logoColor}deg)` }}
+                    className="[&>svg]:w-8 [&>svg]:h-8 flex items-center justify-center p-2 border rounded"
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
-    </div>
 
-    <div role="radiogroup" aria-label="Logo library" className="grid max-h-64 grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1.5 overflow-y-auto rounded-[6px] bg-muted p-1.5  ">
-      {LOGO_ICONS.map(item => {
-        const active = activeId === item.id
-        return <button
-          key={item.id}
-          type="button"
-          role="radio"
-          aria-checked={active}
-          aria-label={item.name}
-          title={item.name}
-          onClick={() => choose(item.id)}
-          className={cn(
-            'flex aspect-square min-h-11 items-center justify-center rounded-[4px] bg-background p-2 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/60 dark:bg-zinc-900',
-            active ? 'ring-2 ring-foreground ring-offset-2 ring-offset-muted' : 'ring-1 ring-black/5 hover:ring-black/20 dark:ring-white/10 dark:hover:ring-white/30',
-          )}
-        >
-          <span aria-hidden="true" className="block size-full [&>svg]:size-full" style={hueFilter} dangerouslySetInnerHTML={{ __html: item.lightSvg }} />
-        </button>
-      })}
-    </div>
-
-    {!editing ? <Track>
-      <button type="button" className={pillClass} aria-controls={editorId} aria-expanded={false} onClick={startEditing}>{selected ? 'Edit as custom SVG' : 'Edit custom SVG'}</button>
-    </Track> : <div id={editorId} className="grid gap-3 rounded-[6px] border border-border bg-muted/30 p-3">
-      <label className={labelClass}>Custom SVG
-        <textarea className={cn(textareaClass, 'min-h-32 font-mono text-xs')} value={draft} onChange={e => setDraft(e.target.value)} aria-invalid={!safeDraft} aria-describedby={`${editorId}-help`} maxLength={100000} spellCheck={false} />
-      </label>
-      <p id={`${editorId}-help`} className={`text-xs ${safeDraft ? 'text-muted-foreground' : 'text-destructive'}`} role={safeDraft ? undefined : 'alert'}>{safeDraft ? 'Scripts, links, styles, event handlers and external assets are rejected. Current logo kept until applied.' : 'Not a safe SVG document. Current logo unchanged.'}</p>
-      <Track>
-        <button type="button" className={pillPrimaryClass} disabled={!safeDraft || safeDraft === icon} onClick={() => { setIcon(safeDraft); setEditing(false) }}>Apply SVG</button>
-        <button type="button" className={pillClass} onClick={() => { setDraft(icon); setEditing(false) }}>Cancel</button>
-      </Track>
-    </div>}
-
-    <div className="grid min-w-0 gap-2">
-      <span className="text-xs font-medium text-muted-foreground" id={`${editorId}-hue`}>Logo hue</span>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Track label="Logo hue presets" className="min-w-0 max-w-full flex-wrap overflow-visible rounded-[6px]">
-          {HUE_PRESETS.map(preset => {
-            const active = normalizeStoreLogoColor(hue) === String(preset.value)
-            return <button key={preset.name} type="button" aria-pressed={active} className={trackItemClass(active)} onClick={() => setHue(String(preset.value))}>
-              <span aria-hidden="true" className="size-3 rounded-[4px] ring-1 ring-black/10" style={{ backgroundColor: `oklch(0.6 0.15 ${preset.hue})` }} />
-              {preset.name}
-            </button>
-          })}
-        </Track>
-        <input className={cn(fieldClass, 'w-24 tabular-nums')} aria-labelledby={`${editorId}-hue`} type="number" min="0" max="359" name="logoColor" value={hue} onChange={e => setHue(e.target.value)} />
+      {/* Logo Color Selector */}
+      <div>
+        <Label>Logo Color</Label>
+        <div className="mt-2">
+          <Select
+            value={logoColor}
+            onValueChange={(value) => setLogoColor(value)}
+          >
+            <SelectPrimitive.Trigger
+              className={cn(
+                'flex h-12 w-12 shrink-0 rounded-lg border border-input bg-background focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 p-0 overflow-hidden items-center justify-center'
+              )}
+            >
+              <SelectValue>
+                <div
+                  className="w-6 h-6 rounded-full"
+                  style={{
+                    background: `hsl(${(240 + parseInt(logoColor)) % 360}, 70%, 50%)`
+                  }}
+                />
+              </SelectValue>
+            </SelectPrimitive.Trigger>
+            <SelectContent className="border-border dark:border-blue-700">
+              <div className="grid grid-cols-4 gap-2 p-2">
+                {HUE_PRESETS.map((preset) => (
+                  <SelectItem
+                    key={preset.value}
+                    value={preset.value.toString()}
+                    className="cursor-pointer p-0 h-12 w-12 flex items-center justify-center [&>span:first-child]:hidden"
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full"
+                      style={{
+                        background: `hsl(${(240 + preset.value) % 360}, 70%, 50%)`
+                      }}
+                    />
+                  </SelectItem>
+                ))}
+              </div>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-    </div>
-    <input type="hidden" name="logoIcon" value={icon} />
-  </fieldset>
+    </fieldset>
+  );
 }

@@ -7,6 +7,7 @@ import { Save } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { LogoPicker } from '@/features/platform/store-settings/LogoPicker'
+import { StoreSettingsSaveBar } from '@/features/platform/store-settings/components/StoreSettingsSaveBar'
 import { safeStoreLogo } from '@/features/shared/store-logo'
 import { ErrorBanner, Notice, Panel, StatusDot, Track, fieldClass, labelClass, pillPrimaryClass, textareaClass, trackItemClass } from '@/features/platform/components/ui'
 
@@ -168,7 +169,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/90 py-3 pl-4 pr-20 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:-mx-6 md:pl-6 md:pr-24">
+      <div className="mt-6 flex min-w-0 flex-wrap items-center justify-between gap-3 pb-24 md:pb-0">
         <div className="min-w-0 flex-1 text-sm">
           {state.message ? (
             <p role="alert" className="text-destructive">{state.message}</p>
@@ -177,11 +178,11 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
             <p role="status" className="inline-flex items-center gap-2 text-foreground"><StatusDot tone="emerald" />Store settings saved.</p>
           ) : null}
         </div>
-        <Track>
-          <button type="submit" disabled={!firm} className={pillPrimaryClass}>
-            <Save className="size-4" aria-hidden="true" /> Save store settings
-          </button>
-        </Track>
+        <StoreSettingsSaveBar
+          isSaving={false}
+          label="Save store settings"
+          button={<Track><button type="submit" disabled={!firm} className={pillPrimaryClass}><Save className="size-4" aria-hidden="true" /> Save store settings</button></Track>}
+        />
       </div>
     </form>
   )
