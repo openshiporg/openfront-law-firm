@@ -31,6 +31,7 @@ import {
   requestRefund,
   reversePaymentAllocation,
   reviewRefund,
+  refundCardPayment,
   transitionInvoice,
   transitionPayment,
 } from "./billingWorkflows";
@@ -1069,6 +1070,12 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           explanation: String!
           idempotencyKey: String!
         ): RefundResult!
+        refundCardPayment(
+          paymentId: ID!
+          reason: String!
+          explanation: String!
+          idempotencyKey: String!
+        ): RefundResult!
         reviewRefund(
           refundId: ID!
           decision: String!
@@ -1465,6 +1472,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         reversePaymentAllocation,
         requestRefund,
         reviewRefund,
+        refundCardPayment,
         recordRefundProviderOutcome,
         recordPortalDiscoveryPolicy,
         executePortalGrant: (_root: unknown, { data }: { data: Parameters<typeof executePortalGrant>[1] }, context: any) => executePortalGrant(_root, data, context),

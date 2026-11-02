@@ -7,6 +7,7 @@ import { sha256Digest } from "../lib/digests";
 import { assertCommandTarget, assertLifecycleTransition } from "../lib/lifecycles";
 import { isGraphqlInt } from "../lib/int32";
 import { runSerializableTransaction } from "../lib/transactions";
+import { getPaymentStatus, refundPayment } from "../utils/paymentProviderAdapter";
 import {
   assertMatterAccess,
   assertMatterTeamCapability,
@@ -897,5 +898,99 @@ export async function recordManualPayment(
       metadata: { method: args.method, amountMinor: args.amountMinor, currencyCode, receivedAt: receivedAt.toISOString() },
     });
     return { payment, replayed: false };
+  });
+}
+
+// Refunds a client's online card payment for an operating invoice in one step:
+// Stripe refunds the card first, then the invoice allocation is reversed and a
+// succeeded refund is recorded with Stripe's refund id. Trust deposits stay on
+// the controlled trust disbursement path.
+export async function refundCardPayment(
+  _root: unknown,
+  args: { paymentId: string; reason: string; explanation: string; idempotencyKey: string },
+  context: Context,
+) {
+  const { firmId, userId } = requirePermission(context, "canManagePayments", { humanOnly: true });
+  const key = idempotencyKey(args.idempotencyKey);
+  if (!refundReasons.has(args.reason)) throw new Error("Unsupported refund reason.");
+  const explanation = boundedReason(args.explanation, "Refund explanation", 10, 4000);
+  const prisma = context.prisma as any;
+  const replay = await prisma.refund.findFirst({ where: { firmId, idempotencyKey: key } });
+  if (replay) {
+    if (replay.paymentId !== args.paymentId) throw new Error("Refund idempotency key was reused with a different payload.");
+    return { refund: replay, replayed: true };
+  }
+  const payment = await prisma.payment.findFirst({
+    where: { id: args.paymentId, firmId },
+    include: { paymentProvider: true, allocations: true, refunds: true },
+  });
+  if (!payment || !new Set(["captured", "settled"]).has(payment.status)) throw new Error("Only a captured or settled payment can be refunded.");
+  if (payment.paymentType !== "operating") throw new Error("Trust deposits are refunded through a trust disbursement.");
+  if (!payment.paymentProvider?.isInstalled || !String(payment.providerCode).startsWith("pp_stripe") || !payment.providerPaymentId) {
+    throw new Error("Only an online card payment can be refunded to the card.");
+  }
+  if (payment.refunds.some((row: any) => ["requested", "approved", "processing", "succeeded"].includes(row.status))) {
+    throw new Error("This payment already has a refund.");
+  }
+  const matterId = payment.matterId ?? null;
+  if (matterId) {
+    await assertMatterAccess(prisma, firmId, matterId, userId);
+    await assertMatterTeamCapability(prisma, firmId, matterId, userId, "canBill");
+  }
+  const amountMinor = payment.amountMinor - payment.refundedMinor;
+  if (amountMinor <= 0) throw new Error("Nothing is left to refund on this payment.");
+  const status = await getPaymentStatus({ provider: payment.paymentProvider, paymentId: payment.providerPaymentId });
+  const intentId = status?.paymentIntentId || (String(payment.providerPaymentId).startsWith("pi_") ? payment.providerPaymentId : null);
+  if (!intentId) throw new Error("The card payment has no settled charge to refund.");
+  const providerRefund = await refundPayment({ provider: payment.paymentProvider, paymentId: intentId, amount: amountMinor, idempotencyKey: `law-refund:${firmId}:${key}` });
+  const providerRefundId = String(providerRefund?.data?.id ?? "");
+  if (!["succeeded", "pending"].includes(providerRefund?.status) || providerRefund?.amount !== amountMinor || !providerRefundId) {
+    throw new Error("The card refund was not accepted; check the provider before retrying.");
+  }
+
+  return runSerializableTransaction(prisma, async (tx: any) => {
+    await assertCurrentCommandActor(tx, context, "canManagePayments");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`refund-payment:${firmId}:${payment.id}`}))`;
+    const again = await tx.refund.findFirst({ where: { firmId, idempotencyKey: key } });
+    if (again) return { refund: again, replayed: true };
+    const now = new Date();
+    const live = await tx.paymentAllocation.findMany({
+      where: { paymentId: payment.id, firmId, allocationType: "invoice", reversalAllocations: { none: {} } },
+      include: { invoice: true },
+    });
+    for (const original of live) {
+      await tx.paymentAllocation.create({
+        data: {
+          firmId, matterId: original.matterId, paymentId: original.paymentId, invoiceId: original.invoiceId,
+          idempotencyKey: `${key}:reverse:${original.id}`.slice(0, 160), allocationType: "reversal",
+          amountMinor: original.amountMinor, currencyCode: original.currencyCode, allocatedById: userId,
+          allocatedAt: now, reversesAllocationId: original.id, note: "Card payment refunded",
+        },
+      });
+      if (original.invoice) {
+        const invoice = await tx.invoice.findUnique({ where: { id: original.invoice.id } });
+        const paidMinor = Math.max(0, invoice.paidMinor - original.amountMinor);
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: { paidMinor, balanceDueMinor: invoice.totalMinor - paidMinor, status: invoiceStatusAfterPayment(invoice, paidMinor, now), paidAt: null },
+        });
+      }
+    }
+    const refund = await tx.refund.create({
+      data: {
+        firmId, matterId, paymentId: payment.id, invoiceId: payment.invoiceId,
+        refundNumber: `REF-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+        idempotencyKey: key, status: "succeeded", reason: args.reason, amountMinor,
+        currencyCode: payment.currencyCode, explanation, requestedById: userId, requestedAt: now,
+        approvedById: userId, approvedAt: now, processedAt: now, providerRefundId,
+      },
+    });
+    await tx.payment.update({ where: { id: payment.id }, data: { refundedMinor: { increment: amountMinor } } });
+    await recordAuditEvent(tx, {
+      firmId, eventType: "refund.succeeded", category: "financial", actorUserId: userId, matterId,
+      invoiceId: payment.invoiceId, paymentId: payment.id,
+      metadata: { refundId: refund.id, providerRefundId, amountMinor, source: "card_refund" },
+    });
+    return { refund, replayed: false };
   });
 }

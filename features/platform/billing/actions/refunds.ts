@@ -38,7 +38,17 @@ export type RefundRow = {
   invoiceNumber: string | null
 }
 
+export type CardRefundablePayment = {
+  id: string
+  paymentNumber: string
+  amountMinor: number
+  currencyCode: string
+  payerName: string | null
+  invoiceNumber: string | null
+}
+
 export type RefundSetup = {
+  cardPayments: CardRefundablePayment[]
   payments: RefundablePayment[]
   refunds: RefundRow[]
   viewerId: string | null
@@ -61,10 +71,11 @@ type PaymentRow = {
   invoice: { invoiceNumber: string } | null
   allocations: Array<{ amountMinor: number; allocationType: string }>
   refunds: Array<{ amountMinor: number; status: string }>
+  providerCode?: string | null
 }
 
 const paymentFields = `
-  id paymentNumber status paymentType amountMinor refundedMinor currencyCode
+  id paymentNumber status paymentType amountMinor refundedMinor currencyCode providerCode
   payer { displayName } invoice { invoiceNumber }
   allocations(take: 100) { amountMinor allocationType }
   refunds(take: 100) { amountMinor status }
@@ -122,6 +133,10 @@ export async function getRefundSetup(): Promise<{ success: true; data: RefundSet
   return {
     success: true,
     data: {
+      cardPayments: response.data.payments
+        .filter((payment) => payment.paymentType === 'operating' && String(payment.providerCode ?? '').startsWith('pp_stripe') && !(payment.refundedMinor ?? 0)
+          && !payment.refunds.some((row) => row.status !== 'cancelled' && row.status !== 'failed'))
+        .map((payment) => ({ id: payment.id, paymentNumber: payment.paymentNumber, amountMinor: payment.amountMinor, currencyCode: payment.currencyCode, payerName: payment.payer?.displayName ?? null, invoiceNumber: payment.invoice?.invoiceNumber ?? null })),
       payments: response.data.payments.map(toOption).filter((payment) => payment.refundableMinor > 0),
       refunds: response.data.refunds.map(({ requestedBy, approvedBy, payment, invoice, ...row }) => ({
         ...row,
@@ -219,5 +234,30 @@ export async function reviewPaymentRefund(_previous: RefundActionState, formData
     return { ok: true, message: `${refund.refundNumber} ${decision === 'approve' ? 'approved' : 'rejected'}.` }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'The review was not recorded.' }
+  }
+}
+
+export async function refundCardPaymentAction(_previous: RefundActionState, formData: FormData): Promise<RefundActionState> {
+  try {
+    const idempotencyKey = field(formData, 'idempotencyKey')
+    const paymentId = field(formData, 'paymentId')
+    const reason = field(formData, 'reason')
+    const explanation = field(formData, 'explanation')
+    if (!/^[A-Za-z0-9:_-]{12,160}$/.test(idempotencyKey) || !ID.test(paymentId)) return { ok: false, message: 'Reload the page and try again.' }
+    if (!REASONS.includes(reason)) return { ok: false, message: 'Choose a refund reason.' }
+    if (explanation.length < 10 || explanation.length > 4000) return { ok: false, message: 'Explanation must be between 10 and 4,000 characters.' }
+    const response = await keystoneClient<{ refundCardPayment: { refund: { refundNumber: string; amountMinor: number; currencyCode: string; status: string }; replayed: boolean } }>(`
+      mutation RefundCardPayment($paymentId: ID!, $reason: String!, $explanation: String!, $idempotencyKey: String!) {
+        refundCardPayment(paymentId: $paymentId, reason: $reason, explanation: $explanation, idempotencyKey: $idempotencyKey) {
+          refund { refundNumber amountMinor currencyCode status } replayed
+        }
+      }
+    `, { paymentId, reason, explanation, idempotencyKey })
+    if (!response.success) return { ok: false, message: response.error || 'The card refund did not go through. Check the payment and try again.' }
+    revalidateBilling()
+    const { refund } = response.data.refundCardPayment
+    return { ok: true, message: `Refunded ${formatMoneyLabel(refund.amountMinor, refund.currencyCode)} to the card: ${refund.refundNumber}.` }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'The card refund did not go through.' }
   }
 }

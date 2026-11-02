@@ -9,7 +9,7 @@ import { EmptyState, Notice, Panel, RowList, TitleLine, Track, fieldClass, label
 import { formatInstant } from '@/features/platform/lib/datetime'
 import { currencyFractionDigits, formatMoneyLabel, minorUnitsToDecimal } from '@/features/platform/lib/money'
 
-import { requestPaymentRefund, reviewPaymentRefund, type RefundActionState, type RefundRow, type RefundSetup } from '../actions/refunds'
+import { refundCardPaymentAction, requestPaymentRefund, reviewPaymentRefund, type CardRefundablePayment, type RefundActionState, type RefundRow, type RefundSetup } from '../actions/refunds'
 import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: RefundActionState = { ok: false, message: '' }
@@ -101,6 +101,53 @@ function RequestRefundForm({ payments, onDone }: { payments: RefundSetup['paymen
   )
 }
 
+function CardRefundRow({ payment }: { payment: CardRefundablePayment }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [key] = useState(() => `card-refund-${crypto.randomUUID()}`)
+  const [reason, setReason] = useState('client_request')
+  const [state, run, pending] = useActionState(async (previous: RefundActionState, formData: FormData) => {
+    formData.set('idempotencyKey', key)
+    const result = await refundCardPaymentAction(previous, formData)
+    if (result.ok) router.refresh()
+    return result
+  }, initial)
+  return (
+    <li className="grid min-w-0 gap-2 px-4 py-3">
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">{payment.paymentNumber}</p>
+          <p className="min-w-0 text-xs text-muted-foreground [overflow-wrap:anywhere]">{payment.payerName ?? 'Client'}{payment.invoiceNumber ? ` · ${payment.invoiceNumber}` : ''} · paid by card online</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="font-mono text-sm tabular-nums text-foreground">{formatMoneyLabel(payment.amountMinor, payment.currencyCode)}</span>
+          <button type="button" className={open ? pillClass : pillDangerClass} onClick={() => setOpen((value) => !value)}>{open ? 'Close' : 'Refund to card'}</button>
+        </div>
+      </div>
+      {open ? (
+        <form action={run} className="grid min-w-0 gap-3 sm:grid-cols-2">
+          <input type="hidden" name="paymentId" value={payment.id} />
+          <div className={labelClass}>
+            <label htmlFor={`card-refund-reason-${payment.id}`}>Reason</label>
+            <FormSelect id={`card-refund-reason-${payment.id}`} name="reason" required value={reason} onValueChange={setReason} className={cn(fieldClass, 'text-foreground')}>
+              {reasons.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </FormSelect>
+          </div>
+          <label className={cn(labelClass, 'sm:col-span-2')}>
+            Explanation
+            <textarea name="explanation" required minLength={10} maxLength={4000} rows={2} className={textareaClass} />
+          </label>
+          <p className="text-xs text-muted-foreground sm:col-span-2">The full amount goes back to the client's card and the invoice reopens.</p>
+          <Track>
+            <button type="submit" className={pillDangerClass} disabled={pending || state.ok}>{pending ? 'Refunding…' : `Refund ${formatMoneyLabel(payment.amountMinor, payment.currencyCode)}`}</button>
+          </Track>
+        </form>
+      ) : null}
+      <Message state={state} />
+    </li>
+  )
+}
+
 function ReviewControls({ refund, viewerId }: { refund: RefundRow; viewerId: string | null }) {
   const router = useRouter()
   const [decision, setDecision] = useState<'approve' | 'cancel' | null>(null)
@@ -156,6 +203,14 @@ export function BillingRefundsClient({ setup, actions }: { setup: RefundSetup; a
     >
       <div className="grid min-w-0 gap-4">
         {requesting ? <RequestRefundForm payments={setup.payments} onDone={() => setRequesting(false)} /> : null}
+        {setup.cardPayments.length ? (
+          <div className="grid min-w-0 gap-2">
+            <h3 className="text-xs font-semibold text-muted-foreground">Card payments</h3>
+            <RowList label="Card payments">
+              {setup.cardPayments.map((payment) => <CardRefundRow key={payment.id} payment={payment} />)}
+            </RowList>
+          </div>
+        ) : null}
         {setup.refunds.length === 0 ? <EmptyState title="No refunds requested" /> : (
           <RowList label="Refunds">
             {setup.refunds.map((refund) => (
