@@ -24,6 +24,11 @@ export type StorefrontPublication = {
   aboutStatement: string | null
 }
 
+/** The published Firm name: the Firm name wins, the Display name is the fallback. */
+export function resolveFirmName(firm: { name?: string | null; displayName?: string | null }): string | null {
+  return (firm.name?.trim() || firm.displayName?.trim() || "") || null
+}
+
 export type StorefrontSettings = {
   firmName: string | null
   tagline: string | null
@@ -126,7 +131,7 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
     return { firmName: null, tagline: null, accentHex: null, supportEmail: null, officePhone: null, officeAddress: [], logoIcon: safeStoreLogo(null), logoColor: '0', isLocalFictional: false, isConfigured: false, accountsEnabled: false, bookingEnabled: false, publication: CLOSED_PUBLICATION }
   }
 
-  const firmName = (firm.displayName || firm.name || "").trim() || null
+  const firmName = resolveFirmName(firm)
   const candidateEmail = firm.supportEmail?.trim() || ""
   const supportEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail) ? candidateEmail : null
   let officePhone: string | null = null

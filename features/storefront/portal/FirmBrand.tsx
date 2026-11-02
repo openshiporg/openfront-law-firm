@@ -15,7 +15,7 @@ export type PortalBrand = {
  * an unverified visitor gets the neutral fallback.
  */
 export function FirmBrand({ brand }: { brand: PortalBrand }) {
-  const name = brand.displayName || brand.name || NEUTRAL_FIRM_NAME
+  const name = brand.name?.trim() || brand.displayName?.trim() || NEUTRAL_FIRM_NAME
   return (
     <div className="flex min-w-0 items-center gap-3">
       <StoreLogo icon={brand.logoIcon ?? ''} hue={brand.logoColor ?? '0'} />
