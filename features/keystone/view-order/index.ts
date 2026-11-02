@@ -13,5 +13,6 @@ export const VIEW_ORDER = [
   "checkbox",
   "json",
   "integer",
-  "multiselect"
+  "multiselect",
+  "image"
 ];

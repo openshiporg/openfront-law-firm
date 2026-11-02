@@ -9,10 +9,11 @@ export type PublishedAttorney = {
   biography: string | null
   admissions: string[]
   email: string | null
+  photoUrl: string | null
   practiceAreas: Array<{ name: string; slug: string | null }>
 }
 
-type Row = { slug: string | null; name: string; title: string | null; focus: string | null; biography: string | null; admissions: string | null; email: string | null; practiceAreas: Array<{ name: string; publicSlug: string | null; isPublic: boolean; status: string }> }
+type Row = { slug: string | null; name: string; title: string | null; focus: string | null; biography: string | null; admissions: string | null; email: string | null; photo_id: string | null; photo_extension: string | null; practiceAreas: Array<{ name: string; publicSlug: string | null; isPublic: boolean; status: string }> }
 
 /**
  * Firm-published attorney profiles for the single active firm. Only profiles a
@@ -28,9 +29,16 @@ export async function getPublishedAttorneys(firmPublished: boolean, slug?: strin
       where: { firmId: firms[0].id, isPublic: true, ...(slug ? { slug } : {}) },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       take: 100,
-      select: { slug: true, name: true, title: true, focus: true, biography: true, admissions: true, email: true, practiceAreas: { select: { name: true, publicSlug: true, isPublic: true, status: true } } },
+      select: { slug: true, name: true, title: true, focus: true, biography: true, admissions: true, email: true, photo_id: true, photo_extension: true, practiceAreas: { select: { name: true, publicSlug: true, isPublic: true, status: true } } },
     }) as Row[]
-    return rows.filter((row) => row.slug).map((row) => ({
+    const sign = async (row: Row) => {
+      if (!row.photo_id || !row.photo_extension) return null
+      try { return await keystoneContext.sudo().images('my_images').getUrl(row.photo_id, row.photo_extension as any) } catch { return null }
+    }
+    const published = rows.filter((row) => row.slug)
+    const photos = await Promise.all(published.map(sign))
+    return published.map((row, index) => ({
+      photoUrl: photos[index],
       slug: row.slug as string,
       name: row.name,
       title: row.title?.trim() || null,

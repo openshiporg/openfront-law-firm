@@ -29,6 +29,8 @@ export type StorefrontSettings = {
   tagline: string | null
   accentHex: string | null
   supportEmail: string | null
+  /** The active office's saved phone, shown as written (format-checked only). */
+  officePhone: string | null
   logoIcon: string
   logoColor: string
   isLocalFictional: boolean
@@ -119,12 +121,18 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
   // Published identity requires active configuration, not legal authority.
   // Onboarding/suspended/closed, or no firm at all, is a truthful unset state.
   if (!firm || firm.status !== "active") {
-    return { firmName: null, tagline: null, accentHex: null, supportEmail: null, logoIcon: safeStoreLogo(null), logoColor: '0', isLocalFictional: false, isConfigured: false, accountsEnabled: false, bookingEnabled: false, publication: CLOSED_PUBLICATION }
+    return { firmName: null, tagline: null, accentHex: null, supportEmail: null, officePhone: null, logoIcon: safeStoreLogo(null), logoColor: '0', isLocalFictional: false, isConfigured: false, accountsEnabled: false, bookingEnabled: false, publication: CLOSED_PUBLICATION }
   }
 
   const firmName = (firm.displayName || firm.name || "").trim() || null
   const candidateEmail = firm.supportEmail?.trim() || ""
   const supportEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail) ? candidateEmail : null
+  let officePhone: string | null = null
+  try {
+    const office = await keystoneContext.sudo().prisma.office.findFirst({ where: { firmId: firm.id, status: 'active' }, orderBy: [{ code: 'asc' }], select: { phone: true } })
+    const candidatePhone = office?.phone?.trim() ?? ''
+    if (/^\+?[\d\s().\-]{7,30}$/.test(candidatePhone) && candidatePhone.replace(/\D/g, '').length >= 7) officePhone = candidatePhone
+  } catch {}
   const isLocalFictional = await isLocalFixtureFirm(keystoneContext.prisma, firm.id)
   // Synthetic firms outside the owned fixture are never published as a real firm.
   const published = isLocalFictional
@@ -139,6 +147,7 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
     tagline: firm.brandTagline?.trim() || null,
     accentHex: resolveStorefrontAccent(firm.brandColor),
     supportEmail,
+    officePhone,
     isConfigured: Boolean(firmName),
   }
 }

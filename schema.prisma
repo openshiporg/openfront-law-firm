@@ -2815,21 +2815,26 @@ model PublicSitePolicy {
 }
 
 model AttorneyProfile {
-  id            String         @id @default(cuid())
-  firm          Firm           @relation("AttorneyProfile_firm", fields: [firmId], references: [id])
-  firmId        String         @map("firm")
-  name          String         @default("")
-  slug          String         @default("")
-  title         String         @default("")
-  focus         String         @default("")
-  biography     String         @default("")
-  admissions    String         @default("")
-  email         String         @default("")
-  practiceAreas PracticeArea[] @relation("AttorneyProfile_practiceAreas")
-  isPublic      Boolean        @default(false)
-  sortOrder     Int?           @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @default(now()) @updatedAt
+  id              String         @id @default(cuid())
+  firm            Firm           @relation("AttorneyProfile_firm", fields: [firmId], references: [id])
+  firmId          String         @map("firm")
+  name            String         @default("")
+  slug            String         @default("")
+  title           String         @default("")
+  focus           String         @default("")
+  biography       String         @default("")
+  admissions      String         @default("")
+  email           String         @default("")
+  photo_id        String?
+  photo_filesize  Int?
+  photo_width     Int?
+  photo_height    Int?
+  photo_extension String?
+  practiceAreas   PracticeArea[] @relation("AttorneyProfile_practiceAreas")
+  isPublic        Boolean        @default(false)
+  sortOrder       Int?           @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
 
   @@unique([firmId, slug])
   @@index([firmId])

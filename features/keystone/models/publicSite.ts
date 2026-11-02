@@ -1,5 +1,5 @@
-import { list } from "@keystone-6/core";
-import { checkbox, integer, relationship, select, text, timestamp } from "@keystone-6/core/fields";
+import { graphql, list } from "@keystone-6/core";
+import { checkbox, image, integer, relationship, select, text, timestamp, virtual } from "@keystone-6/core/fields";
 
 import { isInteractiveHuman, permissions, rules, type AccessArgs } from "../access";
 import { denyAll, firmOwnedHooks } from "../tenancy";
@@ -161,6 +161,18 @@ export const AttorneyProfile = list({
     biography: text({ ui: { displayMode: "textarea" }, validation: { length: { max: 8000 } } }),
     admissions: text({ ui: { displayMode: "textarea", description: "Bar admissions as the firm verified them, one per line." }, validation: { length: { max: 2000 } } }),
     email: text({ validation: { length: { max: 320 } } }),
+    photo: image({ storage: "my_images", label: "Portrait" }),
+    /** Signed portrait URL for the public site; null until a portrait is uploaded. */
+    photoUrl: virtual({
+      field: graphql.field({
+        type: graphql.String,
+        async resolve(item: any, _args, context) {
+          if (item.photo_id && item.photo_extension) return context.images("my_images").getUrl(item.photo_id, item.photo_extension);
+          return null;
+        },
+      }),
+      ui: { itemView: { fieldMode: "hidden" }, listView: { fieldMode: "hidden" } },
+    }),
     practiceAreas: relationship({ ref: "PracticeArea", many: true }),
     isPublic: checkbox({ defaultValue: false }),
     sortOrder: integer({ defaultValue: 0 }),

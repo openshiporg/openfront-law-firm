@@ -8,6 +8,7 @@ import { passwordResetPurpose, sendPasswordResetEmail } from "./lib/mail";
 import { models } from "./models";
 import { permissionKeys } from "./access";
 import { extendGraphqlSchema } from "./mutations";
+import { s3ForcePathStyle } from "./lib/s3-storage";
 
 const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
 
@@ -97,6 +98,20 @@ export default withAuth(
       url: databaseURL,
     },
     lists: models,
+    // Uploaded images (attorney portraits) share the deployment's S3_* bucket with document files.
+    storage: {
+      my_images: {
+        kind: "s3",
+        type: "image",
+        bucketName: process.env.S3_BUCKET_NAME ?? "keystone-test",
+        region: process.env.S3_REGION ?? "us-east-1",
+        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "keystone",
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "keystone",
+        endpoint: process.env.S3_ENDPOINT ?? "https://sfo3.digitaloceanspaces.com",
+        signed: { expiry: 5000 },
+        forcePathStyle: s3ForcePathStyle(process.env.S3_ENDPOINT),
+      },
+    },
     ui: {
       isAccessAllowed: ({ session }) => permissions.canAccessDashboard({ session }),
     },

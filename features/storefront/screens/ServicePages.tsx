@@ -55,6 +55,7 @@ export async function HomePage() {
           <dl className="sf-hero__facts">
             <div><dt>Consultations</dt><dd>{settings.bookingEnabled ? 'Request a time online' : 'Not taken online'}</dd></div>
             <div><dt>Email</dt><dd>{settings.supportEmail ? <a className="sf-link" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : <span className="sf-muted">Not listed online</span>}</dd></div>
+            {settings.officePhone ? <div><dt>Phone</dt><dd><a className="sf-link" href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`}>{settings.officePhone}</a></dd></div> : null}
             <div><dt>Clients</dt><dd><Link className="sf-link" href="/portal">Client portal</Link></dd></div>
           </dl>
           <div className="sf-track">

@@ -31,6 +31,10 @@ function ProfileForm({ profile, areas, onDone }: { profile?: AttorneyProfileRow;
         <label className={labelClass}>Public email<input name="email" type="email" maxLength={320} defaultValue={profile?.email ?? ''} className={fieldClass} /></label>
         <label className={labelClass}>Order<input name="sortOrder" type="number" step={1} defaultValue={profile?.sortOrder ?? 0} className={fieldClass} /></label>
       </div>
+      <div className="grid gap-1.5 sm:col-span-2">
+        <label className={labelClass}>Portrait (square or 4:5 works best)<input name="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" className={fieldClass} /></label>
+        {profile?.photoUrl ? <div className="flex items-center gap-3 text-sm"><img src={profile.photoUrl} alt="" className="size-12 rounded-[2px] border border-border object-cover" /><label className="flex items-center gap-2"><input type="checkbox" name="removePhoto" className="size-4 accent-foreground" />Remove portrait</label></div> : null}
+      </div>
       {areas.length ? <fieldset className="grid gap-1.5 sm:col-span-2">
         <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Practice areas</legend>
         <div className="flex flex-wrap gap-2">

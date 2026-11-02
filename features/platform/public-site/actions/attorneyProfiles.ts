@@ -14,6 +14,7 @@ export type AttorneyProfileRow = {
   biography: string | null
   admissions: string | null
   email: string | null
+  photoUrl: string | null
   isPublic: boolean
   sortOrder: number | null
   practiceAreas: Array<{ id: string; name: string }>
@@ -23,7 +24,7 @@ export type AttorneyProfileSetup = { status: 'loaded'; profiles: AttorneyProfile
 
 export async function getAttorneyProfileSetup(): Promise<AttorneyProfileSetup> {
   const response = await keystoneClient<{ attorneyProfiles: AttorneyProfileRow[] }>(`
-    query AttorneyProfiles { attorneyProfiles(take: 100, orderBy: [{ sortOrder: asc }, { name: asc }]) { id name slug title focus biography admissions email isPublic sortOrder practiceAreas { id name } } }
+    query AttorneyProfiles { attorneyProfiles(take: 100, orderBy: [{ sortOrder: asc }, { name: asc }]) { id name slug title focus biography admissions email photoUrl isPublic sortOrder practiceAreas { id name } } }
   `)
   return response.success ? { status: 'loaded', profiles: response.data.attorneyProfiles ?? [] } : { status: 'error' }
 }
@@ -57,6 +58,14 @@ export async function saveAttorneyProfile(previous: PublicSiteState, formData: F
       sortOrder: Number.isInteger(sortOrder) ? sortOrder : 0,
       practiceAreas: id ? { set: areaIds.map((areaId) => ({ id: areaId })) } : { connect: areaIds.map((areaId) => ({ id: areaId })) },
       ...(slug ? { slug } : {}),
+    }
+    const photo = formData.get('photo')
+    if (photo instanceof File && photo.size > 0) {
+      if (!/^image\/(png|jpeg|webp|gif)$/.test(photo.type)) return { ok: false, message: 'Portrait must be a PNG, JPEG, WebP or GIF image.', revision }
+      if (photo.size > 8 * 1024 * 1024) return { ok: false, message: 'Portrait must be 8 MB or smaller.', revision }
+      data.photo = { upload: photo }
+    } else if (id && formData.get('removePhoto') === 'on') {
+      data.photo = null
     }
     const response = id
       ? await keystoneClient<{ updateAttorneyProfile: { id: string } | null }>(`mutation SaveProfile($id: ID!, $data: AttorneyProfileUpdateInput!) { updateAttorneyProfile(where: { id: $id }, data: $data) { id } }`, { id, data })
