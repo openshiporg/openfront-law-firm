@@ -50,8 +50,8 @@ export async function HomePage() {
     <section className="sf-shell sf-hero" aria-labelledby="home-title">
       <div className="sf-hero__grid">
         <div className="sf-hero__body">
-          <h1 id="home-title" className="sf-display">{name ?? 'Firm information is not yet published.'}</h1>
-          {published && settings.tagline ? <p className="sf-lede">{settings.tagline}</p> : name && !published ? <p className="sf-lede">Practice areas and attorney profiles are not yet published.</p> : null}
+          <h1 id="home-title" className="sf-display">{name ?? NEUTRAL_FIRM_NAME}</h1>
+          {published && settings.tagline ? <p className="sf-lede">{settings.tagline}</p> : null}
           {settings.isLocalFictional ? <p className="sf-fine">Fictional local workspace</p> : null}
           <dl className="sf-hero__facts">
             {settings.bookingEnabled ? <div><dt>Consultations</dt><dd>Request a time online</dd></div> : null}
