@@ -8,6 +8,7 @@ import { keystoneContext } from '@/features/keystone/context';
 import { permissions } from '@/features/keystone/access';
 import { PUBLIC_REQUEST_ERROR, safeErrorSummary } from '@/features/dashboard/lib/security';
 import { createScopedMcpFetch } from './scopedMcpFetch';
+import { clientSourceFromHeaders, loopbackOrigin } from '@/features/keystone/lib/internal-origin';
 
 export async function POST(req: Request) {
   let mcpClient: any = null;
@@ -78,13 +79,18 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Unable to validate AI credentials.' }, { status: 401 });
     }
 
-    const baseUrl = await getBaseUrl();
+    // Self-call goes over loopback (never the shared public egress IP); falls back to the public URL.
+    const loopback = loopbackOrigin();
+    const baseUrl = loopback ?? await getBaseUrl();
+    const clientSource = clientSourceFromHeaders(req.headers);
     const mcpEndpoint = `${baseUrl}/api/mcp-transport/http`;
     const cookie = req.headers.get('cookie') || '';
 
     const endpoint = new URL(mcpEndpoint);
     const transport = new StreamableHTTPClientTransport(endpoint, {
-      fetch: createScopedMcpFetch(endpoint, cookie),
+      fetch: createScopedMcpFetch(endpoint, cookie, loopback && clientSource
+        ? (input, init) => fetch(input, { ...init, headers: new Headers({ ...Object.fromEntries(new Headers(init?.headers)), 'x-real-ip': clientSource }) })
+        : fetch),
     });
     mcpClient = await createMCPClient({ transport });
     const aiTools = await mcpClient.tools();

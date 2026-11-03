@@ -1,3 +1,4 @@
+import { clientSourceFromHeaders, internalGraphqlEndpoint, internalIdentityHeaders } from "@/features/keystone/lib/internal-origin";
 import { NextResponse } from "next/server";
 
 import { getRequestOrigin } from "@/features/dashboard/lib/internalAppOrigin";
@@ -28,12 +29,18 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(`/dashboard/signin?from=${encodeURIComponent(requestedPath)}`, publicOrigin), 303);
   }
   try {
-    const endpoint = new URL("/api/graphql", publicOrigin);
+    // Server-to-self over loopback with the visitor's signed identity; redirects below still use the public origin.
+    const loopback = internalGraphqlEndpoint();
+    const endpoint = new URL(loopback ?? "/api/graphql", loopback ? undefined : publicOrigin);
     const response = await fetch(endpoint, {
       method: "POST",
       redirect: "manual",
       cache: "no-store",
-      headers: { "content-type": "application/json", cookie },
+      headers: {
+        "content-type": "application/json",
+        cookie,
+        ...(loopback ? internalIdentityHeaders(clientSourceFromHeaders(request.headers)) : {}),
+      },
       body: JSON.stringify({
         query: `query SessionContinuation {
           authenticatedItem { ... on User { id } }
