@@ -215,6 +215,7 @@ export function graphqlTransportRejection(input: {
   secFetchSite?: string;
   origin?: string;
   requestOrigin?: string;
+  internalVerified?: boolean;
 }) {
   if (input.method !== "POST") return { status: 405, message: "GraphQL accepts POST requests only." };
   if (input.secFetchSite?.toLowerCase() === "cross-site") {
@@ -226,7 +227,9 @@ export function graphqlTransportRejection(input: {
   if (!isJson && !isMultipart) {
     return { status: 415, message: "GraphQL requires JSON or same-origin multipart form data." };
   }
-  if (isMultipart) {
+  // Only the server-side loopback HMAC verifier may grant this exception.
+  // Unsigned browser uploads retain the exact same-origin requirement.
+  if (isMultipart && !input.internalVerified) {
     if (!input.origin || !input.requestOrigin) {
       return { status: 403, message: "Multipart GraphQL requests require an exact same-origin browser request." };
     }

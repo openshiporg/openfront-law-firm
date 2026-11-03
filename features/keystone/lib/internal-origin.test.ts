@@ -10,7 +10,45 @@ import {
   loopbackOrigin,
 } from './internal-origin'
 
+import { graphqlTransportRejection } from './graphql-security'
+
 const SECRET = 'a'.repeat(40)
+
+function multipartRejection(headers: Record<string, string>, socket: string, now: number, origin?: string) {
+  return graphqlTransportRejection({
+    method: 'POST', contentType: 'multipart/form-data; boundary=test',
+    requestOrigin: 'https://firm.example', origin,
+    internalVerified: Boolean(verifiedInternalIdentity(headers, socket, SECRET, now)),
+  })
+}
+
+test('multipart accepts a verified loopback identity, not unsigned or remotely replayed headers', () => {
+  const now = Date.now()
+  const { headers } = signedHeaders(now)
+  for (const socket of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+    assert.equal(multipartRejection(headers, socket, now), null)
+  }
+  assert.equal(multipartRejection({}, '127.0.0.1', now)?.status, 403)
+  assert.equal(multipartRejection(headers, '203.0.113.99', now)?.status, 403)
+  assert.equal(multipartRejection(headers, '127.0.0.1', now + 92_000)?.status, 403)
+  assert.equal(multipartRejection({ ...headers, 'x-openfront-client-signature': 'b'.repeat(64) }, '127.0.0.1', now)?.status, 403)
+})
+
+test('browser multipart retains exact same-origin checks', () => {
+  const now = Date.now()
+  assert.equal(multipartRejection({}, '203.0.113.99', now, 'https://other.example')?.status, 403)
+  assert.equal(multipartRejection({}, '203.0.113.99', now, 'https://firm.example'), null)
+  assert.equal(multipartRejection({}, '203.0.113.99', now, 'not an origin')?.status, 403)
+})
+
+test('JSON and the method, cross-site and content-type gates are unchanged', () => {
+  for (const internalVerified of [false, true]) {
+    assert.equal(graphqlTransportRejection({ method: 'POST', contentType: 'application/json', internalVerified }), null)
+    assert.equal(graphqlTransportRejection({ method: 'GET', contentType: 'application/json', internalVerified })?.status, 405)
+    assert.equal(graphqlTransportRejection({ method: 'POST', contentType: 'multipart/form-data', secFetchSite: 'cross-site', internalVerified })?.status, 403)
+    assert.equal(graphqlTransportRejection({ method: 'POST', contentType: 'text/plain', internalVerified })?.status, 415)
+  }
+})
 
 // This repo has no IP-keyed limiter; the verifier is shipped for the fleet pattern and must stay strict.
 function requestIdentity(headers: Record<string, string>, socket: string | null | undefined, secret: string, now: number) {

@@ -4,6 +4,7 @@ import processRequest from "graphql-upload/processRequest.js";
 import { type NextApiRequest, type NextApiResponse } from 'next'
 
 import { getRequestBaseUrl } from '../../features/dashboard/lib/internalAppOrigin'
+import { verifiedInternalIdentity } from '../../features/keystone/security/internalIdentity'
 import { authenticateBearerToken } from '../../features/keystone/lib/machine-auth'
 import {
   GraphqlRequestBodyError,
@@ -36,6 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     secFetchSite: String(req.headers["sec-fetch-site"] ?? ""),
     origin: typeof req.headers.origin === "string" ? req.headers.origin : undefined,
     requestOrigin,
+    internalVerified: Boolean(verifiedInternalIdentity(req.headers, req.socket.remoteAddress)),
   });
   if (rejection) {
     if (rejection.status === 405) res.setHeader("Allow", "POST");
