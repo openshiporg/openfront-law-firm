@@ -100,7 +100,7 @@ export async function ServicesPage({ searchParams }: { searchParams: Promise<{ a
     <header className="sf-page__head">
       <h1 className="sf-title">Practice areas</h1>{services.length ? <p className="sf-label">Consultation appointments</p> : null}
     </header>
-    {services.length ? <PracticeIndex services={services} bookingEnabled={settings.bookingEnabled} /> : <div className="sf-empty"><p role="status" className="sf-h3">{cursor ? 'No more practice areas.' : 'Practice areas are not published.'}</p>{cursor ? null : <><p className="sf-muted text-sm">To ask about a legal matter, contact the firm directly.</p><Link className="sf-link" href="/contact">Contact the firm</Link></>}</div>}
+    {services.length ? <PracticeIndex services={services} bookingEnabled={settings.bookingEnabled} /> : <div className="sf-empty"><p role="status" className="sf-h3">{cursor ? 'No more practice areas.' : 'No practice areas to show right now.'}</p>{cursor ? null : <><p className="sf-muted text-sm">To ask about a legal matter, contact the firm directly.</p><Link className="sf-link" href="/contact">Contact the firm</Link></>}</div>}
     {cursor || nextCursor ? <nav aria-label="Practice area pages" className="sf-track mt-8">{cursor ? <Link className="sf-pill" href="/practice-areas">First page</Link> : null}{nextCursor ? <Link className="sf-pill sf-pill--raised" href={`/practice-areas?after=${encodeURIComponent(nextCursor)}`}>More practice areas</Link> : null}</nav> : null}
   </div></PublicPage>
 }

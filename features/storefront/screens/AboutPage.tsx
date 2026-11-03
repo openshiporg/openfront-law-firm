@@ -18,7 +18,7 @@ export default async function AboutPage() {
         <article className="grid gap-8">
           <header className="grid gap-3"><h1 className="sf-title">{settings.firmName ?? 'About'}</h1></header>
           <div className="sf-prose sf-prose--lead">
-            {about ? about.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p>{who} has not published verified firm, attorney or practice-area information.</p>}
+            {about ? about.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p>{who} is an independent law practice. Contact the firm to learn more.</p>}
           </div>
         </article>
         <aside className="sf-split__aside">
