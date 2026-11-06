@@ -29,7 +29,7 @@ const initialState: OnboardingState = {
     accentId: seed.accentId,
     logoIcon: seedLogo.lightSvg,
     logoColor: seed.logoColor,
-    supportEmail: "",
+    supportEmail: seed.supportEmail,
     officeName: "",
     officeCode: "",
     timezone: "UTC",

@@ -15,7 +15,7 @@ const DEMO_BRAND = {
   shortName: "Harbor & Pine",
   brandTagline: "Fictional local workspace · no legal services",
   brandColor: "#1f4d46",
-  supportEmail: "office@example.invalid",
+  supportEmail: "hello@law-firm.openship.org",
 };
 const prisma = prismaWithoutGraphQLErrorConversion(keystoneContext.prisma) as any;
 
