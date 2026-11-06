@@ -5,6 +5,9 @@ import { sha256Digest } from "../lib/digests";
 import { assertLifecycleTransition } from "../lib/lifecycles";
 import { runSerializableTransaction } from "../lib/transactions";
 import { assertCurrentCommandActor } from "./command-authority";
+import { advanceIntakeAfterConsultation } from "./intakeWorkflows";
+import { consultationPaymentKey, refundConsultationFee } from "./consultationPayments";
+import { prismaWithoutGraphQLErrorConversion } from "../lib/transactions";
 import { boundedReason, optionalBoundedText, recordAuditEvent, requirePermission } from "./workflow-helpers";
 
 const consultationOutcomes = new Set(["pending", "recommend_engagement", "decline", "follow_up"]);
@@ -51,6 +54,10 @@ export async function scheduleConsultation(
     const consultation = await tx.consultation.findFirst({ where: { id: reference.id, firmId } });
     if (!consultation || consultation.hostId !== reference.hostId) throw new Error("Consultation changed concurrently; reload before retrying.");
     if (consultation.status !== "scheduled") assertLifecycleTransition("consultation", consultation.status, "scheduled");
+    if (consultation.status === "requested" && consultation.feeMinor > 0) {
+      const fee = await tx.payment.findFirst({ where: { firmId, idempotencyKey: consultationPaymentKey(consultation.id) }, select: { status: true } });
+      if (!fee || !["captured", "settled"].includes(fee.status)) throw new Error("The consultation fee has not been paid yet; the client confirms the time by paying.");
+    }
 
     const host = await tx.firmMembership.findFirst({
       where: { firmId, userId: args.hostId, status: "active", role: { status: "active", canManageIntake: true }, user: { status: "active" } },
@@ -111,7 +118,7 @@ export async function transitionConsultation(
     ? boundedReason(args.reason, "Cancellation reason", 3, 2000)
     : optionalBoundedText(args.reason, "Reason", 2000);
 
-  return runSerializableTransaction(context.prisma as any, async (tx: any) => {
+  const result = await runSerializableTransaction(context.prisma as any, async (tx: any) => {
     await assertCurrentCommandActor(tx, context, "canManageIntake");
     const reference = await tx.consultation.findFirst({ where: { id: args.consultationId, firmId }, select: { id: true, hostId: true } });
     if (!reference) throw new Error("Consultation was not found in the active firm.");
@@ -139,8 +146,16 @@ export async function transitionConsultation(
       intakeId: consultation.intakeId,
       metadata: { consultationId: consultation.id, fromStatus: consultation.status, outcome, ...(reason ? { reasonDigest: sha256Digest(reason) } : {}) },
     });
+    if (args.toStatus === "completed") {
+      await advanceIntakeAfterConsultation(tx, context, { firmId, userId, intakeId: consultation.intakeId, consultationId: consultation.id, outcome });
+    }
     return projection(updated);
   });
+  // A firm-cancelled paid consultation is refunded to the card in full.
+  if (args.toStatus === "cancelled") {
+    await refundConsultationFee(prismaWithoutGraphQLErrorConversion(context.prisma) as any, { firmId, consultationId: result.id, actorUserId: userId, explanation: `Consultation cancelled by the firm.${reason ? ` ${reason}` : ""}` });
+  }
+  return result;
 }
 
 /** The customer who booked a consultation may cancel it while it is still upcoming.
@@ -154,7 +169,7 @@ export async function cancelOwnConsultation(
   if (!isInteractiveHumanSession(session)) throw new Error("Sign in to manage your consultation.");
   const reason = optionalBoundedText(args.reason, "Cancellation reason", 1000);
 
-  return runSerializableTransaction(context.prisma as any, async (tx: any) => {
+  const result = await runSerializableTransaction(context.prisma as any, async (tx: any) => {
     const account = await tx.user.findFirst({ where: { id: session.itemId, status: "active" }, select: { id: true } });
     const reference = account
       ? await tx.consultation.findFirst({ where: { id: args.consultationId, accountId: account.id }, select: { id: true, firmId: true, hostId: true } })
@@ -179,6 +194,9 @@ export async function cancelOwnConsultation(
       intakeId: consultation.intakeId,
       metadata: { consultationId: consultation.id, fromStatus: consultation.status },
     });
-    return projection(updated);
+    return { ...projection(updated), firmId: consultation.firmId };
   });
+  // Cancelling before the start refunds any paid consultation fee in full.
+  await refundConsultationFee(prismaWithoutGraphQLErrorConversion(context.prisma) as any, { firmId: result.firmId, consultationId: result.id, actorUserId: session.itemId, explanation: `Consultation cancelled by the client before it started.${reason ? ` ${reason}` : ""}` });
+  return projection(result);
 }

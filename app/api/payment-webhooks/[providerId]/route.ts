@@ -3,6 +3,7 @@ import { keystoneContext } from "@/features/keystone/context";
 import { prismaWithoutGraphQLErrorConversion } from "@/features/keystone/lib/transactions";
 import { handleWebhook } from "@/features/keystone/utils/paymentProviderAdapter";
 import { reconcilePaymentByProviderId } from "@/features/keystone/mutations/portalPayments";
+import { afterConsultationPaymentCaptured } from "@/features/keystone/mutations/consultationPayments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!prior) await prisma.idempotencyKey.create({ data: { idempotencyKey: key, requestMethod: "POST", requestPath: "payment-provider-webhook", requestParams: { providerId, eventId: verified.event.id }, recoveryPoint: "verified", lockedAt: new Date() } });
     const payment = await prisma.payment.findFirst({ where: { id: paymentId, firmId: resource.metadata?.firmId } });
     if (!payment || payment.paymentProviderId !== resource.id && payment.providerCode !== provider.code) throw new Error("Provider event does not correlate to this payment.");
-    await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId);
+    const settled = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId);
+    if (settled?.status === "captured" && !(settled as any).replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
     await prisma.idempotencyKey.update({ where: { idempotencyKey: key }, data: { recoveryPoint: "completed", responseCode: 200, responseBody: { paymentId }, lockedAt: null } });
     return NextResponse.json({ received: true });
   } catch (error) {

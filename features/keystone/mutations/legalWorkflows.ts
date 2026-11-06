@@ -13,7 +13,7 @@ import {
   requirePermission,
 } from "./workflow-helpers";
 import { blockingConflictCheckStatuses } from "../lib/conflict-status";
-import { advanceIntakeAfterConflictClearance } from "./intakeWorkflows";
+import { advanceIntakeAfterConflictClearance, advanceIntakeOnConflictProgress } from "./intakeWorkflows";
 import { accessibleMatterStorageWhere } from "../lib/matter-access";
 import { permissions } from "../access";
 
@@ -378,6 +378,9 @@ export async function transitionConflictCheck(
       intakeId: check.intakeId,
       metadata: { checkId: check.id, fromStatus: check.status, toStatus: args.toStatus },
     });
+    if (check.intakeId) {
+      await advanceIntakeOnConflictProgress(tx, context, { firmId, userId, intakeId: check.intakeId, checkId: check.id, checkStatus: args.toStatus });
+    }
     return { check: updated, replayed: false };
   });
 }

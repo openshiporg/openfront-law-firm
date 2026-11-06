@@ -5,6 +5,7 @@ import { isLocalFixtureFirm } from '../lib/local-fixture'
 import { runSerializableTransaction } from '../lib/transactions'
 import { sha256Digest } from '../lib/digests'
 import { recordAuditEvent } from './workflow-helpers'
+import { consultationPaymentKey, consultationPaymentState, releaseUnpaidConsultations } from './consultationPayments'
 import { assertCurrentCommandActor } from './command-authority'
 import { adversePartyContact, normalizeConflictTerm, parseAdversePartyNames } from './intakeWorkflows'
 import { loadActiveHumanSession } from '../lib/machine-auth'
@@ -55,8 +56,15 @@ async function account(tx: any, context: Context) {
   if (!user || user.status !== 'active') throw new Error('Sign in to your account.')
   return user
 }
-function dto(row: any) {
-  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || 'UTC' }
+function dto(row: any, payment: any = null) {
+  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || 'UTC', paymentState: consultationPaymentState(row, payment) }
+}
+/** Customer DTOs carry the consultation-fee payment state (none/due/paid/refunded/expired). */
+async function withPayments(tx: any, rows: any[]) {
+  const paid = rows.filter((row) => row.feeMinor > 0)
+  const payments = paid.length ? await tx.payment.findMany({ where: { firmId: paid[0].firmId, idempotencyKey: { in: paid.map((row) => consultationPaymentKey(row.id)) } }, select: { idempotencyKey: true, status: true, amountMinor: true, refundedMinor: true } }) : []
+  const byKey = new Map(payments.map((payment: any) => [payment.idempotencyKey, payment]))
+  return rows.map((row) => dto(row, byKey.get(consultationPaymentKey(row.id)) ?? null))
 }
 
 const serviceSelect = { id: true, code: true, publicSlug: true, name: true, description: true, consultationFeeMinor: true, consultationMinutes: true }
@@ -207,6 +215,7 @@ export async function consultationAvailability(_root: unknown, args: { serviceId
     if (!admitted) throw new Error('Consultation booking is unavailable.')
     const { firm } = admitted
     requireConfiguredConsultationCalendar(admitted)
+    await releaseUnpaidConsultations(tx, firm.id)
     const service = await tx.practiceArea.findFirst({ where: { id: args.serviceId, firmId: firm.id, status: 'active', isPublic: true } })
     if (!service) throw new Error('Service is unavailable.')
     const timezone = validTimezone(firm.defaultTimezone)
@@ -274,7 +283,7 @@ export async function bookClientConsultation(
     const prior = await tx.consultation.findUnique({ where: { firmId_requestKey: { firmId: firm.id, requestKey: args.requestKey } } })
     if (prior) {
       if (prior.accountId !== user.id || prior.requestDigest !== fingerprint) throw new Error('Request reference is unavailable for this account or has changed.')
-      return dto(prior)
+      return (await withPayments(tx, [prior]))[0]
     }
     // Only a NEW effect requires current publication and current notices. An
     // exact owned receipt above retains its original immutable consent snapshot.
@@ -288,6 +297,7 @@ export async function bookClientConsultation(
     if (!service) throw new Error('Service is unavailable.')
     const end = new Date(start.getTime() + service.consultationMinutes * 60000)
     if (!withinHorizon(start, Date.now())) throw new Error('Select an available time within the next fourteen days.')
+    await releaseUnpaidConsultations(tx, firm.id)
     const hosts = await eligibleHosts(tx, firm)
     if (!hosts.length) throw new Error('No consultation host is available.')
     let receiver: Host | null = null
@@ -349,7 +359,7 @@ export async function customerConsultationPage(_root: unknown, args: { cursor?: 
     })
     const page = rows.slice(0, HISTORY_PAGE_SIZE)
     const last = page.at(-1)
-    return { appointments: page.map(dto), nextCursor: rows.length > HISTORY_PAGE_SIZE && last ? encodeCursor({ a: user.id, c: last.createdAt.toISOString(), i: last.id }) : null }
+    return { appointments: await withPayments(tx, page), nextCursor: rows.length > HISTORY_PAGE_SIZE && last ? encodeCursor({ a: user.id, c: last.createdAt.toISOString(), i: last.id }) : null }
   })
 }
 /** First history page (kept for existing callers). */
@@ -362,6 +372,6 @@ export async function customerConsultation(_root: unknown, args: { id: string },
     const firm = await servicingFirm(tx)
     if (!firm) throw new Error('Appointment history is temporarily unavailable.')
     const row = await tx.consultation.findFirst({ where: { id: args.id, accountId: user.id, firmId: firm.id } })
-    return row ? dto(row) : null
+    return row ? (await withPayments(tx, [row]))[0] : null
   })
 }

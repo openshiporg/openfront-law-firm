@@ -2,12 +2,12 @@ import { paymentProviderAdapters } from "../../integrations/payment";
 
 const ADAPTERS = new Set(Object.keys(paymentProviderAdapters));
 const OPERATIONS = new Set(["createPaymentFunction", "capturePaymentFunction", "refundPaymentFunction", "getPaymentStatusFunction", "generatePaymentLinkFunction", "handleWebhookFunction"]);
-const INPUT_KEYS = new Set(["invoice", "retainer", "firmId", "paymentId", "amount", "currency", "idempotencyKey", "successUrl", "cancelUrl", "refundId", "event", "headers", "rawBody"]);
+const INPUT_KEYS = new Set(["invoice", "retainer", "consultation", "firmId", "paymentId", "amount", "currency", "idempotencyKey", "successUrl", "cancelUrl", "refundId", "event", "headers", "rawBody"]);
 
 export function paymentAdapterPayload(provider: any, args: any) {
   const input: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(args ?? {})) if (INPUT_KEYS.has(key) && value !== undefined) input[key] = value;
-  for (const key of ["invoice", "retainer"]) {
+  for (const key of ["invoice", "retainer", "consultation"]) {
     const record = input[key] as Record<string, unknown> | undefined;
     if (record) input[key] = Object.fromEntries(["id", "number", "title", "email"].filter((field) => record[field] !== undefined).map((field) => [field, record[field]]));
   }

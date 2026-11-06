@@ -49,31 +49,33 @@ const intakeClearancePath: Record<string, string[]> = {
   consultation: ['decision'],
 }
 
-/** Runs inside finalizeConflictCheck's transaction once a check is cleared. When the
- * intake has a cleared check and no blocking check left, and the reviewer may manage
- * intake, the intake walks its lifecycle to the decision stage. Conversion stays an
- * explicit, reasoned command. A conflict_found result never reaches this. */
-export async function advanceIntakeAfterConflictClearance(
-  tx: any,
-  context: Context,
-  input: { firmId: string; userId: string; intakeId: string; checkId: string },
-) {
+/** Lifecycle walks the intake card takes on its own as its conflict check and consultation
+ * progress (Clio Grow style): a running check puts it in conflict review; a cleared check
+ * moves it to the consultation stage while a consultation is still open, otherwise to
+ * decision; a completed consultation moves it to decision once conflicts are clear. */
+export const intakeAutoPaths: Record<'conflict_review' | 'consultation' | 'decision', Record<string, string[]>> = {
+  conflict_review: { new: ['screening', 'conflict_review'], screening: ['conflict_review'] },
+  consultation: { new: ['screening', 'conflict_review', 'consultation'], screening: ['conflict_review', 'consultation'], conflict_review: ['consultation'] },
+  decision: intakeClearancePath,
+}
+
+async function intakeAutomationActor(tx: any, context: Context) {
   const session = context.session as any
-  if (!isInteractiveHumanSession(session) || !permissions.canManageIntake({ session })) return null
+  if (!isInteractiveHumanSession(session) || !permissions.canManageIntake({ session })) return false
   try {
     await assertCurrentCommandActor(tx, context, 'canManageIntake')
+    return true
   } catch {
-    return null
+    return false
   }
+}
+
+async function walkIntake(tx: any, input: { firmId: string; userId: string; intakeId: string; target: keyof typeof intakeAutoPaths; cause: string; metadata: Record<string, unknown>; gate?: (intake: any) => Promise<boolean> }) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`intake:${input.firmId}:${input.intakeId}`}))`
   const intake = await tx.intake.findFirst({ where: { id: input.intakeId, firmId: input.firmId }, select: { id: true, status: true } })
-  const path = intake ? intakeClearancePath[intake.status] : undefined
+  const path = intake ? intakeAutoPaths[input.target][intake.status] : undefined
   if (!intake || !path) return null
-  const [cleared, blocking] = await Promise.all([
-    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: 'cleared' } }),
-    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: { in: [...blockingConflictCheckStatuses] } } }),
-  ])
-  if (!cleared || blocking) return null
+  if (input.gate && !await input.gate(intake)) return null
   let fromStatus = intake.status as string
   for (const toStatus of path) {
     assertLifecycleTransition('intake', fromStatus, toStatus)
@@ -83,12 +85,60 @@ export async function advanceIntakeAfterConflictClearance(
       category: 'legal_workflow',
       actorUserId: input.userId,
       intakeId: intake.id,
-      metadata: { fromStatus, toStatus, cause: 'conflict_check_cleared', conflictCheckId: input.checkId, reasonDigest: sha256Digest('Conflict check cleared.') },
+      metadata: { fromStatus, toStatus, cause: input.cause, ...input.metadata },
     })
     fromStatus = toStatus
   }
-  await tx.intake.update({ where: { id: intake.id }, data: { status: 'decision' } })
-  return { intakeId: intake.id, fromStatus: intake.status as string, toStatus: 'decision' }
+  await tx.intake.update({ where: { id: intake.id }, data: { status: fromStatus } })
+  return { intakeId: intake.id, fromStatus: intake.status as string, toStatus: fromStatus }
+}
+
+/** A conflict check that starts running puts its intake into conflict review. */
+export async function advanceIntakeOnConflictProgress(tx: any, context: Context, input: { firmId: string; userId: string; intakeId: string; checkId: string; checkStatus: string }) {
+  if (!['running', 'review_required'].includes(input.checkStatus)) return null
+  if (!await intakeAutomationActor(tx, context)) return null
+  return walkIntake(tx, { ...input, target: 'conflict_review', cause: `conflict_check_${input.checkStatus}`, metadata: { conflictCheckId: input.checkId } })
+}
+
+async function conflictsClear(tx: any, firmId: string, intakeId: string) {
+  const [cleared, blocking] = await Promise.all([
+    tx.conflictCheck.count({ where: { firmId, intakeId, status: 'cleared' } }),
+    tx.conflictCheck.count({ where: { firmId, intakeId, status: { in: [...blockingConflictCheckStatuses] } } }),
+  ])
+  return Boolean(cleared) && !blocking
+}
+
+/** A completed consultation moves its intake to decision once its conflicts are clear. */
+export async function advanceIntakeAfterConsultation(tx: any, context: Context, input: { firmId: string; userId: string; intakeId: string; consultationId: string; outcome?: string | null }) {
+  if (!await intakeAutomationActor(tx, context)) return null
+  return walkIntake(tx, {
+    ...input,
+    target: 'decision',
+    cause: 'consultation_completed',
+    metadata: { consultationId: input.consultationId, outcome: input.outcome ?? null },
+    gate: (intake) => conflictsClear(tx, input.firmId, intake.id),
+  })
+}
+
+/** Runs inside finalizeConflictCheck's transaction once a check is cleared. When the
+ * intake has a cleared check and no blocking check left, and the reviewer may manage
+ * intake, the intake walks its lifecycle to the decision stage. Conversion stays an
+ * explicit, reasoned command. A conflict_found result never reaches this. */
+export async function advanceIntakeAfterConflictClearance(
+  tx: any,
+  context: Context,
+  input: { firmId: string; userId: string; intakeId: string; checkId: string },
+) {
+  if (!await intakeAutomationActor(tx, context)) return null
+  // An open consultation is the next step: stop at the consultation stage until it is held.
+  const openConsultations = await tx.consultation.count({ where: { firmId: input.firmId, intakeId: input.intakeId, status: { in: ['requested', 'scheduled'] } } })
+  return walkIntake(tx, {
+    ...input,
+    target: openConsultations ? 'consultation' : 'decision',
+    cause: 'conflict_check_cleared',
+    metadata: { conflictCheckId: input.checkId, reasonDigest: sha256Digest('Conflict check cleared.') },
+    gate: (intake) => conflictsClear(tx, input.firmId, intake.id),
+  })
 }
 
 function text(value: unknown, label: string, maximum: number, required = true) {

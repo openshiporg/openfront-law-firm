@@ -51,9 +51,9 @@ export async function bookConsultation(previous: BookingState, form: FormData): 
   const revision = previous.revision + 1
   if (!values.startsAt) return { error: 'Choose a time.', values, revision }
   if (form.get('acknowledgment') !== 'yes') return { error: 'Read the notice and confirm the acknowledgment before submitting.', values, revision }
-  const response = await keystoneClient<{ bookClientConsultation: { id: string } }>(
+  const response = await keystoneClient<{ bookClientConsultation: { id: string; feeMinor: number; paymentState: string } }>(
     `mutation($serviceId: ID!, $startsAt: String!, $requestKey: String!, $summary: String, $jurisdiction: String!, $opposingParties: String!, $keyDeadline: String, $acknowledgmentVersion: String!) {
-      bookClientConsultation(serviceId: $serviceId, startsAt: $startsAt, requestKey: $requestKey, summary: $summary, jurisdiction: $jurisdiction, opposingParties: $opposingParties, keyDeadline: $keyDeadline, acknowledgmentVersion: $acknowledgmentVersion) { id }
+      bookClientConsultation(serviceId: $serviceId, startsAt: $startsAt, requestKey: $requestKey, summary: $summary, jurisdiction: $jurisdiction, opposingParties: $opposingParties, keyDeadline: $keyDeadline, acknowledgmentVersion: $acknowledgmentVersion) { id feeMinor paymentState }
     }`,
     { serviceId: String(form.get('serviceId') || ''), requestKey: String(form.get('requestKey') || ''), acknowledgmentVersion: String(form.get('acknowledgmentVersion') || ''), ...values },
   )
@@ -64,7 +64,27 @@ export async function bookConsultation(previous: BookingState, form: FormData): 
     return { error: 'The outcome of this request is unconfirmed. Do not submit a different request. Check your appointment history and contact the firm with this request reference if it is still unresolved.', values, revision, outcome: 'unknown', requestKey: String(form.get('requestKey') || '') }
   }
   revalidatePath('/account')
-  redirect(`/account/appointments/${encodeURIComponent(response.data.bookClientConsultation.id)}`)
+  const booked = response.data.bookClientConsultation
+  // A paid consultation goes straight to Stripe Checkout; the time is held while the client pays.
+  if (booked.paymentState === 'due') {
+    const checkout = await keystoneClient<{ startConsultationPayment: { url: string | null } }>(`mutation($id: ID!) { startConsultationPayment(consultationId: $id) { url } }`, { id: booked.id })
+    if (checkout.success && checkout.data.startConsultationPayment.url) redirect(checkout.data.startConsultationPayment.url)
+  }
+  redirect(`/account/appointments/${encodeURIComponent(booked.id)}`)
+}
+
+export type PaymentState = { error: string | null }
+
+/** Opens Stripe Checkout for an appointment whose consultation fee is still due. */
+export async function payConsultationFee(_previous: PaymentState, form: FormData): Promise<PaymentState> {
+  const id = String(form.get('consultationId') || '').trim()
+  if (!id) return { error: 'This consultation is unavailable.' }
+  const checkout = await keystoneClient<{ startConsultationPayment: { url: string | null; status: string } }>(`mutation($id: ID!) { startConsultationPayment(consultationId: $id) { url status } }`, { id })
+  if (!checkout.success) return { error: 'Payment could not be started. The time held for payment may have ended; request a new time or contact the firm.' }
+  const url = checkout.data.startConsultationPayment.url
+  if (url) redirect(url)
+  revalidatePath(`/account/appointments/${id}`)
+  return { error: null }
 }
 
 export type CancelState = { error: string | null; done: boolean }

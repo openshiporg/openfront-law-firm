@@ -11,7 +11,7 @@ export function CancelConsultationForm({ consultationId }: { consultationId: str
     <form action={action} className="sf-form border-t border-[var(--color-rule)] p-5">
       <input type="hidden" name="consultationId" value={consultationId} />
       <label className="sf-field-label">Reason <span className="sf-field-opt">(optional)</span><textarea name="reason" maxLength={1000} className="sf-field" /></label>
-      <label className="sf-check"><input type="checkbox" name="confirm" value="yes" required /><span>Cancel this consultation. The time is released.</span></label>
+      <label className="sf-check"><input type="checkbox" name="confirm" value="yes" required /><span>Cancel this consultation. The time is released and any fee paid is refunded to your card.</span></label>
       {state.error ? <p role="alert" className="sf-error">{state.error}</p> : null}
       <div className="sf-track"><button className="sf-pill sf-pill--raised" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel consultation'}</button></div>
     </form>

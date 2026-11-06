@@ -97,6 +97,6 @@ export function ConsultationBookingForm({ service, slots, requestKey, timezone, 
 
     {state.error && <p role="alert" className="sf-error">{state.error}</p>}
     {state.outcome === 'unknown' ? <div role="status" className="sf-card"><div className="sf-card__body grid gap-3 text-sm"><p className="flex items-center gap-2 font-semibold"><span className="sf-dot sf-dot--amber" aria-hidden="true" />Request outcome unknown</p><p className="break-all font-mono text-xs">Reference: {state.requestKey}</p><p className="sf-muted">Keep this reference when contacting the firm. A missing appointment does not prove the request had no effect.</p><div className="sf-track"><Link href="/account" className="sf-pill sf-pill--raised">Check your appointments</Link></div></div></div> : null}
-    <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--primary sf-pill--lg" disabled={pending || !slots.length || state.outcome === 'unknown'}>{pending ? 'Sending request…' : state.outcome === 'unknown' ? 'Request needs reconciliation' : 'Request appointment'}</button></div>
+    <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--primary sf-pill--lg" disabled={pending || !slots.length || state.outcome === 'unknown'}>{pending ? 'Sending request…' : state.outcome === 'unknown' ? 'Request needs reconciliation' : service.consultationFeeMinor > 0 ? 'Continue to payment' : 'Request appointment'}</button></div>
   </form>
 }

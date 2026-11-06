@@ -8,9 +8,10 @@ import { StoreLogo } from '../StoreLogo'
 import { getStorefrontSettings, NEUTRAL_FIRM_NAME } from '../lib/storefront-settings'
 import { firmMetadata } from '../lib/metadata'
 import { FIXTURE_FIRST_CONTACT_NOTICE, firstContactVersion } from '../lib/first-contact'
-import { appointmentPaymentState, appointmentStatus, formatAppointmentTime, getConsultationAvailability, getConsultationCatalog, getConsultationService, getConsultationServiceById, getCustomerConsultation, getCustomerConsultations, type Service } from '../lib/consultation-data'
+import { appointmentNotice, appointmentPaymentState, appointmentStatus, reconcileConsultationFee, formatAppointmentTime, getConsultationAvailability, getConsultationCatalog, getConsultationService, getConsultationServiceById, getCustomerConsultation, getCustomerConsultations, type Service } from '../lib/consultation-data'
 import { ConsultationBookingForm } from '../CustomerForms'
 import { CancelConsultationForm } from '../CancelConsultationForm'
+import { PayConsultationForm } from '../PayConsultationForm'
 import { formatMinorUnits as formatMoney } from '@/features/platform/lib/money'
 
 /** A request-time check: the appointment page is rendered per request. */
@@ -131,7 +132,7 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
             <dl className="sf-facts">
               <div><dt>Length</dt><dd className="sf-num">{service.consultationMinutes} minutes</dd></div>
               <div><dt>Consultation fee</dt><dd className="sf-num">{feeLabel(service)}</dd></div>
-              <div><dt>Payment</dt><dd>Not collected online</dd></div>
+              <div><dt>Payment</dt><dd>{service.consultationFeeMinor > 0 ? 'Paid by card when you book' : 'No payment needed'}</dd></div>
             </dl>
             {settings.bookingEnabled ? <div className="sf-track sf-track--block sf-docked"><Link className="sf-pill sf-pill--primary sf-pill--lg" href={book}>Choose a time</Link></div> : <p className="sf-notice sf-notice--plain">Online booking is closed.</p>}
             <p className="sf-fine">A request does not create an attorney-client relationship. The firm runs a conflict check before confirming.</p>
@@ -185,6 +186,7 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
           <dl className="sf-facts">
             <div><dt>Length</dt><dd className="sf-num">{service.consultationMinutes} minutes</dd></div>
             <div><dt>Fee</dt><dd className="sf-num">{feeLabel(service)}</dd></div>
+            {service.consultationFeeMinor > 0 ? <div><dt>Payment</dt><dd>Card, on the next step</dd></div> : null}
             <div><dt>Time zone</dt><dd>{availability.data.timezone}</dd></div>
           </dl>
         </div></div>
@@ -194,8 +196,10 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
 }
 
 export async function appointmentMetadata() { return firmMetadata('Appointment') }
-export async function AppointmentPage({ params }: { params: Promise<{ id: string }> }) {
+export async function AppointmentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ session_id?: string; paid?: string }> }) {
   const id = (await params).id
+  const returned = await searchParams
+  if (returned?.session_id || returned?.paid) await reconcileConsultationFee(id)
   const result = await getCustomerConsultation(id)
   if (result.status === 'signed_out') redirect(`/account/signin?from=${encodeURIComponent(`/account/appointments/${encodeURIComponent(id)}`)}`)
   if (result.status === 'unavailable') return <ServiceUnavailable title="Appointment" retryHref={`/account/appointments/${encodeURIComponent(id)}`} />
@@ -216,7 +220,8 @@ export async function AppointmentPage({ params }: { params: Promise<{ id: string
         <div><dt>Consultation fee</dt><dd className="sf-num">{row.feeMinor > 0 ? formatMoney(row.feeMinor, row.currencyCode) : 'No fee'}</dd></div>
         <div><dt>Payment</dt><dd>{appointmentPaymentState(row)}</dd></div>
       </dl>
-      <p role="status" className="sf-notice">{row.status === 'requested' ? 'The firm runs a conflict check before confirming. No payment is collected online.' : 'No payment is collected online.'}</p>
+      <p role="status" className="sf-notice">{appointmentNotice(row)}</p>
+      {row.paymentState === 'due' ? <PayConsultationForm consultationId={row.id} amountLabel={formatMoney(row.feeMinor, row.currencyCode)} /> : null}
       {['requested', 'scheduled'].includes(row.status) && notStarted(row.startsAt) ? <CancelConsultationForm consultationId={row.id} /> : null}
       <div className="sf-track"><Link className="sf-pill sf-pill--raised" href="/account">Your appointments</Link><Link className="sf-pill" href="/contact">Contact the firm</Link></div>
     </div>

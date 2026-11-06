@@ -3,6 +3,7 @@ import Stripe from "stripe";
 type CreatePaymentInput = {
   invoice?: { id: string; number?: string; title?: string; email?: string };
   retainer?: { id: string; number?: string; title?: string; email?: string };
+  consultation?: { id: string; number?: string; title?: string; email?: string };
   paymentId: string;
   firmId: string;
   amount: number;
@@ -37,19 +38,23 @@ const getStripeClient = (provider?: { credentials?: Record<string, unknown> }) =
   });
 };
 
-export async function createPaymentFunction({ invoice, retainer, paymentId, firmId, amount, currency, successUrl, cancelUrl, idempotencyKey, provider }: CreatePaymentInput) {
+export async function createPaymentFunction({ invoice, retainer, consultation, paymentId, firmId, amount, currency, successUrl, cancelUrl, idempotencyKey, provider }: CreatePaymentInput) {
   if (!Number.isSafeInteger(amount) || amount < 1 || !idempotencyKey) throw new Error("Invalid payment amount or idempotency key");
   const stripe = getStripeClient(provider);
-  const resource = invoice ?? retainer;
-  if (!resource) throw new Error("Invoice or retainer details are required");
-  const metadata = { firmId, paymentId, ...(invoice ? { invoiceId: invoice.id } : { retainerId: retainer!.id }) };
+  const resource = invoice ?? retainer ?? consultation;
+  if (!resource) throw new Error("Invoice, retainer or consultation details are required");
+  const metadata = { firmId, paymentId, ...(invoice ? { invoiceId: invoice.id } : retainer ? { retainerId: retainer.id } : { consultationId: consultation!.id }) };
+  // Consultation fees return to the client's appointment page; portal payments to the portal.
   const base = new URL(successUrl).origin;
-  const returnUrl = `${base}/portal/payments/return?payment=${encodeURIComponent(paymentId)}`;
+  const returnUrl = consultation ? successUrl : `${base}/portal/payments/return?payment=${encodeURIComponent(paymentId)}`;
+  const joiner = returnUrl.includes("?") ? "&" : "?";
+  const fallbackName = invoice ? `Invoice ${resource.number || ""}` : retainer ? `Retainer ${resource.number || ""}` : "Consultation fee";
   const session = await stripe.checkout.sessions.create({
-    mode: "payment", success_url: `${returnUrl}&session_id={CHECKOUT_SESSION_ID}`, cancel_url: returnUrl,
+    mode: "payment", success_url: `${returnUrl}${joiner}session_id={CHECKOUT_SESSION_ID}`, cancel_url: consultation ? cancelUrl : returnUrl,
     customer_email: resource.email || undefined,
-    line_items: [{ quantity: 1, price_data: { currency: currency.toLowerCase(), unit_amount: amount, product_data: { name: resource.title || (invoice ? `Invoice ${resource.number || ""}` : `Retainer ${resource.number || ""}`) } } }],
+    line_items: [{ quantity: 1, price_data: { currency: currency.toLowerCase(), unit_amount: amount, product_data: { name: resource.title || fallbackName } } }],
     metadata, payment_intent_data: { metadata },
+    ...(consultation ? { expires_at: Math.floor(Date.now() / 1000) + 31 * 60 } : {}),
   }, { idempotencyKey });
   return { status: "pending", checkoutSessionId: session.id, checkoutUrl: session.url, amount, currency: currency.toUpperCase() };
 }

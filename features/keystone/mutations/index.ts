@@ -64,6 +64,7 @@ import {
 } from "./portalWorkflows";
 import { postTrustTransaction } from "./postTrustTransaction";
 import { reconcilePortalPayment, startPortalPayment } from "./portalPayments";
+import { reconcileConsultationPayment, startConsultationPayment } from "./consultationPayments";
 import { executePortalGrant, portalPolicyWorkspace, recordPortalDiscoveryPolicy } from "./portalPolicyWorkflows";
 import {
   prepareTrustReconciliation,
@@ -793,7 +794,9 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
       type ConsultationCatalogPage { services: [ConsultationService!]!, nextCursor: String }
       type ConsultationSlot { startsAt: String!, endsAt: String! }
       type ConsultationAvailability { timezone: String!, slots: [ConsultationSlot!]! }
-      type CustomerConsultation { id: ID!, serviceTitle: String!, feeMinor: Int!, currencyCode: String!, status: String!, startsAt: String, endsAt: String, timezone: String! }
+      type CustomerConsultation { id: ID!, serviceTitle: String!, feeMinor: Int!, currencyCode: String!, status: String!, startsAt: String, endsAt: String, timezone: String!, paymentState: String! }
+      type ConsultationPaymentStart { url: String, paymentId: ID!, status: String! }
+      type ConsultationPaymentStatus { status: String! }
       type CustomerConsultationPage { appointments: [CustomerConsultation!]!, nextCursor: String }
       type CustomerAccountRegistration { id: ID! }
       type Query {
@@ -1317,6 +1320,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           reason: String
         ): ControlledRecordProjection!
         cancelOwnConsultation(consultationId: ID!, reason: String): ControlledRecordProjection!
+        startConsultationPayment(consultationId: ID!): ConsultationPaymentStart!
+        reconcileConsultationPayment(consultationId: ID!): ConsultationPaymentStatus!
         prepareRetainerAgreement(
           matterId: ID!
           clientId: ID!
@@ -1511,6 +1516,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         scheduleConsultation,
         transitionConsultation,
         cancelOwnConsultation,
+        startConsultationPayment,
+        reconcileConsultationPayment,
         prepareRetainerAgreement,
         transitionRetainerAgreement,
         recordDocketEntry,

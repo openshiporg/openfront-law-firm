@@ -9,7 +9,7 @@ export * from './consultation-presentation'
  */
 export type CustomerResult<T> = { status: 'ok'; data: T } | { status: 'signed_out' } | { status: 'unavailable' }
 
-const selection = 'id serviceTitle feeMinor currencyCode status startsAt endsAt timezone'
+const selection = 'id serviceTitle feeMinor currencyCode status startsAt endsAt timezone paymentState'
 const serviceSelection = 'id code publicSlug name description consultationFeeMinor consultationMinutes currencyCode'
 
 export type CatalogPage = { services: Service[]; nextCursor: string | null }
@@ -59,3 +59,9 @@ export async function getConsultationAvailability(serviceId: string): Promise<Cu
   return result.success ? { status: 'ok', data: result.data.consultationAvailability } : { status: 'unavailable' }
 }
 
+
+/** On return from Checkout: confirm the consultation fee with the provider (the webhook does the same). */
+export async function reconcileConsultationFee(id: string) {
+  const result = await keystoneClient<{ reconcileConsultationPayment: { status: string } }>(`mutation($id: ID!) { reconcileConsultationPayment(consultationId: $id) { status } }`, { id })
+  return result.success ? result.data.reconcileConsultationPayment.status : null
+}

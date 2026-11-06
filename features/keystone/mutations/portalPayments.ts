@@ -70,6 +70,8 @@ export async function reconcilePaymentByProviderId(prisma: any, paymentId: strin
     if (["captured", "settled"].includes(current.status)) return { status: current.status, paymentId: current.id, replayed: true };
     if (current.status !== "pending" && current.status !== "authorized") throw new Error("Payment cannot be reconciled from its current state.");
     await tx.payment.update({ where: { id: current.id }, data: { status: "captured", capturedAt: new Date(), providerPaymentId: payment.providerPaymentId } });
+    // A consultation fee is earned operating revenue with no invoice to allocate against.
+    if (current.paymentType === "operating" && /^consultation:[^:]+$/.test(current.idempotencyKey ?? "")) return { status: "captured", paymentId: current.id, replayed: false };
     if (current.paymentType === "operating") {
       if (!current.invoiceId) throw new Error("Operating payment has no invoice.");
       const invoice = await tx.invoice.findFirst({ where: { id: current.invoiceId, firmId: current.firmId } });
