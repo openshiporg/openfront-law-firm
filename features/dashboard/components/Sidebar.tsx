@@ -129,7 +129,7 @@ export function Sidebar({ adminMeta, user, onOpenDialog }: SidebarProps) {
         </SidebarMenuButton>
         <SidebarMenuButton asChild>
           <div className="hidden group-has-[[data-collapsible=icon]]/sidebar-wrapper:block">
-            <LogoIcon className="size-5 text-violet-600" color="#7c3aed" suffix="-full-header" />
+            <LogoIcon className="size-5 text-[#6e2b2f]" color="#6e2b2f" suffix="-full-header" />
           </div>
         </SidebarMenuButton>
       </SidebarHeader>

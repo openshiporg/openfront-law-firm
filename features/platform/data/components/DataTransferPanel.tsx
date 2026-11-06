@@ -156,7 +156,7 @@ export function DataTransferPanel({ connections, connectionTotal }: { connection
     setCsvText(await file.text())
   }
 
-  const step = 'flex size-5 shrink-0 items-center justify-center rounded-[4px] bg-muted font-mono text-[11px] font-semibold tabular-nums text-muted-foreground'
+  const step = 'flex size-5 shrink-0 items-center justify-center rounded-[4px] bg-muted font-mono text-xs font-semibold tabular-nums text-muted-foreground'
   const card = 'min-w-0 overflow-hidden rounded-[6px] border border-border bg-card'
   const cardHead = 'flex min-w-0 items-center gap-2 border-b border-border px-4 py-3 text-sm font-semibold text-foreground'
 

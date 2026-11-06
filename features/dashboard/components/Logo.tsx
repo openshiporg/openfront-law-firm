@@ -8,7 +8,7 @@ const syne = Syne({
   adjustFontFallback: false,
 });
 
-const LOGO_COLOR = "#7c3aed";
+const LOGO_COLOR = "#6e2b2f";
 
 interface LogoProps {
   className?: string;

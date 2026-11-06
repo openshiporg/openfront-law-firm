@@ -45,7 +45,7 @@ const markTones: Record<Tone, string> = {
   emerald: 'bg-emerald-600 dark:bg-emerald-500',
   sky: 'bg-sky-600 dark:bg-sky-500',
   amber: 'bg-amber-500',
-  violet: 'bg-violet-600 dark:bg-violet-500',
+  violet: 'bg-teal-600 dark:bg-teal-500',
   rose: 'bg-rose-600 dark:bg-rose-500',
   zinc: 'bg-zinc-400 dark:bg-zinc-500',
 }
@@ -96,7 +96,7 @@ export function splitFileNumber(text: string): { number: string | null; rest: st
 
 /** Matter number as a typed file-jacket label: the platform's signature mark. */
 export function FileLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return <span className={cn('lf-figures inline-flex h-5 shrink-0 items-center rounded-[2px] border border-[var(--lf-manila-line)] bg-[var(--lf-manila)] px-1.5 text-[11px] font-semibold leading-none text-foreground', className)}>{children}</span>
+  return <span className={cn('lf-figures inline-flex h-5 shrink-0 items-center rounded-[2px] border border-[var(--lf-manila-line)] bg-[var(--lf-manila)] px-1.5 text-xs font-semibold leading-none text-foreground', className)}>{children}</span>
 }
 
 /** Title with its status on the same line. */

@@ -426,6 +426,9 @@ export function mapWorkspaceRecord(category: string, source: Source, record: any
 
 const actionPermissions: Partial<Record<string, PermissionKey>> = {
   Intake: "canManageIntake",
+  // Confirm / reschedule / cancel / record outcome run through the intake-managed
+  // consultation commands; without this entry booked requests could never leave "requested".
+  Consultation: "canManageIntake",
   "Conflict check": "canResolveConflicts",
   Matter: "canManageMatters",
   Deadline: "canManageCalendar",

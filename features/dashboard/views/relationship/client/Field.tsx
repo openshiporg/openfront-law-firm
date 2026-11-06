@@ -56,6 +56,8 @@ function LinkToRelatedItems({ itemId, value, list, refFieldKey }: any) {
   }
 
   if (value?.kind === "many") {
+    // An empty relationship has nothing to link to; `!id_in=""` is an invalid filter.
+    if (!(refFieldKey && itemId) && !(value?.value ?? []).length) return null;
     const query = constructQuery({ refFieldKey, value, itemId });
     return (
       <Button variant="ghost">
