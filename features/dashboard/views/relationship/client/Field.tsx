@@ -60,8 +60,8 @@ function LinkToRelatedItems({ itemId, value, list, refFieldKey }: any) {
     if (!(refFieldKey && itemId) && !(value?.value ?? []).length) return null;
     const query = constructQuery({ refFieldKey, value, itemId });
     return (
-      <Button variant="ghost">
-        <Link href={`/dashboard/${list?.path ?? ''}?${query}`}>View related {list?.plural ?? 'items'}</Link>
+      <Button variant="ghost" className="h-auto min-h-9 max-w-full whitespace-normal text-left">
+        <Link href={`/dashboard/${list?.path ?? ''}?${query}`} className="break-words">View related {list?.plural ?? 'items'}</Link>
       </Button>
     );
   }
@@ -213,6 +213,7 @@ export function ClientField({
                 <>
                   <Button 
                     variant="outline"
+                    className="h-auto min-h-9 max-w-full whitespace-normal text-left"
                     onClick={() => setIsDrawerOpen(true)}
                   >
                     Create related {foreignList.singular}
