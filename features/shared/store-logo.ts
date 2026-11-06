@@ -1,7 +1,7 @@
 import { LOGO_ICONS } from '../platform/store-settings/lib/untitled-logo-registry'
 import { sanitizeStoreLogoSvg } from './sanitize-store-logo'
 
-export const DEFAULT_STORE_LOGO_ICON = LOGO_ICONS[0].lightSvg
+export const DEFAULT_STORE_LOGO_ICON = LOGO_ICONS.find((icon) => icon.id === 'hexsmith')!.lightSvg
 export function normalizeStoreLogoColor(value: unknown): string {
   const numeric = Number(String(value ?? '0'))
   if (!Number.isFinite(numeric)) return '0'

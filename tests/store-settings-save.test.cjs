@@ -38,5 +38,5 @@ test('custom SVG kept, unsafe SVG rejected, unsafe stored value falls back to a 
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><path d="M0 0h8v8z"/></svg>';
   assert.equal(sanitizeStoreLogoSvg(`  ${svg}\n`), svg);
   assert.equal(sanitizeStoreLogoSvg('<svg onload="x()"></svg>'), '');
-  assert.equal(safeStoreLogo('<svg onload="x()"></svg>'), LOGO_ICONS[0].lightSvg);
+  assert.equal(safeStoreLogo('<svg onload="x()"></svg>'), LOGO_ICONS.find((icon) => icon.id === 'hexsmith').lightSvg);
 });

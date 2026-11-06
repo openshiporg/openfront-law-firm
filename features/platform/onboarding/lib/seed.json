@@ -4,7 +4,7 @@
   "supportEmail": "hello@law-firm.openship.org",
   "currencyCode": "USD",
   "timezone": "UTC",
-  "logoIcon": "3portals",
+  "logoIcon": "hexsmith",
   "logoColor": "0",
   "accentId": "muted",
   "templates": ["minimal", "full"],
