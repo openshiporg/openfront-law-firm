@@ -231,3 +231,34 @@ test('timestamp picker round-trips in the viewer zone and keeps the same instant
   // typed 10:00 means 10:00 in the zone
   assert.equal(t.withTimeInZone(new Date('2026-11-02T20:00:00Z'), 10, 0, 0, 'America/New_York').toISOString(), '2026-11-02T15:00:00.000Z');
 });
+
+test('password emails: invites read "Set up", resets read "Reset", both named from the firm record', async () => {
+  const sent = [];
+  const mail = sandbox({
+    env: { SMTP_HOST: 'smtp.invalid', SMTP_FROM: 'firm@example.invalid', SMTP_PORT: '587', SMTP_STORE_LINK: 'https://firm.example.invalid' },
+    mocks: { nodemailer: { createTransport: () => ({ sendMail: async (m) => { sent.push(m); } }) } },
+  }).load('features/keystone/lib/mail.ts');
+  const prisma = (memberships, firms = [{ name: 'Example Firm' }]) => ({
+    user: { findUnique: async () => ({ firmMemberships: memberships }) },
+    firm: { findMany: async () => firms },
+  });
+  const invited = await mail.passwordEmailWording(prisma([{ status: 'invited', firm: { name: 'Harbor & Pine' } }]), 'u1');
+  assert.deepEqual(plain(invited), { kind: 'invite', firmName: 'Harbor & Pine' });
+  const active = await mail.passwordEmailWording(prisma([{ status: 'active', firm: { name: '', displayName: 'Cedar Law' } }]), 'u2');
+  assert.deepEqual(plain(active), { kind: 'reset', firmName: 'Cedar Law' });
+  const customer = await mail.passwordEmailWording(prisma([], [{ name: 'Only Firm' }]), 'u3');
+  assert.deepEqual(plain(customer), { kind: 'reset', firmName: 'Only Firm' });
+  const ambiguous = await mail.passwordEmailWording(prisma([], [{ name: 'A' }, { name: 'B' }]), 'u4');
+  assert.equal(ambiguous.firmName, null);
+
+  await mail.sendPasswordResetEmail('tok', 'a@example.invalid', undefined, 'staff', invited);
+  await mail.sendPasswordResetEmail('tok', 'b@example.invalid', undefined, 'customer', { kind: 'reset', firmName: 'Harbor & Pine' });
+  await mail.sendPasswordResetEmail('tok', 'c@example.invalid');
+  assert.equal(sent[0].subject, 'Set up your Harbor & Pine sign-in');
+  assert.match(sent[0].html, />Set up sign-in</);
+  assert.match(sent[0].html, /\/dashboard\/reset\?token=tok/);
+  assert.equal(sent[1].subject, 'Reset your Harbor & Pine password');
+  assert.match(sent[1].html, /\/account\/reset\?token=tok/);
+  assert.equal(sent[2].subject, 'Reset your password');
+  assert.ok(sent.every((m) => !/password reset token/i.test(m.subject)));
+});

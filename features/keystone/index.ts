@@ -4,7 +4,7 @@ import { statelessSessions } from "@keystone-6/core/session";
 import "dotenv/config";
 
 import { permissions } from "./access";
-import { passwordResetPurpose, sendPasswordResetEmail } from "./lib/mail";
+import { passwordEmailWording, passwordResetPurpose, sendPasswordResetEmail } from "./lib/mail";
 import { models } from "./models";
 import { permissionKeys } from "./access";
 import { extendGraphqlSchema } from "./mutations";
@@ -61,8 +61,10 @@ const { withAuth } = createAuth({
     // Staff (any firm membership or the bootstrap principal) recover on the dashboard;
     // storefront customers recover on /account/reset.
     async sendToken({ itemId, identity, token, context }) {
-      const purpose = await passwordResetPurpose(context.sudo().prisma, String(itemId));
-      await sendPasswordResetEmail(token, identity, undefined, purpose);
+      const prisma = context.sudo().prisma;
+      const purpose = await passwordResetPurpose(prisma, String(itemId));
+      const wording = await passwordEmailWording(prisma, String(itemId)).catch(() => ({ kind: "reset" as const, firmName: null }));
+      await sendPasswordResetEmail(token, identity, undefined, purpose, wording);
     },
   },
   sessionData: `
