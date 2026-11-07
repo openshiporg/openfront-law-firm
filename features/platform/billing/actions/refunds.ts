@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { refusalOr } from '@/features/dashboard/lib/security'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 import { decimalToMinorUnits, formatMoneyLabel } from '@/features/platform/lib/money'
 
@@ -193,7 +194,7 @@ export async function requestPaymentRefund(_previous: RefundActionState, formDat
         }
       }
     `, { paymentId, amountMinor, reason, explanation, idempotencyKey })
-    if (!response.success) return { ok: false, message: 'The refund was not requested. Check payment permission and billing access on the matter.' }
+    if (!response.success) return { ok: false, message: refusalOr(response.error, 'The refund was not requested. Check payment permission and billing access on the matter.') }
     revalidateBilling()
     const { refund, replayed } = response.data.requestRefund
     return { ok: true, message: `${replayed ? 'Already requested' : 'Requested'}: ${refund.refundNumber} for ${formatMoneyLabel(amountMinor, payment.currencyCode)} from ${payment.paymentNumber}.` }
@@ -229,7 +230,7 @@ export async function reviewPaymentRefund(_previous: RefundActionState, formData
         reviewRefund(refundId: $refundId, decision: $decision, reason: $reason) { refund { refundNumber status } }
       }
     `, { refundId, decision, reason })
-    if (!response.success) return { ok: false, message: 'The review was not recorded. Check payment permission and matter access.' }
+    if (!response.success) return { ok: false, message: refusalOr(response.error, 'The review was not recorded. Check payment permission and matter access.') }
     revalidateBilling()
     return { ok: true, message: `${refund.refundNumber} ${decision === 'approve' ? 'approved' : 'rejected'}.` }
   } catch (error) {
@@ -253,7 +254,7 @@ export async function refundCardPaymentAction(_previous: RefundActionState, form
         }
       }
     `, { paymentId, reason, explanation, idempotencyKey })
-    if (!response.success) return { ok: false, message: response.error || 'The card refund did not go through. Check the payment and try again.' }
+    if (!response.success) return { ok: false, message: refusalOr(response.error, 'The card refund did not go through. Check the payment and try again.') }
     revalidateBilling()
     const { refund } = response.data.refundCardPayment
     return { ok: true, message: `Refunded ${formatMoneyLabel(refund.amountMinor, refund.currencyCode)} to the card: ${refund.refundNumber}.` }

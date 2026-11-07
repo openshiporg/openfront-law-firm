@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
+import { refusalOr } from '@/features/dashboard/lib/security'
 import { keystoneContext } from '@/features/keystone/context'
 
 export type AccountState = { error: string | null }
@@ -96,7 +97,7 @@ export async function cancelConsultation(_previous: CancelState, form: FormData)
   if (!id) return { error: 'This consultation is unavailable.', done: false }
   if (form.get('confirm') !== 'yes') return { error: 'Confirm the cancellation.', done: false }
   const response = await keystoneClient<{ cancelOwnConsultation: { id: string } }>(`mutation($id: ID!, $reason: String) { cancelOwnConsultation(consultationId: $id, reason: $reason) { id } }`, { id, reason: reason || null })
-  if (!response.success) return { error: 'This consultation could not be cancelled online. It may have started or already changed. Contact the firm.', done: false }
+  if (!response.success) return { error: refusalOr(response.error, 'This consultation could not be cancelled online. It may have started or already changed. Contact the firm.'), done: false }
   revalidatePath('/account')
   revalidatePath(`/account/appointments/${id}`)
   return { error: null, done: true }

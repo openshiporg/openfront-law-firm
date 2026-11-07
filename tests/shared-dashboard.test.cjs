@@ -112,6 +112,19 @@ test('form errors show Keystone validation text, never Prisma, stack or GraphQL 
     { message: 'connect ECONNREFUSED postgres://user:pw@db', extensions: { code: 'INTERNAL_SERVER_ERROR' } },
   ]) assert.equal(of(leak), PUBLIC_REQUEST_ERROR);
   assert.equal(publicGraphQLErrorMessage(new Error('synthetic')), PUBLIC_REQUEST_ERROR);
+  // The server's command and lifecycle refusals reach the form; their driver-looking cousins do not.
+  assert.equal(of({ message: 'This consultation can no longer be cancelled online.', extensions: { code: 'COMMAND_REFUSED' } }),
+    'This consultation can no longer be cancelled online.');
+  assert.equal(of({ message: 'Matter cannot transition from open to archived.', extensions: { code: 'LIFECYCLE_REFUSED' } }),
+    'Matter cannot transition from open to archived.');
+  assert.equal(of({ message: 'Invalid `prisma.refund.create()` invocation', extensions: { code: 'COMMAND_REFUSED' } }), PUBLIC_REQUEST_ERROR);
+});
+
+test('a form falls back to its own sentence only when the server gave no readable refusal', () => {
+  const { refusalOr, PUBLIC_REQUEST_ERROR } = sandbox().load('features/dashboard/lib/security.ts');
+  assert.equal(refusalOr('This payment already has a refund.', 'fallback'), 'This payment already has a refund.');
+  assert.equal(refusalOr(PUBLIC_REQUEST_ERROR, 'fallback'), 'fallback');
+  assert.equal(refusalOr(undefined, 'fallback'), 'fallback');
 });
 
 function authActions({ env = {}, response }) {

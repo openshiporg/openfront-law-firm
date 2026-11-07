@@ -19,9 +19,11 @@ export function safeErrorSummary(error: unknown): { message: string; codes: stri
   return { message: PUBLIC_REQUEST_ERROR, codes: [...new Set(codes)] };
 }
 
-// Keystone codes whose messages are written for the person filling the form.
+// Keystone codes whose messages are written for the person filling the form, plus the server's own
+// command/lifecycle refusals (graphql-security.ts unmasks guard errors under these two codes).
 const USER_FACING_CODES = new Set([
   'KS_VALIDATION_FAILURE', 'KS_USER_INPUT_ERROR', 'KS_ACCESS_DENIED', 'KS_EXTENSION_ERROR',
+  'COMMAND_REFUSED', 'LIFECYCLE_REFUSED',
 ]);
 // Anything that looks like database, driver or stack output stays server-side.
 const UNSAFE_DETAIL = /prisma|invocation|\bat\s+\S+\s*\(|\bat\s+\/|node_modules|postgres(ql)?:\/\/|\bSQL\b|ECONN|query engine|\.ts:\d+|\.js:\d+/i;
@@ -57,6 +59,11 @@ export function publicGraphQLErrorMessage(error: unknown): string {
     if (cleaned) messages.push(cleaned);
   }
   return messages.length ? [...new Set(messages)].join('\n') : PUBLIC_REQUEST_ERROR;
+}
+
+/** The server's readable refusal when there is one, else the caller's own fallback sentence. */
+export function refusalOr(error: string | undefined, fallback: string): string {
+  return error && error !== PUBLIC_REQUEST_ERROR ? error : fallback;
 }
 
 /** Only root-relative, same-site navigation; also reject encoded bypasses. */
