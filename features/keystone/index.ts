@@ -9,6 +9,7 @@ import { models } from "./models";
 import { permissionKeys } from "./access";
 import { extendGraphqlSchema } from "./mutations";
 import { s3ForcePathStyle } from "./lib/s3-storage";
+import { pooledDatabaseUrl } from './database-url';
 
 const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
 
@@ -95,7 +96,7 @@ export default withAuth(
   config({
     db: {
       provider: "postgresql",
-      url: databaseURL,
+      url: pooledDatabaseUrl(databaseURL),
     },
     lists: models,
     // Uploaded images (attorney portraits) share the deployment's S3_* bucket with document files.
