@@ -53,7 +53,7 @@ export async function MyWorkPage() {
       (c) => ({ id: c.id, href: path('work', 'consultation', c.id), title: c.serviceTitle || 'Consultation', meta: c.intake?.intakeNumber ?? 'Intake', status: c.status, when: at(c.startsAt) }),
     ),
     rows<{ id: string; checkNumber: string | null; status: string; createdAt: string | null; intake: { title: string | null } | null; matter: { matterNumber: string | null } | null }>(
-      `query MyConflictChecks($id: ID!, $open: [ConflictCheckStatusType!]) { conflictChecks(where: { status: { in: $open }, OR: [{ requestedBy: { id: { equals: $id } } }, { reviewedBy: { id: { equals: $id } } }] }, orderBy: [{ createdAt: asc }], take: 25) { id checkNumber status createdAt intake { title } matter { matterNumber } } }`,
+      `query MyConflictChecks($id: ID!, $open: [ConflictCheckStatusType!]) { conflictChecks(where: { status: { in: $open }, OR: [{ requestedBy: { id: { equals: $id } } }, { reviewedBy: { id: { equals: $id } } }, { intake: { assignedTo: { id: { equals: $id } } } }] }, orderBy: [{ createdAt: asc }], take: 25) { id checkNumber status createdAt intake { title } matter { matterNumber } } }`,
       { id, open: openChecks }, 'conflictChecks',
       (c) => ({ id: c.id, href: '/dashboard/platform/intake#conflict-review', title: c.intake?.title || c.matter?.matterNumber || 'Conflict check', meta: c.checkNumber, status: c.status, when: day(c.createdAt) }),
     ),
@@ -86,7 +86,7 @@ export async function MyWorkPage() {
 
   const sections: Section[] = [
     { id: 'my-consultations', title: 'Consultations I host', rows: consultations, empty: 'No consultations waiting on you.', all: { href: '/dashboard/platform/work', label: 'Calendar & tasks' } },
-    { id: 'my-conflicts', title: 'Conflict checks', rows: checks, empty: 'No open conflict checks you requested or review.', all: { href: '/dashboard/platform/intake#conflict-review', label: 'Conflict review' } },
+    { id: 'my-conflicts', title: 'Conflict checks', rows: checks, empty: 'No open conflict checks on your intakes.', all: { href: '/dashboard/platform/intake#conflict-review', label: 'Conflict review' } },
     { id: 'my-matters', title: 'My matters', rows: matters, empty: 'You are not on any open matter.', all: { href: '/dashboard/platform/matters', label: 'All matters you can see' } },
     { id: 'my-tasks', title: 'Tasks', rows: tasks, empty: 'No open tasks assigned to you.' },
     { id: 'my-deadlines', title: 'Deadlines', rows: deadlines, empty: 'No pending deadlines assigned to you.' },
