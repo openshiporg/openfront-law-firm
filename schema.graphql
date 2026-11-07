@@ -55,6 +55,7 @@ enum UserOnboardingStatusType {
 type UserDashboardAdmission {
   canAccessDashboard: Boolean!
   canManageOnboarding: Boolean!
+  permissions: [String!]!
 }
 
 scalar DateTime @specifiedBy(url: "https://datatracker.ietf.org/doc/html/rfc3339#section-5.6")

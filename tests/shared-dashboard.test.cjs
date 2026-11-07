@@ -180,6 +180,19 @@ test('sidebar shows only lists and platform pages the session can see', () => {
   assert.equal(access.visibleSidebarLists(lists, null).length, 1);
 });
 
+test('sidebar follows the role: an attorney sees practice desks, not firm administration', () => {
+  const access = sandbox().load('features/dashboard/lib/sidebarAccess.ts');
+  const items = ['my-work', 'today', 'intake', 'matters', 'time-expenses', 'accounting', 'team', 'firm', 'branding']
+    .map(slug => ({ href: `/dashboard/platform/${slug}` }));
+  const attorney = { role: { canAccessDashboard: true, permissions: ['canAccessDashboard', 'canReadIntake', 'canReadMatters', 'canReadBilling'] } };
+  assert.deepEqual(plain(access.visiblePlatformItems(items, [], attorney)).map(item => item.href.split('/').pop()),
+    ['my-work', 'today', 'intake', 'matters', 'time-expenses']);
+  const admin = { role: { canAccessDashboard: true, permissions: ['canAccessDashboard', 'canReadIntake', 'canReadMatters', 'canReadBilling', 'canReadTrust', 'canManagePeople', 'canManageFirm'] } };
+  assert.equal(access.visiblePlatformItems(items, [], admin).length, items.length);
+  // An older session shape without permission keys keeps today's behaviour.
+  assert.equal(access.visiblePlatformItems(items, [], { role: { canAccessDashboard: true } }).length, items.length);
+});
+
 test('formatInZone: viewer zone by default, explicit zone when given, labelled', () => {
   const t = sandbox().load('features/dashboard/lib/storeTime.ts');
   const d = new Date('2026-11-02T18:00:00Z');

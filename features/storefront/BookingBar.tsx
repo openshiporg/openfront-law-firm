@@ -71,6 +71,6 @@ export function BookingBar({ choices, timezone, initialServiceId }: { choices: C
       </div>
       <div className="alt-book__submit"><button className="alt-book__button" type="submit">Request a consultation</button></div>
     </div>
-    <p className="alt-book__note"><em>A request does not create</em> an attorney-client relationship. Not for emergencies or deadline protection.</p>
+    <p className="alt-book__note">Asking for a time doesn’t make us your lawyers yet. For a deadline this week, call the office.</p>
   </form>
 }

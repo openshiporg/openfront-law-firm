@@ -34,20 +34,45 @@ export function ServiceUnavailable({ title, retryHref }: { title: string; retryH
 }
 
 function PracticeIndex({ services, bookingEnabled }: { services: Service[]; bookingEnabled: boolean }) {
+  const terms = commonTerms(services)
   return <ol className="sf-index">
     {services.map(service => <li key={service.id} className="sf-index__row">
       <Link href={`/practice-areas/${encodeURIComponent(service.publicSlug)}`} className="sf-index__link"><h3 className="sf-h3">{service.name}</h3></Link>
       {service.description ? <p className="sf-muted line-clamp-2 max-w-[60ch] text-[1.0625rem] leading-7">{service.description}</p> : null}
-      <p className="sf-index__meta sf-num"><span>{service.consultationMinutes} min consultation</span><span>{feeLabel(service)}</span></p>
-      {bookingEnabled ? <div className="sf-index__aside mt-3 md:mt-0"><div className="sf-track"><Link href={`/consultation?service=${encodeURIComponent(service.id)}`} className="sf-pill sf-pill--primary sf-pill--sm">Book</Link></div></div> : null}
+      <p className="sf-index__meta sf-num">{[service.consultationMinutes !== terms.minutes ? `${service.consultationMinutes} min` : null, service.consultationFeeMinor !== terms.fee ? (service.consultationFeeMinor <= 0 ? 'No fee' : feeLabel(service)) : null].filter(Boolean).join(' · ')}</p>
+      {bookingEnabled ? <div className="sf-index__aside mt-3 md:mt-0"><div className="sf-track"><Link href={`/consultation?service=${encodeURIComponent(service.id)}`} className="sf-pill sf-pill--primary sf-pill--sm" aria-label={`Book a ${service.name} consultation`}>Book</Link></div></div> : null}
     </li>)}
   </ol>
 }
 
 export async function homeMetadata() { return firmMetadata(null) }
 
-function ConsultationFacts({ service }: { service: Service }) {
-  return <span className="alt-practice__meta"><span>{service.consultationMinutes} min consultation</span><span>{feeLabel(service)}</span></span>
+/** The most common length and fee, stated once; a row only shows what differs from it. */
+function commonTerms(services: Service[]) {
+  const mode = <T,>(values: T[]) => { const counts = new Map<T, number>(); values.forEach((v) => counts.set(v, (counts.get(v) ?? 0) + 1)); return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] }
+  return { minutes: mode(services.map((s) => s.consultationMinutes)), fee: mode(services.map((s) => s.consultationFeeMinor)) }
+}
+
+function termsSentence(terms: { minutes?: number; fee?: number }, services: Service[]) {
+  if (!services.length || terms.minutes === undefined || terms.fee === undefined) return null
+  const reference = services.find((s) => s.consultationFeeMinor === terms.fee)!
+  const differs = services.filter((s) => s.consultationFeeMinor !== terms.fee)
+  const first = `First consultations run ${terms.minutes} minutes${terms.fee <= 0 ? ' and cost nothing' : ` and cost ${feeLabel(reference)}`}`
+  if (!differs.length) return `${first}.`
+  const parts = differs.map((s) => `${s.name}, ${s.consultationFeeMinor <= 0 ? 'no fee' : feeLabel(s)}`)
+  return `${first}, except ${parts.join('; ')}.`
+}
+
+function RowDifference({ service, terms }: { service: Service; terms: { minutes?: number; fee?: number } }) {
+  const notes = [
+    service.consultationMinutes !== terms.minutes ? `${service.consultationMinutes} min` : null,
+    service.consultationFeeMinor !== terms.fee ? (service.consultationFeeMinor <= 0 ? 'No fee' : feeLabel(service)) : null,
+  ].filter(Boolean)
+  return notes.length ? <span className="alt-practice__meta">{notes.join(' · ')}</span> : <span aria-hidden="true" />
+}
+
+function countWord(n: number) {
+  return ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'][n] ?? String(n)
 }
 
 /** Home: the firm's people in black and white, the booking bar, practice areas and attorneys. */
@@ -66,14 +91,16 @@ export async function HomePage() {
   const times = openTimes?.status === 'ok' ? openTimes.data : null
   const choices = services.map((service) => ({ id: service.id, name: service.name, consultationMinutes: service.consultationMinutes, fee: feeLabel(service), slots: times?.services.find((row) => row.serviceId === service.id)?.slots ?? [] }))
   const team = attorneys ?? []
+  const terms = commonTerms(services)
+  const street = settings.officeAddress[0]?.split(',')[0]?.trim()
+  const lede = [team.length ? `${countWord(team.length)} attorneys` : null, street ? `at ${street}` : null, place ? `in ${place.city}` : null].filter(Boolean).join(' ')
   return <PublicPage dock={settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link href="/practice-areas" className="sf-pill sf-pill--lg">Request a consultation</Link></div> : undefined}>
     <section className="alt-hero" aria-labelledby="home-title">
       {/* eslint-disable-next-line @next/next/no-img-element -- first-paint hero, never lazy */}
       <img className="alt-hero__img" src="/storefront-hero.jpg" alt={`The attorneys of ${name}`} width={1920} height={1280} fetchPriority="high" decoding="sync" />
       <div className="alt-hero__body">
-        <h1 id="home-title" className="alt-hero__title">Calm, organized counsel. Free of surprises.</h1>
-        <span className="alt-rule" aria-hidden="true" />
-        {published && settings.tagline ? <p className="alt-hero__tagline">{settings.tagline}</p> : null}
+        <h1 id="home-title" className="alt-hero__title">Wills, closings, custody, contracts. Handled plainly.</h1>
+        {published && lede ? <p className="alt-hero__tagline">{lede}. We tell you the cost before we start.</p> : published && settings.tagline ? <p className="alt-hero__tagline">{settings.tagline}</p> : null}
       </div>
     </section>
 
@@ -82,8 +109,8 @@ export async function HomePage() {
     <div className="alt-lower">
       <section aria-labelledby="home-practice">
         <div className="alt-head alt-head--practice">
-          <p className="alt-caps">Practice areas</p>
-          <h2 id="home-practice" className="sf-h2">We handle core legal needs for families and businesses{place ? ` in ${place.state}` : ''}.</h2>
+          <h2 id="home-practice" className="sf-h2">What we take on</h2>
+          {termsSentence(terms, services) ? <p className="alt-head__note">{termsSentence(terms, services)}</p> : null}
         </div>
         {!published ? <p className="sf-muted">Firm information is not yet published.</p>
           : catalog?.status !== 'ok' ? <p role="alert" className="sf-notice sf-notice--plain">Practice areas could not be loaded. <Link href="/" className="sf-link">Try again</Link></p>
@@ -91,7 +118,7 @@ export async function HomePage() {
             {services.map((service) => <li key={service.id} className="alt-practice__row">
               <Link className="alt-practice__link" href={`/practice-areas/${encodeURIComponent(service.publicSlug)}`}>
                 <span className="alt-practice__name">{service.name}</span>
-                <ConsultationFacts service={service} />
+                <RowDifference service={service} terms={terms} />
                 <ChevronRight className="alt-practice__chev size-6" strokeWidth={1.25} aria-hidden="true" />
               </Link>
             </li>)}
@@ -106,8 +133,8 @@ export async function HomePage() {
       <span className="alt-lower__divider" aria-hidden="true" />
       {team.length ? <section aria-labelledby="home-attorneys">
         <div className="alt-head">
-          <p className="alt-caps">Attorneys</p>
-          <h2 id="home-attorneys" className="sf-h2">Experienced counsel, a collaborative approach.</h2>
+          <h2 id="home-attorneys" className="sf-h2">Who you will work with</h2>
+          <p className="alt-head__note">You meet the attorney who will handle your matter, not an intake desk.</p>
         </div>
         <ul className="alt-attorneys">
           {team.slice(0, 4).map((person) => <li key={person.slug}><Link className="alt-attorney" href={`/attorneys/${encodeURIComponent(person.slug)}`}>
@@ -118,7 +145,7 @@ export async function HomePage() {
             {firstAdmission(person.admissions) ? <span className="alt-attorney__admitted">Admitted {firstAdmission(person.admissions)}</span> : null}
           </Link></li>)}
         </ul>
-      </section> : <section aria-labelledby="home-about"><div className="alt-head"><p className="alt-caps">About</p><h2 id="home-about" className="sf-h2">{name}</h2></div>{settings.publication.aboutStatement ? <div className="sf-prose"><p>{settings.publication.aboutStatement.split(/\n{2,}/)[0]}</p></div> : null}</section>}
+      </section> : <section aria-labelledby="home-about"><div className="alt-head"><h2 id="home-about" className="sf-h2">{name}</h2></div>{settings.publication.aboutStatement ? <div className="sf-prose"><p>{settings.publication.aboutStatement.split(/\n{2,}/)[0]}</p></div> : null}</section>}
     </div>
   </PublicPage>
 }
@@ -132,7 +159,7 @@ export async function ServicesPage({ searchParams }: { searchParams: Promise<{ a
   const { services, nextCursor } = catalog.data
   return <PublicPage><div className="sf-shell sf-page">
     <header className="sf-page__head">
-      <h1 className="sf-title">Practice areas</h1>{services.length ? <p className="sf-label">Consultation appointments</p> : null}
+      <h1 className="sf-title">Practice areas</h1>{services.length && termsSentence(commonTerms(services), services) ? <p className="sf-lede">{termsSentence(commonTerms(services), services)}</p> : null}
     </header>
     {services.length ? <PracticeIndex services={services} bookingEnabled={settings.bookingEnabled} /> : <div className="sf-empty"><p role="status" className="sf-h3">{cursor ? 'No more practice areas.' : 'No practice areas to show right now.'}</p>{cursor ? null : <><p className="sf-muted text-sm">To ask about a legal matter, contact the firm directly.</p><Link className="sf-link" href="/contact">Contact the firm</Link></>}</div>}
     {cursor || nextCursor ? <nav aria-label="Practice area pages" className="sf-track mt-8">{cursor ? <Link className="sf-pill" href="/practice-areas">First page</Link> : null}{nextCursor ? <Link className="sf-pill sf-pill--raised" href={`/practice-areas?after=${encodeURIComponent(nextCursor)}`}>More practice areas</Link> : null}</nav> : null}
@@ -162,7 +189,6 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
   const book = `/consultation?service=${encodeURIComponent(service.id)}`
   const [lede, ...rest] = service.description ? service.description.split(/\n{2,}/) : []
   const masthead = <div className="alt-masthead">
-    {settings.tagline ? <p>{settings.tagline}</p> : null}
     <ul>
       {settings.officeAddress.length ? <li>{settings.officeAddress.join(', ')}</li> : null}
       {settings.officePhone ? <li><a href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`}>{settings.officePhone}</a></li> : null}
@@ -176,11 +202,10 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
       <article className="alt-detail__main">
         <nav aria-label="Breadcrumb"><ol className="alt-crumbs"><li><Link href="/practice-areas">Practice areas</Link></li><li aria-current="page">{service.name}</li></ol></nav>
         <h1 className="alt-detail__title">{service.name}</h1>
-        <span className="alt-rule" aria-hidden="true" />
         {lede ? <p className="alt-detail__lede">{lede}</p> : null}
         {rest.length ? <div className="sf-prose">{rest.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : null}
         {people.length ? <section className="alt-who" aria-labelledby="who-handles">
-          <p id="who-handles" className="alt-caps alt-who__head">Who handles this</p>
+          <h2 id="who-handles" className="alt-who__head">{people.length === 1 ? 'Your attorney' : 'Your attorneys'}</h2>
           <ul className="alt-who__list">
             {people.map((person) => <li key={person.slug}><Link className="alt-who__person" href={`/attorneys/${encodeURIComponent(person.slug)}`}>
               <AttorneyPortrait name={person.name} photoUrl={person.photoUrl} size="fill" className="alt-who__photo" />
@@ -196,18 +221,17 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
       </article>
       <span className="alt-detail__divider" aria-hidden="true" />
       <aside className="alt-bookcard" aria-labelledby="book-card">
-        <p className="alt-caps">Book a consultation</p>
-        <h2 id="book-card" className="alt-bookcard__name">{service.name}</h2>
-        <ul className="alt-bookcard__facts sf-num"><li>{service.consultationMinutes} minutes</li><li>{feeLabel(service)}</li></ul>
+        <h2 id="book-card" className="alt-bookcard__name">Book a first meeting</h2>
+        <ul className="alt-bookcard__facts sf-num"><li><strong>{service.consultationMinutes} minutes</strong></li><li><strong>{service.consultationFeeMinor <= 0 ? 'No fee' : feeLabel(service)}</strong>{service.consultationFeeMinor > 0 ? ', paid by card when you book' : ''}</li></ul>
         {!settings.bookingEnabled ? <p className="sf-notice sf-notice--plain">Online booking is closed. <Link className="sf-link" href="/contact">Contact the firm</Link></p>
           : <form action="/consultation" method="get" className="grid gap-4">
             <input type="hidden" name="service" value={service.id} />
             {days.length && times ? <fieldset className="alt-slots">
-              <legend className="alt-caps">Available times this week</legend>
+              <legend>Open this week</legend>
               {days.map(({ day, slots: list }, dayIndex) => {
                 const [weekday, ...date] = day.split(' ')
                 return <div key={day} className="alt-slots__day">
-                  <span className="alt-slots__daylabel">{weekday}<br />{date.join(' ')}</span>
+                  <span className="alt-slots__daylabel"><b>{weekday}</b>{date.join(' ')}</span>
                   <div className="alt-slots__times">
                     {list.map((slot, index) => <label key={slot.startsAt} className="sf-seg"><input type="radio" name="at" value={slot.startsAt} defaultChecked={dayIndex === 0 && index === 0} aria-label={slotLabel(slot.startsAt, times.timezone)} /><span className="sf-pill sf-num">{slotTimeLabel(slot.startsAt, times.timezone)}</span></label>)}
                   </div>
@@ -215,10 +239,10 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
               })}
               <p className="alt-bookcard__zone">Times in {timezoneLabel(times.timezone)}. <Link className="sf-link" href={book}>More times</Link></p>
             </fieldset> : <p role="status" className="sf-notice sf-notice--plain">{times ? 'No open times this week.' : 'Open times could not be loaded.'} <Link className="sf-link" href={book}>See all times</Link></p>}
-            <p className="alt-bookcard__check">The firm runs a conflict check before confirming.</p>
+            <p className="alt-bookcard__check">Before we confirm, we check that we don’t already represent anyone on the other side. That usually takes a business day.</p>
             <button className="sf-pill sf-pill--solid">{days.length ? 'Request this time' : 'Request a consultation'}</button>
           </form>}
-        <p className="alt-bookcard__fine">A request does not create an attorney-client relationship. Not for emergencies or deadline protection.</p>
+        <p className="alt-bookcard__fine">Booking doesn’t make us your lawyers yet, and this form is not watched around the clock. If a court deadline is days away, call {settings.officePhone ?? 'the office'}.</p>
       </aside>
     </div>
   </PublicPage>
@@ -259,7 +283,7 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
       <div className="grid gap-8">
         <header className="grid gap-3">
           <h1 className="sf-title">Request a consultation</h1>
-          <p className="sf-label">{settings.isLocalFictional ? 'Fictional local appointment' : 'Appointment request'}</p>
+          <p className="sf-lede">{service.name}</p>
         </header>
         <ConsultationBookingForm service={service} slots={slots} requestKey={randomUUID()} timezone={availability.data.timezone} notice={notice} acknowledgmentVersion={acknowledgmentVersion} initialStartsAt={at} />
       </div>

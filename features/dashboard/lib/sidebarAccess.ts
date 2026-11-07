@@ -5,7 +5,44 @@
  */
 
 type SidebarList = { path: string; isHidden?: boolean | null }
-type SidebarUser = { role?: { canAccessDashboard?: boolean | null } | null } | null | undefined
+type SidebarUser = { role?: { canAccessDashboard?: boolean | null; permissions?: string[] | null } | null } | null | undefined
+
+/**
+ * Platform destination -> permissions, any one of which opens it. A destination not
+ * listed stays visible. Display only: every page and command enforces its own access.
+ */
+export const platformDestinationPermissions: Record<string, readonly string[]> = {
+  intake: ['canReadIntake', 'canManageIntake', 'canRunConflictChecks'],
+  matters: ['canReadMatters', 'canManageMatters'],
+  contacts: ['canReadPeople', 'canManagePeople'],
+  work: ['canReadCalendar', 'canManageCalendar', 'canReadTasks', 'canManageTasks'],
+  dockets: ['canReadCalendar', 'canManageCalendar'],
+  documents: ['canReadDocuments', 'canManageDocuments'],
+  communications: ['canReadCommunications', 'canManageCommunications'],
+  'time-expenses': ['canReadBilling', 'canManageBilling'],
+  billing: ['canReadBilling', 'canManageBilling', 'canReadPayments', 'canManagePayments'],
+  retainers: ['canReadBilling', 'canManageBilling'],
+  accounting: ['canReadTrust', 'canManageTrust'],
+  portal: ['canReadPortal', 'canManagePortal'],
+  ai: ['canReadAgents', 'canManageAgents'],
+  governance: ['canReadRetention', 'canManageRetention'],
+  reports: ['canViewAudit', 'canReadBilling', 'canReadTrust'],
+  firm: ['canManageFirm'],
+  team: ['canManagePeople', 'canManageRoles'],
+  data: ['canManageFirm', 'canManagePeople'],
+  integrations: ['canReadIntegrations', 'canManageIntegrations'],
+  'payment-providers': ['canManagePayments', 'canManageTrust', 'canManageFirm'],
+  'public-site': ['canManageFirm'],
+  branding: ['canManageFirm'],
+}
+
+/** Known permissions hide destinations the role lacks; unknown (older session shape) shows all. */
+function roleAllows(slug: string, user: SidebarUser) {
+  const granted = user?.role?.permissions
+  const required = platformDestinationPermissions[slug]
+  if (!Array.isArray(granted) || !required) return true
+  return required.some((permission) => granted.includes(permission))
+}
 
 /** Only an explicit false hides navigation; an unknown user is left to the middleware. */
 export function canUseDashboardNav(user: SidebarUser) {
@@ -30,6 +67,6 @@ export function visiblePlatformItems<T extends { href: string }>(
   const hiddenPaths = new Set(lists.filter((list) => list.isHidden).map((list) => list.path))
   return items.filter((item) => {
     const slug = item.href.split('/platform/')[1]?.split(/[/?#]/)[0]
-    return !slug || !hiddenPaths.has(slug)
+    return !slug || (!hiddenPaths.has(slug) && roleAllows(slug, user))
   })
 }

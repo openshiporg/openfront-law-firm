@@ -32,7 +32,7 @@ export default async function AttorneyPage({ params }: { params: Promise<{ slug:
         <article className="grid gap-6">
           <div className="flex items-center gap-5">
             <AttorneyPortrait name={person.name} photoUrl={person.photoUrl} size="detail" />
-            <div className="grid min-w-0 gap-1">{person.title || person.focus ? <p className="sf-label">{[person.title, person.focus].filter(Boolean).join(' · ')}</p> : null}<h1 className="sf-title">{person.name}</h1></div>
+            <div className="grid min-w-0 gap-1"><h1 className="sf-title">{person.name}</h1>{person.title ? <p className="alt-who__role">{person.title}</p> : null}{person.focus ? <p className="alt-who__focus mt-1">{person.focus}</p> : null}</div>
           </div>
           {person.biography ? <div className="sf-prose sf-prose--lead">{person.biography.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : null}
           {person.practiceAreas.length ? <section className="sf-section" aria-labelledby="attorney-areas">
@@ -45,7 +45,7 @@ export default async function AttorneyPage({ params }: { params: Promise<{ slug:
             {person.admissions.length ? <dl className="sf-facts"><div><dt>Admitted</dt><dd>{person.admissions.map((line) => <span key={line} className="block">{line}</span>)}</dd></div></dl> : null}
             {person.email ? <p className="text-sm"><a className="sf-link break-all" href={`mailto:${person.email}`}>{person.email}</a></p> : null}
             {settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link href="/practice-areas" className="sf-pill sf-pill--primary">Request a consultation</Link></div> : <div className="sf-track sf-track--block"><Link href="/contact" className="sf-pill sf-pill--raised">Contact the firm</Link></div>}
-            <p className="sf-fine">Contacting an attorney does not create an attorney-client relationship.</p>
+            <p className="sf-fine">Writing to an attorney doesn’t make the firm your lawyers. Please don’t send confidential details until we confirm.</p>
           </div></div>
         </aside>
       </div>

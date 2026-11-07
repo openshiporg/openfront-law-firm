@@ -63,7 +63,7 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
             {settings.bookingEnabled ? <Link href="/practice-areas">Consultation appointments</Link> : null}
             <Link href="/account">Your appointments</Link>
             <Link href="/portal">Client portal</Link>
-            <Link href="/dashboard">Staff sign in</Link>
+            <Link href="/account/signin?as=staff">Attorney &amp; staff sign in</Link>
           </nav>
           <nav className="sf-foot__col" aria-label="Legal">
             <p className="sf-label">Legal</p>
@@ -73,7 +73,7 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
           </nav>
         </div>
         <div className="sf-foot__base">
-          <p>No legal advice or attorney-client relationship. Not for emergencies or deadline protection.</p>
+          <p>This site is general information, not legal advice. Contacting us doesn’t make us your lawyers.</p>
           <p>{firmName}{settings.isLocalFictional ? ' · Fictional local workspace' : ''}</p>
         </div>
       </div>

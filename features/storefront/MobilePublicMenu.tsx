@@ -12,7 +12,7 @@ export function MobilePublicMenu({ settings }: { settings: StorefrontSettings })
   const pathname = usePathname() ?? '/'
   const close = () => { if (details.current) details.current.open = false }
   useEffect(() => { close() }, [pathname])
-  const links: Array<readonly [string, string]> = [...publicNavigation, ['Your appointments', '/account'], ['Client portal', '/portal']]
+  const links: Array<readonly [string, string]> = [...publicNavigation, ['Your appointments', '/account'], ['Client portal', '/portal'], ['Attorney & staff sign in', '/account/signin?as=staff']]
   return <details ref={details} className="sf-mobile-menu">
     <summary aria-label="Menu">
       <Menu className="size-7 [details[open]_&]:hidden" strokeWidth={1.25} aria-hidden="true" /><X className="hidden size-7 [details[open]_&]:block" strokeWidth={1.25} aria-hidden="true" />

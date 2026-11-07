@@ -27,8 +27,24 @@ function AuthShell({ title, label = 'Consultation requests and appointments', ta
   </div></PublicPage>
 }
 
-export async function AccountAuthPage({ mode, searchParams }: { mode: 'signin' | 'signup'; searchParams: Promise<{ service?: string; reset?: string; from?: string; at?: string }> }) {
-  const { service = '', reset, from = '', at = '' } = await searchParams
+/** Who is signing in: clients use the storefront account; attorneys and staff use the firm workspace. */
+function AudienceChoice({ staff }: { staff: boolean }) {
+  return <nav aria-label="Who is signing in" className="sf-track sf-track--block">
+    <Link href="/account/signin" className="sf-pill" aria-current={staff ? undefined : 'page'}>Client</Link>
+    <Link href="/account/signin?as=staff" className="sf-pill" aria-current={staff ? 'page' : undefined}>Attorney &amp; staff</Link>
+  </nav>
+}
+
+export async function AccountAuthPage({ mode, searchParams }: { mode: 'signin' | 'signup'; searchParams: Promise<{ service?: string; reset?: string; from?: string; at?: string; as?: string }> }) {
+  const { service = '', reset, from = '', at = '', as: audience = '' } = await searchParams
+  if (mode === 'signin' && audience === 'staff') {
+    const settings = await getStorefrontSettings()
+    return <AuthShell title="Attorney &amp; staff sign in" label={`${settings.firmName ? `The ${settings.firmName} workspace` : "The firm workspace"}: your consultations, matters, conflict checks and time.`} tabs={<AudienceChoice staff />} foot={<><span className="sf-muted">New to the firm?</span><span className="sf-muted">Use the setup link in your invitation email.</span></>}>
+      <p className="text-sm leading-6">Attorneys see the consultations they host and the matters they are on. Firm administrators see the whole practice.</p>
+      <div className="sf-track sf-track--block"><Link className="sf-pill sf-pill--primary sf-pill--lg" href="/dashboard/signin?from=%2Fdashboard%2Fplatform%2Fmy-work">Continue to the firm workspace</Link></div>
+      <p className="sf-fine">Clients sign in on the <Link className="sf-link" href="/account/signin">client tab</Link>.</p>
+    </AuthShell>
+  }
   const slot = typeof at === 'string' ? at.slice(0, 40) : ''
   const settings = await getStorefrontSettings()
   const query = service ? `?service=${encodeURIComponent(service)}${slot ? `&at=${encodeURIComponent(slot)}` : ''}` : from ? `?from=${encodeURIComponent(from)}` : ''
@@ -36,10 +52,10 @@ export async function AccountAuthPage({ mode, searchParams }: { mode: 'signin' |
     <p className="sf-muted text-sm leading-6">This firm is not accepting new online accounts.</p>
     <div className="sf-track sf-track--block"><Link className="sf-pill sf-pill--raised sf-pill--lg" href="/account/signin">Sign in</Link></div>
   </AuthShell>
-  const tabs = settings.accountsEnabled ? <nav aria-label="Account" className="sf-track sf-track--block">
+  const tabs = settings.accountsEnabled ? <div className="grid gap-3">{mode === 'signin' ? <AudienceChoice staff={false} /> : null}<nav aria-label="Account" className="sf-track sf-track--block">
     <Link href={`/account/signin${query}`} className="sf-pill" aria-current={mode === 'signin' ? 'page' : undefined}>Sign in</Link>
     <Link href={`/account/signup${query}`} className="sf-pill" aria-current={mode === 'signup' ? 'page' : undefined}>Create account</Link>
-  </nav> : null
+  </nav></div> : null
   return <AuthShell title={mode === 'signup' ? 'Create account' : 'Sign in'} tabs={tabs} foot={<><span className="sf-muted">Invited by the firm?</span><Link className="sf-link" href="/portal">Client portal</Link></>}>
     {mode === 'signin' && reset === '1' ? <p role="status" className="sf-notice">Password changed. Sign in with the new password.</p> : null}
     {mode === 'signup' && settings.publication.mode === 'live' ? <p className="text-sm"><Link className="sf-link" href="/privacy">Privacy notice</Link></p> : null}
@@ -74,7 +90,7 @@ export async function AccountPage({ searchParams }: { searchParams: Promise<{ af
     {cursor || nextCursor ? <nav aria-label="Appointment pages" className="sf-track mt-6">{cursor ? <Link className="sf-pill" href="/account">Most recent</Link> : null}{nextCursor ? <Link className="sf-pill sf-pill--raised" href={`/account?after=${encodeURIComponent(nextCursor)}`}>Older appointments</Link> : null}</nav> : null}
   </div></PublicPage>
 }
-export function AccountSignInPage(props: { searchParams: Promise<{ service?: string; reset?: string; from?: string; at?: string }> }) { return <AccountAuthPage mode="signin" {...props} /> }
+export function AccountSignInPage(props: { searchParams: Promise<{ service?: string; reset?: string; from?: string; at?: string; as?: string }> }) { return <AccountAuthPage mode="signin" {...props} /> }
 export function AccountSignUpPage(props: { searchParams: Promise<{ service?: string; from?: string; at?: string }> }) { return <AccountAuthPage mode="signup" {...props} /> }
 export async function signInMetadata() { return firmMetadata('Sign in') }
 export async function signUpMetadata() { return firmMetadata('Create account') }

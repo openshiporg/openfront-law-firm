@@ -22,6 +22,7 @@ import {
   Scale,
   ShieldCheck,
   Store,
+  UserRound,
   UsersRound,
 } from 'lucide-react'
 
@@ -46,6 +47,14 @@ export const practiceHomeItem: PracticeNavItem = {
   href: '/dashboard/platform/today',
   description: 'Current intake, matter, work, billing, and hold queues.',
   icon: LayoutDashboard,
+}
+
+/** The signed-in attorney's own desk: what they host, review, own and record. */
+export const myWorkItem: PracticeNavItem = {
+  title: 'My work',
+  href: '/dashboard/platform/my-work',
+  description: 'Your consultations, conflict checks, matters, tasks and time.',
+  icon: UserRound,
 }
 
 export const practiceNavGroups: PracticeNavGroup[] = [
@@ -120,7 +129,7 @@ export const practiceNavGroups: PracticeNavGroup[] = [
   },
 ]
 
-export const practiceNavItems = [practiceHomeItem, ...practiceNavGroups.flatMap((group) => group.items)]
+export const practiceNavItems = [practiceHomeItem, myWorkItem, ...practiceNavGroups.flatMap((group) => group.items)]
 
 // One user-facing title per platform destination: sidebar labels, page headings,
 // breadcrumbs and back links all read it from here.
@@ -158,6 +167,7 @@ const relativeToDashboard = (href: string) => href.slice(dashboardBasePath.lengt
 
 export const platformNavItems: PlatformNavItem[] = [
   { ...practiceHomeItem, href: relativeToDashboard(practiceHomeItem.href), group: 'standalone' },
+  { ...myWorkItem, href: relativeToDashboard(myWorkItem.href), group: 'standalone' },
   ...practiceNavGroups.flatMap((group) =>
     group.items.map((item) => ({ ...item, href: relativeToDashboard(item.href), group: group.id })),
   ),

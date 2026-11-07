@@ -4,7 +4,7 @@ import { graphql, list } from "@keystone-6/core";
 import { denyAll } from "@keystone-6/core/access";
 import { password, relationship, select, text, virtual } from "@keystone-6/core/fields";
 
-import { isHumanIdentitySession, isInteractiveHuman, isInteractiveHumanSession, isSignedIn, permissions, rules, type Session } from "../access";
+import { isHumanIdentitySession, isInteractiveHuman, isInteractiveHumanSession, isSignedIn, permissionKeys, permissions, rules, type Session } from "../access";
 import { activeFirmRelationshipHooks } from "../tenancy";
 import { sha256Digest } from "../lib/digests";
 import { readOnlyRelationship } from "./fields";
@@ -12,11 +12,14 @@ import { trackingFields } from "./trackingFields";
 
 const userRelationshipHooks = activeFirmRelationshipHooks({ lifecycle: "user", allowBootstrapCreate: true });
 
-const DashboardAdmission = graphql.object<{ canAccessDashboard: boolean; canManageOnboarding: boolean }>()({
+const DashboardAdmission = graphql.object<{ canAccessDashboard: boolean; canManageOnboarding: boolean; permissions: string[] }>()({
   name: "UserDashboardAdmission",
   fields: {
     canAccessDashboard: graphql.field({ type: graphql.nonNull(graphql.Boolean) }),
     canManageOnboarding: graphql.field({ type: graphql.nonNull(graphql.Boolean) }),
+    // The viewer's own current permission keys, so navigation can match the role.
+    // Display only: every list, query and command still enforces its own access.
+    permissions: graphql.field({ type: graphql.nonNull(graphql.list(graphql.nonNull(graphql.String))) }),
   },
 });
 
@@ -26,6 +29,7 @@ export function viewerDashboardAdmission(session: Session | null | undefined, us
   return {
     canAccessDashboard: permissions.canAccessDashboard({ session }),
     canManageOnboarding: permissions.canManageOnboarding({ session }),
+    permissions: permissionKeys.filter((key) => permissions[key]({ session })),
   };
 }
 
@@ -172,7 +176,7 @@ export const User = list({
         resolve: (item, _args, context) => viewerDashboardAdmission(context.session as Session | undefined, String(item.id)),
       }),
       ui: {
-        query: "{ canAccessDashboard canManageOnboarding }",
+        query: "{ canAccessDashboard canManageOnboarding permissions }",
         createView: { fieldMode: "hidden" },
         itemView: { fieldMode: "hidden" },
         listView: { fieldMode: "hidden" },

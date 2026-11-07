@@ -6,7 +6,17 @@
     "enrichment": "none",
     "nav": "N6 masthead",
     "footer": "Ft4 dense colophon",
-    "brief": "Openfront Law Firm · public storefront redesign (home, practice areas, attorneys, about, contact, consultation)",
+    "brief": "Openfront Law Firm \u00b7 public storefront redesign (home, practice areas, attorneys, about, contact, consultation)",
+    "scope": "storefront"
+  },
+  {
+    "date": "2026-11-07",
+    "macrostructure": "Editorial masthead + ruled index (Altair polish)",
+    "theme": "Altair: ink #0f1714, ivory serif, brass #b9965b",
+    "enrichment": "none (existing group photo, grayscale)",
+    "nav": "N6 masthead (kept)",
+    "footer": "Ft4 dense colophon (kept)",
+    "brief": "De-slop polish: sentence-case labels, weight contrast, hairline rules, fees stated once, Portland-specific copy, tabular figures, hanging punctuation, press states; staff sign-in entry",
     "scope": "storefront"
   }
 ]
