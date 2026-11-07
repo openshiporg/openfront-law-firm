@@ -161,7 +161,7 @@ export const graphqlDepthRule: ValidationRule = (context) => ({
 });
 
 // Codes whose message is written for the user (guard reasons), not internals.
-const REASON_CODES = new Set(["KS_VALIDATION_FAILURE", "LIFECYCLE_REFUSED"]);
+const REASON_CODES = new Set(["KS_VALIDATION_FAILURE", "LIFECYCLE_REFUSED", "COMMAND_REFUSED"]);
 // Command guards throw plain `Error`s whose text is written for the user. Prisma, driver and
 // runtime failures are subclasses (or carry stack/SQL text), so they stay redacted.
 const UNSAFE_DETAIL = /prisma|invocation|\bat\s+\S+\s*\(|node_modules|postgres(ql)?:\/\/|\bSQL\b|ECONN|query engine|\.ts:\d+|\.js:\d+|fetch failed|stripe|secret|token|password/i;
