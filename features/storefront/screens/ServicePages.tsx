@@ -23,7 +23,9 @@ function notStarted(startsAt: string | null | undefined) {
 }
 
 function feeLabel(service: Pick<Service, 'consultationFeeMinor' | 'currencyCode'>) {
-  return service.consultationFeeMinor > 0 ? formatMoney(service.consultationFeeMinor, service.currencyCode) : 'No fee'
+  if (service.consultationFeeMinor <= 0) return 'No fee'
+  const label = formatMoney(service.consultationFeeMinor, service.currencyCode)
+  return service.consultationFeeMinor % 100 === 0 ? label.replace(/\.00$/, '') : label
 }
 
 /** A temporary backend failure keeps a retry path instead of posing as "not found" or "sign in". */
@@ -57,7 +59,8 @@ export async function HomePage() {
     published && settings.bookingEnabled ? getConsultationOpenTimes(null) : Promise.resolve(null),
     getPublishedAttorneys(published),
   ])
-  const services = catalog?.status === 'ok' ? catalog.data.services : []
+  // Home lists practice areas in the order the firm added them (ids are time-ordered cuids).
+  const services = catalog?.status === 'ok' ? [...catalog.data.services].sort((x, y) => x.id < y.id ? -1 : x.id > y.id ? 1 : 0) : []
   const name = settings.firmName ?? NEUTRAL_FIRM_NAME
   const place = officeLocality(settings.officeAddress)
   const times = openTimes?.status === 'ok' ? openTimes.data : null
