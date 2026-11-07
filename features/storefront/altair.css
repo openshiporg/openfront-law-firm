@@ -719,3 +719,6 @@ textarea.sf-field { padding-block: 0.75rem; min-height: 6.5rem; resize: vertical
   .alt-book__row { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
   .alt-select > span:first-child { overflow: visible; text-overflow: clip; white-space: normal; }
 }
+
+/* A long action inside a card wraps inside the card instead of pushing past its edge. */
+.sf-card .sf-pill { max-width: 100%; white-space: normal; text-align: center; line-height: 1.3; }
