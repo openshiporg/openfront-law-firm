@@ -41,8 +41,13 @@ export async function startPortalPayment(_root: unknown, args: { kind: "invoice"
 
   const provider = await prisma.paymentProvider.findFirst({ where: { firmId: identity.firmId, code: setup.account === "trust" ? "pp_stripe_trust" : "pp_stripe_operating", isInstalled: true } });
   if (!provider) throw new Error("The firm's selected payment account is not configured.");
-  const key = `${args.kind}:${args.id}:${setup.amount}`;
-  let payment = await prisma.payment.findFirst({ where: { firmId: identity.firmId, idempotencyKey: key } });
+  // One key per payable amount. A finished attempt (captured, refunded, failed, cancelled) is never
+  // reused: after a refund the invoice owes money again and needs a fresh payment and checkout session.
+  const baseKey = `${args.kind}:${args.id}:${setup.amount}`;
+  const attempts = await prisma.payment.findMany({ where: { firmId: identity.firmId, OR: [{ idempotencyKey: baseKey }, { idempotencyKey: { startsWith: `${baseKey}:r` } }] }, orderBy: { createdAt: "desc" }, select: { id: true, idempotencyKey: true, status: true } });
+  const open = attempts.find((row: any) => ["pending", "authorized"].includes(row.status));
+  const key = open ? open.idempotencyKey : attempts.length ? `${baseKey}:r${attempts.length}` : baseKey;
+  let payment = open ? await prisma.payment.findFirst({ where: { id: open.id, firmId: identity.firmId } }) : null;
   if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustAccountId: (setup as any).retainer.trustLedgerAccount?.trustAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
   const resource = args.kind === "invoice" ? { id: args.id, number: (setup as any).invoice.invoiceNumber, title: `Invoice ${(setup as any).invoice.invoiceNumber}`, email: (setup as any).invoice.client?.primaryEmail } : { id: args.id, number: (setup as any).retainer.agreementNumber, title: `Retainer ${(setup as any).retainer.agreementNumber}`, email: (setup as any).retainer.client?.primaryEmail };
   const result = await createPayment({ provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: identity.firmId, idempotencyKey: key, successUrl: `${webBase()}/portal/payments/return?payment=${payment.id}`, cancelUrl: `${webBase()}/portal/payments/return?payment=${payment.id}`, ...(args.kind === "invoice" ? { invoice: resource } : { retainer: resource }) });
