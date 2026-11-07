@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit --pretty false",
     "test": "node --test tests/*.test.cjs && npm run test:internal-origin",
     "start": "next start",
-    "test:internal-origin": "tsx --test features/keystone/lib/internal-origin.test.ts",
+    "test:internal-origin": "tsx --test features/keystone/lib/internal-origin.test.ts features/keystone/lib/keystonePrismaErrors.test.ts",
     "lint": "eslint . --max-warnings=0",
     "migrate:gen": "keystone build --no-ui && tsx features/keystone/view-order/generate-view-order.ts && prisma migrate dev",
     "migrate": "prisma migrate deploy",

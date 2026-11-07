@@ -10,6 +10,7 @@ import { permissionKeys } from "./access";
 import { extendGraphqlSchema } from "./mutations";
 import { s3ForcePathStyle } from "./lib/s3-storage";
 import { pooledDatabaseUrl } from './database-url';
+import { throwKeystonePrismaErrors } from './lib/keystonePrismaErrors';
 
 const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
 
@@ -99,6 +100,8 @@ export default withAuth(
     db: {
       provider: "postgresql",
       url: pooledDatabaseUrl(databaseURL),
+      // Keystone returns failed queries as values; this makes them throw so transactions roll back.
+      extendPrismaClient: throwKeystonePrismaErrors,
     },
     lists: models,
     // Uploaded images (attorney portraits) share the deployment's S3_* bucket with document files.
