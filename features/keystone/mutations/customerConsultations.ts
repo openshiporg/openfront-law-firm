@@ -95,17 +95,24 @@ export async function consultationCatalogPage(_root: unknown, args: { cursor?: s
     const admitted = await publicFirm(tx, 'booking')
     if (!admitted) return { services: [], nextCursor: null }
     const { firm } = admitted
-    const after = decodeCursor(args.cursor, ['s', 'i'])
+    // Keyset over (sortOrder, publicSlug, id): the firm's chosen order, stable across pages.
+    const after = decodeCursor(args.cursor, ['o', 's', 'i'])
+    const order = after ? Number(after.o) : null
+    if (after && !Number.isInteger(order)) throw new Error('This page is unavailable. Start again from the first page.')
     const rows = await tx.practiceArea.findMany({
       where: { AND: [
         { firmId: firm.id, status: 'active', isPublic: true, publicSlug: { not: null } },
-        after ? { OR: [{ publicSlug: { gt: after.s } }, { publicSlug: after.s, id: { gt: after.i } }] } : {},
+        after ? { OR: [
+          { sortOrder: { gt: order } },
+          { sortOrder: order, publicSlug: { gt: after.s } },
+          { sortOrder: order, publicSlug: after.s, id: { gt: after.i } },
+        ] } : {},
       ] },
-      orderBy: [{ publicSlug: 'asc' }, { id: 'asc' }], take: CATALOG_PAGE_SIZE + 1, select: serviceSelect,
+      orderBy: [{ sortOrder: 'asc' }, { publicSlug: 'asc' }, { id: 'asc' }], take: CATALOG_PAGE_SIZE + 1, select: { ...serviceSelect, sortOrder: true },
     })
     const page = rows.slice(0, CATALOG_PAGE_SIZE)
     const last = page.at(-1)
-    return { services: page.map((service: any) => serviceDto(service, firm)), nextCursor: rows.length > CATALOG_PAGE_SIZE && last ? encodeCursor({ s: last.publicSlug, i: last.id }) : null }
+    return { services: page.map((service: any) => serviceDto(service, firm)), nextCursor: rows.length > CATALOG_PAGE_SIZE && last ? encodeCursor({ o: String(last.sortOrder), s: last.publicSlug, i: last.id }) : null }
   })
 }
 /** First catalog page (kept for existing callers). */
@@ -274,7 +281,7 @@ export async function consultationOpenTimes(_root: unknown, args: { serviceId?: 
     try { requireConfiguredConsultationCalendar(admitted) } catch { return { timezone: validTimezone(firm.defaultTimezone), services: [] } }
     const services = await tx.practiceArea.findMany({
       where: { firmId: firm.id, status: 'active', isPublic: true, publicSlug: { not: null }, ...(args.serviceId ? { id: String(args.serviceId) } : {}) },
-      orderBy: [{ publicSlug: 'asc' }, { id: 'asc' }], take: CATALOG_PAGE_SIZE, select: { id: true, consultationMinutes: true },
+      orderBy: [{ sortOrder: 'asc' }, { publicSlug: 'asc' }, { id: 'asc' }], take: CATALOG_PAGE_SIZE, select: { id: true, consultationMinutes: true },
     })
     const timezone = validTimezone(firm.defaultTimezone)
     if (!services.length) return { timezone, services: [] }

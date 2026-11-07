@@ -798,6 +798,7 @@ model PracticeArea {
   publicSlug                         String?
   consultationFeeMinor               Int                     @default(0)
   consultationMinutes                Int                     @default(30)
+  sortOrder                          Int                     @default(0)
   matters                            Matter[]                @relation("Matter_practiceArea")
   createdAt                          DateTime                @default(now())
   updatedAt                          DateTime                @default(now()) @updatedAt

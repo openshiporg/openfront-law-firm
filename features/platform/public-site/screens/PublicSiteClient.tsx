@@ -93,6 +93,7 @@ function PracticeAreaForm({ area, currencyCode, onDone }: { area?: PublicPractic
       <label className={cn(labelClass, 'sm:col-span-2')}>Description<textarea name="description" rows={3} maxLength={4000} defaultValue={area?.description ?? ''} className={textareaClass} /></label>
       <label className={labelClass}>Consultation length (minutes)<input name="consultationMinutes" type="number" min={15} max={120} step={15} required defaultValue={area?.consultationMinutes ?? 30} className={fieldClass} /></label>
       <label className={labelClass}>Consultation fee ({currencyCode})<input name="consultationFee" inputMode="decimal" defaultValue={fee} className={fieldClass} /></label>
+      <label className={labelClass}>Order on public site<input name="sortOrder" type="number" step={1} min={-10000} max={10000} defaultValue={area?.sortOrder ?? 0} className={fieldClass} /><span className="text-xs font-normal text-muted-foreground">Lower numbers are listed first.</span></label>
       <div className="sm:col-span-2"><Switch name="isPublic" label="Show on public site" defaultChecked={area?.isPublic ?? true} /></div>
       <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
         <Result state={state} />

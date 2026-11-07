@@ -683,3 +683,24 @@ textarea.sf-field { padding-block: 0.75rem; min-height: 6.5rem; resize: vertical
   .alt-practice__link { gap: 0.75rem; }
 }
 @media (max-width: 22rem) { .alt-practice__link { grid-template-columns: minmax(0, 1fr) 7.25rem 1rem; } }
+
+/* Phone and tablet: the photograph sits on top with the people clear of any text; the
+ * headline follows below on the dark ground, overlapping only the faded torsos. */
+@media (max-width: 63.99rem) {
+  .alt-hero { display: grid; min-height: 0; background: var(--alt-ink); }
+  .alt-hero__img { position: relative; inset: auto; z-index: -2; grid-area: 1 / 1; height: auto; aspect-ratio: 3 / 2; object-position: 50% 20%; }
+  .alt-hero::after {
+    inset: 0 0 auto 0;
+    height: auto;
+    aspect-ratio: 3 / 2;
+    background: linear-gradient(to bottom, transparent 0%, transparent 52%, rgb(15 23 20 / 0.7) 80%, var(--alt-ink) 100%);
+  }
+  .alt-hero__body { position: relative; grid-area: 2 / 1; margin-top: clamp(-4.5rem, -14vw, -2.75rem); padding-top: 0; padding-bottom: 1.5rem; gap: 0.75rem; }
+  .alt-hero__title { max-width: 16ch; font-size: clamp(2.125rem, 6.4vw + 0.6rem, 3.25rem); }
+}
+
+/* Booking bar on phones: the two fields stack full width so nothing is cut off. */
+@media (max-width: 40rem) {
+  .alt-book__row { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
+  .alt-select > span:first-child { overflow: visible; text-overflow: clip; white-space: normal; }
+}

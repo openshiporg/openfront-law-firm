@@ -59,8 +59,8 @@ export async function HomePage() {
     published && settings.bookingEnabled ? getConsultationOpenTimes(null) : Promise.resolve(null),
     getPublishedAttorneys(published),
   ])
-  // Home lists practice areas in the order the firm added them (ids are time-ordered cuids).
-  const services = catalog?.status === 'ok' ? [...catalog.data.services].sort((x, y) => x.id < y.id ? -1 : x.id > y.id ? 1 : 0) : []
+  // Practice areas arrive in the firm's chosen order (Public site → Practice areas → Order).
+  const services = catalog?.status === 'ok' ? catalog.data.services : []
   const name = settings.firmName ?? NEUTRAL_FIRM_NAME
   const place = officeLocality(settings.officeAddress)
   const times = openTimes?.status === 'ok' ? openTimes.data : null

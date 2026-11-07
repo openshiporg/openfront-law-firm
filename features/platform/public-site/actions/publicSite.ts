@@ -28,6 +28,7 @@ export type PublicPracticeAreaRow = {
   publicSlug: string | null
   consultationFeeMinor: number
   consultationMinutes: number
+  sortOrder: number
 }
 
 export type PublicSiteSetup =
@@ -37,14 +38,14 @@ export type PublicSiteSetup =
 export type PublicSiteState = { ok: boolean; message: string; revision: number }
 
 const policyFields = 'id status publicAccountsEnabled publicBookingEnabled privacyNotice privacyNoticeVersion firstContactNotice firstContactNoticeVersion aboutStatement publishedAt'
-const areaFields = 'id name code status description isPublic publicSlug consultationFeeMinor consultationMinutes'
+const areaFields = 'id name code status description isPublic publicSlug consultationFeeMinor consultationMinutes sortOrder'
 
 export async function getPublicSiteSetup(): Promise<PublicSiteSetup> {
   const response = await keystoneClient<{ firms: Array<{ id: string; defaultCurrency: string | null }>; publicSitePolicies: PublicSitePolicyRow[]; practiceAreas: PublicPracticeAreaRow[] }>(`
     query PublicSiteSetup {
       firms(take: 1) { id defaultCurrency }
       publicSitePolicies(take: 1) { ${policyFields} }
-      practiceAreas(take: 100, orderBy: [{ name: asc }]) { ${areaFields} }
+      practiceAreas(take: 100, orderBy: [{ sortOrder: asc }, { name: asc }]) { ${areaFields} }
     }
   `)
   if (!response.success) return { status: 'error', message: 'Public site settings could not be loaded. Firm management permission is required.' }
@@ -109,6 +110,8 @@ export async function savePracticeArea(previous: PublicSiteState, formData: Form
     const feeRaw = String(formData.get('consultationFee') ?? '').trim() || '0'
     const consultationFeeMinor = decimalToMinorUnits(feeRaw, currency)
     if (consultationFeeMinor < 0) return { ok: false, message: 'Fee cannot be negative.', revision }
+    const sortOrder = Number(formData.get('sortOrder') || 0)
+    if (!Number.isInteger(sortOrder) || sortOrder < -10000 || sortOrder > 10000) return { ok: false, message: 'Order must be a whole number.', revision }
     const slug = textValue(formData, 'publicSlug', 80).toLowerCase()
     if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return { ok: false, message: 'Web address may use lowercase letters, numbers and single hyphens.', revision }
     const data: Record<string, unknown> = {
@@ -117,6 +120,7 @@ export async function savePracticeArea(previous: PublicSiteState, formData: Form
       isPublic: formData.get('isPublic') === 'on',
       consultationMinutes: minutes,
       consultationFeeMinor,
+      sortOrder,
       ...(slug ? { publicSlug: slug } : {}),
     }
     const response = id

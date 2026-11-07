@@ -2423,6 +2423,7 @@ type PracticeArea {
   publicSlug: String
   consultationFeeMinor: Int
   consultationMinutes: Int
+  sortOrder: Int
   matters(where: MatterWhereInput! = {}, orderBy: [MatterOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: MatterWhereUniqueInput): [Matter!]
   mattersCount(where: MatterWhereInput! = {}): Int
   createdAt: DateTime
@@ -2452,6 +2453,7 @@ input PracticeAreaWhereInput {
   publicSlug: StringNullableFilter
   consultationFeeMinor: IntFilter
   consultationMinutes: IntFilter
+  sortOrder: IntFilter
   matters: MatterManyRelationFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
@@ -2474,6 +2476,7 @@ input PracticeAreaOrderByInput {
   publicSlug: OrderDirection
   consultationFeeMinor: OrderDirection
   consultationMinutes: OrderDirection
+  sortOrder: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
 }
@@ -2488,6 +2491,7 @@ input PracticeAreaUpdateInput {
   publicSlug: String
   consultationFeeMinor: Int
   consultationMinutes: Int
+  sortOrder: Int
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -2507,6 +2511,7 @@ input PracticeAreaCreateInput {
   publicSlug: String
   consultationFeeMinor: Int
   consultationMinutes: Int
+  sortOrder: Int
   createdAt: DateTime
   updatedAt: DateTime
 }

@@ -107,7 +107,7 @@ export const PracticeArea = list({
       },
     },
   },
-  ui: { listView: { initialColumns: ["name", "code", "publicSlug", "isPublic", "status"] } },
+  ui: { listView: { initialColumns: ["name", "code", "publicSlug", "isPublic", "sortOrder", "status"] } },
   fields: {
     firm: firmRelationship(),
     name: text({ validation: { isRequired: true } }),
@@ -130,6 +130,8 @@ export const PracticeArea = list({
     }),
     consultationFeeMinor: integer({ defaultValue: 0, validation: { isRequired: true, min: 0, max: 2147483647 } }),
     consultationMinutes: integer({ defaultValue: 30, validation: { isRequired: true, min: 15, max: 120 } }),
+    // Public listing order (lowest first); ties fall back to the web address.
+    sortOrder: integer({ defaultValue: 0, validation: { isRequired: true, min: -10000, max: 10000 } }),
     // Read-only inverse: `matters: { set: [] }` would unlink hidden matters without
     // Matter's own access or hooks; matters choose their practice area themselves.
     matters: readOnlyRelationship("Matter.practiceArea", true),
