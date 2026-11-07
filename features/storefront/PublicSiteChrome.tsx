@@ -8,6 +8,7 @@ import {
 } from "@/features/storefront/lib/storefront-settings"
 import { StoreBrand as FirmLink } from './StoreBrand'
 import { MobilePublicMenu } from './MobilePublicMenu'
+import { StorefrontDock } from './StorefrontDock'
 import { StorefrontNav } from './StorefrontNav'
 import { officeLocality } from './lib/locality'
 
@@ -89,7 +90,7 @@ export async function PublicPage({ children, dock, masthead }: { children: React
       <PublicSiteHeader settings={settings} />
       {masthead}
       <main id="public-main" tabIndex={-1} className="flex-1 outline-none">{children}</main>
-      {dock ? <div className="sf-dock">{dock}</div> : null}
+      {dock ? <StorefrontDock>{dock}</StorefrontDock> : null}
       <PublicSiteFooter settings={settings} />
     </div>
   )

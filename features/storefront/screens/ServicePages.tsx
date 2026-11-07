@@ -220,7 +220,7 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
         </section> : null}
       </article>
       <span className="alt-detail__divider" aria-hidden="true" />
-      <aside className="alt-bookcard" aria-labelledby="book-card">
+      <aside className="alt-bookcard" data-dock-anchor aria-labelledby="book-card">
         <h2 id="book-card" className="alt-bookcard__name">Book a first meeting</h2>
         <ul className="alt-bookcard__facts sf-num"><li><strong>{service.consultationMinutes} minutes</strong></li><li><strong>{service.consultationFeeMinor <= 0 ? 'No fee' : feeLabel(service)}</strong>{service.consultationFeeMinor > 0 ? ', paid by card when you book' : ''}</li></ul>
         {!settings.bookingEnabled ? <p className="sf-notice sf-notice--plain">Online booking is closed. <Link className="sf-link" href="/contact">Contact the firm</Link></p>

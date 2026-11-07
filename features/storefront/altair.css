@@ -681,7 +681,11 @@ textarea.sf-field { padding-block: 0.75rem; min-height: 6.5rem; resize: vertical
 .sf-foot__base p { margin: 0; max-width: 62ch; }
 
 /* Phone action bar: one brass action within thumb reach */
-.sf-dock { position: sticky; bottom: 0; z-index: 40; padding: 0.625rem var(--sf-gutter) calc(0.625rem + env(safe-area-inset-bottom)); background: var(--alt-ink); }
+.sf-dock { position: fixed; inset: auto 0 0 0; z-index: 40; padding: 0.625rem var(--sf-gutter) calc(0.625rem + env(safe-area-inset-bottom)); background: var(--alt-ink); border-top: 1px solid var(--alt-hair); transition: transform 180ms var(--sf-ease), visibility 0s linear 0s; }
+.sf-dock[data-shown="false"] { transform: translateY(100%); visibility: hidden; transition: transform 140ms var(--sf-ease), visibility 0s linear 140ms; }
+@media (prefers-reduced-motion: reduce) { .sf-dock, .sf-dock[data-shown="false"] { transition: none; } }
+/* The page always ends one dock-height lower, so nothing is left resting under it. */
+@media (max-width: 63.99rem) { .storefront:has(> .sf-dock) { padding-bottom: var(--sf-dock-h, calc(4.5rem + env(safe-area-inset-bottom))); } }
 .sf-dock .sf-pill { border: 0; background: var(--alt-brass); color: var(--alt-ink); font-weight: 700; letter-spacing: 0.2em; min-height: 3.25rem; }
 .sf-dock .sf-pill:hover { background: var(--alt-brass-2); }
 @media (max-width: 22rem) { .sf-dock .sf-pill { letter-spacing: 0.1em; } }

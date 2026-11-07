@@ -37,7 +37,7 @@ export function BookingBar({ choices, timezone, initialServiceId }: { choices: C
     router.push(`/consultation?${query.toString()}`)
   }
 
-  return <form className="alt-book" onSubmit={submit} aria-label="Request a consultation">
+  return <form className="alt-book" data-dock-anchor onSubmit={submit} aria-label="Request a consultation">
     <div className="alt-book__row">
       <div className="alt-book__field alt-book__field--matter">
         <span className="alt-book__label" id="book-matter">I need help with</span>
