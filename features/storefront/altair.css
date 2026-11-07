@@ -195,7 +195,9 @@
  * ---------------------------------------------------------------- */
 .sf-track { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; gap: 0.75rem; }
 .sf-track--block { display: flex; width: 100%; flex-wrap: nowrap; }
-.sf-track.sf-track--block > * { flex: 1 1 0; }
+.sf-track.sf-track--block > * { flex: 1 1 0; min-width: 0; }
+/* Narrow phones: a two-choice track may wrap its labels rather than push the card wide. */
+@media (max-width: 22rem) { .sf-track.sf-track--block > .sf-pill { white-space: normal; text-align: center; line-height: 1.2; padding-inline: 0.75rem; } }
 
 .sf-pill {
   display: inline-flex;
@@ -302,7 +304,8 @@
 .sf-narrow { max-width: 40rem; }
 .sf-section + .sf-section { margin-top: clamp(3rem, 6vw, 5rem); }
 .sf-section__head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 0.5rem 1.5rem; margin-bottom: 0.5rem; }
-.sf-split { display: grid; gap: 2.5rem; align-items: start; }
+.sf-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2.5rem; align-items: start; }
+.sf-split > * { min-width: 0; }
 @media (min-width: 64rem) {
   .sf-split { grid-template-columns: minmax(0, 1fr) 24rem; gap: 4rem; }
   .sf-split--wide-aside { grid-template-columns: minmax(0, 1fr) 28rem; }

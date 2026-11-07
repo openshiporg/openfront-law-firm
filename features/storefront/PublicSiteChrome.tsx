@@ -49,7 +49,7 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
           <div className="grid content-start gap-3">
             <FirmLink settings={settings} place={firmPlace(settings)} />
             {settings.tagline ? <p className="sf-fine max-w-[32ch]">{settings.tagline}</p> : null}
-            {settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="sf-link text-base"><EmailText value={settings.supportEmail} /></a> : null}
+            {settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="sf-link inline-flex min-h-11 items-center text-base"><EmailText value={settings.supportEmail} /></a> : null}
           </div>
           <nav className="sf-foot__col" aria-label="Firm">
             <p className="sf-label">Firm</p>

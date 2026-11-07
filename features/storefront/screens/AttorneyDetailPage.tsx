@@ -27,7 +27,7 @@ export default async function AttorneyPage({ params }: { params: Promise<{ slug:
   if (!person) notFound()
   return <PublicPage>
     <div className="sf-shell sf-page">
-      <nav aria-label="Breadcrumb" className="mb-8"><Link href="/attorneys" className="sf-link text-sm">Attorneys</Link></nav>
+      <nav aria-label="Breadcrumb" className="mb-6"><ol className="alt-crumbs"><li><Link href="/attorneys">Attorneys</Link></li></ol></nav>
       <div className="sf-split">
         <article className="grid gap-6">
           <div className="flex items-center gap-5">
