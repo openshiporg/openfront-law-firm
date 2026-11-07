@@ -161,6 +161,16 @@ export const graphqlDepthRule: ValidationRule = (context) => ({
 
 // Codes whose message is written for the user (guard reasons), not internals.
 const REASON_CODES = new Set(["KS_VALIDATION_FAILURE", "LIFECYCLE_REFUSED"]);
+// Command guards throw plain `Error`s whose text is written for the user. Prisma, driver and
+// runtime failures are subclasses (or carry stack/SQL text), so they stay redacted.
+const UNSAFE_DETAIL = /prisma|invocation|\bat\s+\S+\s*\(|node_modules|postgres(ql)?:\/\/|\bSQL\b|ECONN|query engine|\.ts:\d+|\.js:\d+|fetch failed|stripe|secret|token|password/i;
+function isAuthoredMessage(error: GraphQLError) {
+  const original = error.originalError as (Error & { code?: unknown }) | undefined | null;
+  if (!original || original.constructor?.name !== "Error" || original.code !== undefined) return false;
+  const message = error.message;
+  return typeof message === "string" && message.length > 0 && message.length <= 400 && !UNSAFE_DETAIL.test(message);
+}
+
 function reasonFromMessage(code: string, message: string) {
   if (code !== "KS_VALIDATION_FAILURE") return message;
   // Keystone prefixes "You provided invalid data for this operation:\n  - List.field: reason".
@@ -174,6 +184,12 @@ export function redactGraphqlExecutionResult(result: ExecutionResult): Execution
     ...result,
     errors: result.errors.map((error) => {
       const code = typeof error.extensions?.code === "string" ? error.extensions.code : undefined;
+      if (isAuthoredMessage(error)) {
+        return new GraphQLError(error.message, {
+          nodes: error.nodes, source: error.source, positions: error.positions, path: error.path,
+          extensions: { code: code ?? "COMMAND_REFUSED" },
+        });
+      }
       if (code && REASON_CODES.has(code) && error.message) {
         return new GraphQLError(reasonFromMessage(code, error.message), {
           nodes: error.nodes, source: error.source, positions: error.positions, path: error.path, extensions: { code },

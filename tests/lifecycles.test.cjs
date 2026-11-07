@@ -63,9 +63,15 @@ test("graphql redaction keeps guard reasons and hides everything else", () => {
     new GraphQLError("Matter cannot transition from closed to open.", { extensions: { code: "LIFECYCLE_REFUSED" } }),
     new GraphQLError("You provided invalid data for this operation:\n  - Invoice.status: Invoice cannot transition from paid to draft.", { extensions: { code: "KS_VALIDATION_FAILURE" } }),
     new GraphQLError("connect ECONNREFUSED 10.0.0.1:5432", { extensions: { code: "INTERNAL_SERVER_ERROR" } }),
+    new GraphQLError("A consultation must end after it starts.", { originalError: new Error("A consultation must end after it starts.") }),
+    new GraphQLError("Invalid `prisma.user.findMany()` invocation", { originalError: new Error("Invalid `prisma.user.findMany()` invocation") }),
+    new GraphQLError("Unique constraint failed", { originalError: Object.assign(new Error("Unique constraint failed"), { code: "P2002" }) }),
+    new GraphQLError("boom", { originalError: new TypeError("Cannot read properties of undefined") }),
   ] }).errors;
   assert.equal(out[0].message, "Matter cannot transition from closed to open.");
   assert.equal(out[1].message, "Invoice.status: Invoice cannot transition from paid to draft.");
   assert.match(out[2].message, /could not be completed/);
   assert.doesNotMatch(out[2].message, /ECONNREFUSED/);
+  assert.equal(out[3].message, "A consultation must end after it starts.");
+  for (const i of [4, 5, 6]) assert.match(out[i].message, /could not be completed/);
 });
