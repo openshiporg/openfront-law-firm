@@ -320,7 +320,37 @@ export async function readBoundedJsonBody(
 
 // Yoga masks any non-GraphQLError before result plugins run. Let authored command-guard
 // messages through (same rule as the redaction plugin) and keep everything else masked.
+/**
+ * Database invariants (unique indexes, money and time CHECKs) back up the command guards. A write that
+ * loses a race or slips past a guard gets a readable, coded refusal; constraint names and SQL stay hidden.
+ */
+export function constraintRefusal(error: unknown): { message: string; code: "CONFLICT" | "INVARIANT_REFUSED" } | null {
+  type Wrapped = { code?: unknown; message?: unknown; extensions?: { prisma?: { code?: unknown } }; originalError?: unknown; cause?: unknown };
+  const seen = new Set<unknown>();
+  let current = error as Wrapped | null | undefined;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const code = typeof current.code === "string" ? current.code : current.extensions?.prisma?.code;
+    const text = typeof current.message === "string" ? current.message : "";
+    if (code === "P2002" || /Unique constraint failed|duplicate key value violates unique constraint/i.test(text)) {
+      return { code: "CONFLICT", message: "Someone else just made a conflicting change. Refresh to see the current state, then try again." };
+    }
+    if (code === "P2004" || /violates check constraint|check constraint violation/i.test(text)) {
+      return { code: "INVARIANT_REFUSED", message: "This change would leave billing or trust amounts inconsistent (for example, a refund larger than the payment), so it was not saved." };
+    }
+    current = (current.originalError ?? current.cause) as Wrapped | null | undefined;
+  }
+  return null;
+}
+
 export function maskGraphqlError(error: unknown, message: string, isDev?: boolean) {
+  const refusal = error instanceof GraphQLError ? constraintRefusal(error.originalError ?? error) : null;
+  if (refusal && error instanceof GraphQLError) {
+    return new GraphQLError(refusal.message, {
+      nodes: error.nodes, source: error.source, positions: error.positions, path: error.path,
+      extensions: { code: refusal.code },
+    });
+  }
   if (error instanceof GraphQLError && isAuthoredMessage(error)) {
     return new GraphQLError(error.message, {
       nodes: error.nodes, source: error.source, positions: error.positions, path: error.path,
