@@ -341,7 +341,7 @@
 
 /* The ivory booking bar */
 .alt-book { background: var(--alt-paper); color: var(--alt-paper-ink); padding: 1rem var(--sf-gutter) 1.125rem; }
-.alt-book__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.875rem 0.75rem; align-items: end; max-width: 80rem; margin-inline: auto; }
+.alt-book__row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 0.875rem 0.75rem; align-items: end; max-width: 80rem; margin-inline: auto; }
 .alt-book__field { display: grid; gap: 0.4rem; min-width: 0; }
 .alt-book__label { font: 700 0.75rem/1.2 var(--alt-sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--alt-paper-ink); white-space: nowrap; }
 .alt-book__submit { grid-column: 1 / -1; }
@@ -442,7 +442,7 @@
 /* Practice areas and attorneys, side by side on desktop */
 .alt-lower { display: grid; gap: 2.75rem; padding: 1.75rem var(--sf-gutter) 2.5rem; }
 @media (min-width: 64rem) {
-  .alt-lower { grid-template-columns: minmax(0, 36fr) 1px minmax(0, 53fr); gap: 0 2.5rem; padding-top: 1.5rem; align-items: stretch; }
+  .alt-lower { grid-template-columns: minmax(0, 41fr) 1px minmax(0, 53fr); gap: 0 2.25rem; padding-top: 1.5rem; align-items: stretch; }
   .alt-lower__divider { background: var(--alt-brass-line); }
 }
 @media (max-width: 63.99rem) { .alt-lower__divider { display: none; } }
@@ -465,7 +465,7 @@
 }
 .alt-practice__name { font: 400 clamp(1.5rem, 0.6vw + 1.1rem, 1.625rem)/1.12 var(--alt-serif); overflow-wrap: break-word; hyphens: manual; }
 .alt-practice__link:hover .alt-practice__name { color: var(--alt-brass-2); }
-.alt-practice__meta { font: 600 0.75rem/1.35 var(--alt-sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--alt-ivory); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.alt-practice__meta { font: 600 0.75rem/1.35 var(--alt-sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--alt-ivory); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .alt-practice__meta span + span::before { content: " — "; }
 .alt-practice__chev { display: none; }
 @media (max-width: 63.99rem) {
@@ -513,6 +513,7 @@
 @media (max-width: 63.99rem) { .alt-detail__divider { display: none; } }
 .alt-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 0.9rem; margin: 0 0 0.75rem; padding: 0; list-style: none; font: 500 0.75rem/1.4 var(--alt-sans); letter-spacing: 0.18em; text-transform: uppercase; }
 .alt-crumbs a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--alt-brass); text-decoration: underline; text-underline-offset: 0.3em; }
+.alt-crumbs li { display: inline-flex; align-items: center; }
 .alt-crumbs li + li::before { content: "/"; margin-right: 0.9rem; color: var(--alt-ivory-2); }
 .alt-detail__title { margin: 0; font: 400 clamp(2.5rem, 3.4vw + 1rem, 4.25rem)/1.02 var(--alt-serif); letter-spacing: -0.015em; text-wrap: balance; }
 .alt-detail__lede { margin: 0; max-width: 40em; font: 400 clamp(1.1875rem, 0.6vw + 1rem, 1.625rem)/1.32 var(--alt-serif); color: var(--alt-ivory); text-wrap: pretty; }

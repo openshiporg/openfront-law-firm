@@ -16,10 +16,12 @@ export default async function AttorneysPage() {
     <div className="sf-shell sf-page">
       <header className="sf-page__head"><h1 className="sf-title">Attorneys</h1><p className="sf-label">{settings.firmName || 'Directory'}</p></header>
       {attorneys === null ? <p role="alert" className="sf-notice sf-notice--plain">Attorney profiles could not be loaded. <Link className="sf-link" href="/attorneys">Try again</Link></p>
-        : attorneys.length ? <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {attorneys.map((person) => <li key={person.slug}><Link href={`/attorneys/${encodeURIComponent(person.slug)}`} className="sf-card grid h-full content-start gap-4 p-5 no-underline transition-colors hover:border-[var(--color-ink)]">
-          <AttorneyPortrait name={person.name} photoUrl={person.photoUrl} size="card" />
-          <span className="grid gap-1"><span className="sf-h3">{person.name}</span><span className="sf-muted text-sm">{[person.title, person.focus].filter(Boolean).join(' · ')}</span></span>
+        : attorneys.length ? <ul className="alt-attorneys">
+        {attorneys.map((person) => <li key={person.slug}><Link className="alt-attorney" href={`/attorneys/${encodeURIComponent(person.slug)}`}>
+          <AttorneyPortrait name={person.name} photoUrl={person.photoUrl} size="fill" className="alt-attorney__photo" />
+          <span className="alt-attorney__name">{person.name}</span>
+          {person.title ? <span className="alt-attorney__role">{person.title}</span> : null}
+          {person.focus ? <span className="alt-attorney__focus">{person.focus}</span> : null}
         </Link></li>)}
       </ul> : <div className="sf-empty">
         <p className="sf-h3">Contact the firm to arrange a consultation.</p>
