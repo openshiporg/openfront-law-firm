@@ -1,3 +1,4 @@
+import { maskError } from "graphql-yoga";
 import {
   getNamedType,
   GraphQLError,
@@ -164,7 +165,7 @@ const REASON_CODES = new Set(["KS_VALIDATION_FAILURE", "LIFECYCLE_REFUSED"]);
 // Command guards throw plain `Error`s whose text is written for the user. Prisma, driver and
 // runtime failures are subclasses (or carry stack/SQL text), so they stay redacted.
 const UNSAFE_DETAIL = /prisma|invocation|\bat\s+\S+\s*\(|node_modules|postgres(ql)?:\/\/|\bSQL\b|ECONN|query engine|\.ts:\d+|\.js:\d+|fetch failed|stripe|secret|token|password/i;
-function isAuthoredMessage(error: GraphQLError) {
+export function isAuthoredMessage(error: GraphQLError) {
   const original = error.originalError as (Error & { code?: unknown }) | undefined | null;
   if (!original || original.constructor?.name !== "Error" || original.code !== undefined) return false;
   const message = error.message;
@@ -315,4 +316,16 @@ export async function readBoundedJsonBody(
   } catch {
     throw new GraphqlRequestBodyError(400, "GraphQL request body contains invalid JSON.");
   }
+}
+
+// Yoga masks any non-GraphQLError before result plugins run. Let authored command-guard
+// messages through (same rule as the redaction plugin) and keep everything else masked.
+export function maskGraphqlError(error: unknown, message: string, isDev?: boolean) {
+  if (error instanceof GraphQLError && isAuthoredMessage(error)) {
+    return new GraphQLError(error.message, {
+      nodes: error.nodes, source: error.source, positions: error.positions, path: error.path,
+      extensions: { code: "COMMAND_REFUSED" },
+    });
+  }
+  return maskError(error, message, isDev);
 }

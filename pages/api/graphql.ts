@@ -10,6 +10,7 @@ import {
   GraphqlRequestBodyError,
   graphqlSecurityPlugins,
   graphqlTransportRejection,
+  maskGraphqlError,
   MAX_GRAPHQL_BODY_BYTES,
   MAX_GRAPHQL_UPLOAD_BYTES,
   MAX_GRAPHQL_UPLOAD_FILES,
@@ -97,6 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     },
     graphqlEndpoint: "/api/graphql",
     schema: keystoneContext.graphql.schema,
+    maskedErrors: { maskError: maskGraphqlError },
     plugins: [...graphqlSecurityPlugins],
     context: async ({ req, res }: { req: any; res: any }) => {
       const requestContext = await keystoneContext.withRequest(req, res);
