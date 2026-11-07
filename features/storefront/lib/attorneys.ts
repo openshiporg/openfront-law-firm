@@ -33,7 +33,7 @@ export async function getPublishedAttorneys(firmPublished: boolean, slug?: strin
     }) as Row[]
     const sign = async (row: Row) => {
       if (!row.photo_id || !row.photo_extension) return null
-      try { return await keystoneContext.sudo().images('my_images').getUrl(row.photo_id, row.photo_extension as any) } catch { return null }
+      try { return await keystoneContext.sudo().images('my_images').getUrl(row.photo_id, row.photo_extension as Parameters<ReturnType<typeof keystoneContext.images>['getUrl']>[1]) } catch { return null }
     }
     const published = rows.filter((row) => row.slug)
     const photos = await Promise.all(published.map(sign))

@@ -208,6 +208,37 @@ function busyWhere(firmId: string, hostId: string, start: Date, end: Date) {
   return { firmId, hostId, status: { in: ['requested', 'scheduled'] }, startsAt: { lt: end }, endsAt: { gt: start } }
 }
 
+/** Busy intervals per host over the booking horizon; refuses rather than under-reporting. */
+async function hostBusyIntervals(tx: any, firm: any, hosts: Host[], now: number) {
+  const busy = new Map<string, Array<{ start: number; end: number }>>()
+  for (const host of hosts) {
+    const intervals: Array<{ start: number; end: number }> = []
+    let after: string | undefined
+    let complete = false
+    for (let page = 0; page < 64; page++) {
+      const rows = await tx.consultation.findMany({ where: { ...busyWhere(firm.id, host.userId, new Date(now), new Date(now + BOOKING_HORIZON_MS + 86_400_000)), ...(after ? { id: { gt: after } } : {}) }, select: { id: true, startsAt: true, endsAt: true }, orderBy: { id: 'asc' }, take: 256 })
+      intervals.push(...rows.map((row: any) => ({ start: row.startsAt.getTime(), end: row.endsAt.getTime() })))
+      if (rows.length < 256) { complete = true; break }
+      after = rows[rows.length - 1].id
+    }
+    if (!complete) throw new Error('Consultation capacity could not be fully checked. Contact the firm.')
+    busy.set(host.userId, intervals)
+  }
+  return busy
+}
+/** Bookable starts for one consultation length, by the same rules the booking command enforces. */
+function openSlots(hosts: Host[], busy: Map<string, Array<{ start: number; end: number }>>, minutes: number, now: number, horizonMs: number) {
+  const slots: Array<{ startsAt: string; endsAt: string }> = []
+  const first = Math.ceil((now + BOOKING_LEAD_MS) / CANDIDATE_STEP_MS) * CANDIDATE_STEP_MS
+  for (let at = first; at <= now + horizonMs && slots.length < MAX_OFFERED_SLOTS; at += CANDIDATE_STEP_MS) {
+    const start = new Date(at), end = new Date(at + minutes * 60_000)
+    const open = hosts.some((host) => insideConsultationHours(start, end, host.timezone) &&
+      !(busy.get(host.userId) ?? []).some((interval) => interval.start < end.getTime() && interval.end > start.getTime()))
+    if (open) slots.push({ startsAt: start.toISOString(), endsAt: end.toISOString() })
+  }
+  return slots
+}
+
 export async function consultationAvailability(_root: unknown, args: { serviceId: string }, context: Context) {
   return runSerializableTransaction(context.prisma, async (tx: any) => {
     await account(tx, context)
@@ -221,29 +252,43 @@ export async function consultationAvailability(_root: unknown, args: { serviceId
     const timezone = validTimezone(firm.defaultTimezone)
     const now = Date.now()
     const hosts = await eligibleHosts(tx, firm)
-    const busy = new Map<string, Array<{ start: number; end: number }>>()
-    for (const host of hosts) {
-      const intervals: Array<{ start: number; end: number }> = []
-      let after: string | undefined
-      let complete = false
-      for (let page = 0; page < 64; page++) {
-        const rows = await tx.consultation.findMany({ where: { ...busyWhere(firm.id, host.userId, new Date(now), new Date(now + BOOKING_HORIZON_MS + 86_400_000)), ...(after ? { id: { gt: after } } : {}) }, select: { id: true, startsAt: true, endsAt: true }, orderBy: { id: 'asc' }, take: 256 })
-        intervals.push(...rows.map((row: any) => ({ start: row.startsAt.getTime(), end: row.endsAt.getTime() })))
-        if (rows.length < 256) { complete = true; break }
-        after = rows[rows.length - 1].id
-      }
-      if (!complete) throw new Error('Consultation capacity could not be fully checked. Contact the firm.')
-      busy.set(host.userId, intervals)
+    const busy = await hostBusyIntervals(tx, firm, hosts, now)
+    return { timezone, slots: openSlots(hosts, busy, service.consultationMinutes, now, BOOKING_HORIZON_MS) }
+  })
+}
+
+const OPEN_TIMES_HORIZON_MS = 7 * 86_400_000
+const OPEN_TIMES_PER_SERVICE = 60
+/**
+ * Public, read-only open times for the coming week, per published practice area, so a
+ * visitor can pick a matter and a time before signing in. Same admission, hours, host
+ * and overlap rules as the booking command, which re-checks the time on submit. Nothing
+ * is written here: unpaid holds that have lapsed still read as busy until the next
+ * booking or signed-in availability read releases them, so a time is never over-offered.
+ */
+export async function consultationOpenTimes(_root: unknown, args: { serviceId?: string | null }, context: Context) {
+  return runSerializableTransaction(context.prisma, async (tx: any) => {
+    const admitted = await publicFirm(tx, 'booking')
+    if (!admitted) return { timezone: 'UTC', services: [] }
+    const { firm } = admitted
+    try { requireConfiguredConsultationCalendar(admitted) } catch { return { timezone: validTimezone(firm.defaultTimezone), services: [] } }
+    const services = await tx.practiceArea.findMany({
+      where: { firmId: firm.id, status: 'active', isPublic: true, publicSlug: { not: null }, ...(args.serviceId ? { id: String(args.serviceId) } : {}) },
+      orderBy: [{ publicSlug: 'asc' }, { id: 'asc' }], take: CATALOG_PAGE_SIZE, select: { id: true, consultationMinutes: true },
+    })
+    const timezone = validTimezone(firm.defaultTimezone)
+    if (!services.length) return { timezone, services: [] }
+    const now = Date.now()
+    const hosts = await eligibleHosts(tx, firm)
+    const busy = await hostBusyIntervals(tx, firm, hosts, now)
+    const byLength = new Map<number, Array<{ startsAt: string; endsAt: string }>>()
+    return {
+      timezone,
+      services: services.map((service: any) => {
+        if (!byLength.has(service.consultationMinutes)) byLength.set(service.consultationMinutes, openSlots(hosts, busy, service.consultationMinutes, now, OPEN_TIMES_HORIZON_MS).slice(0, OPEN_TIMES_PER_SERVICE))
+        return { serviceId: service.id, slots: byLength.get(service.consultationMinutes) }
+      }),
     }
-    const slots: Array<{ startsAt: string; endsAt: string }> = []
-    const first = Math.ceil((now + BOOKING_LEAD_MS) / CANDIDATE_STEP_MS) * CANDIDATE_STEP_MS
-    for (let at = first; at <= now + BOOKING_HORIZON_MS && slots.length < MAX_OFFERED_SLOTS; at += CANDIDATE_STEP_MS) {
-      const start = new Date(at), end = new Date(at + service.consultationMinutes * 60_000)
-      const open = hosts.some((host) => insideConsultationHours(start, end, host.timezone) &&
-        !(busy.get(host.userId) ?? []).some((interval) => interval.start < end.getTime() && interval.end > start.getTime()))
-      if (open) slots.push({ startsAt: start.toISOString(), endsAt: end.toISOString() })
-    }
-    return { timezone, slots }
   })
 }
 

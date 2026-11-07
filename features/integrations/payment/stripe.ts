@@ -23,7 +23,7 @@ type PaymentOperationInput = {
 };
 
 type PaymentWebhookInput = {
-  event: any;
+  event: unknown;
   headers: Record<string, string> & { __rawBody?: string };
 };
 
@@ -112,7 +112,7 @@ export async function generatePaymentLinkFunction({ paymentId, provider }: Payme
   return session.url;
 }
 
-export async function handleWebhookFunction({ event, headers, provider }: PaymentWebhookInput & { provider?: { credentials?: Record<string, unknown> } }) {
+export async function handleWebhookFunction({ headers, provider }: PaymentWebhookInput & { provider?: { credentials?: Record<string, unknown> } }) {
   const webhookEnv = typeof provider?.credentials?.webhookSecretEnv === "string" ? provider.credentials.webhookSecretEnv : "STRIPE_WEBHOOK_SECRET";
   const webhookSecret = process.env[webhookEnv];
   if (!webhookSecret) {

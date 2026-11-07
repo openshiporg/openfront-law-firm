@@ -1,5 +1,5 @@
 /* Openfront Law Firm: public storefront tokens.
- * The public site is the legal pad (see features/storefront/legal-pad.css, which overrides the
+ * The public site is the Altair theme (see features/storefront/altair.css, which overrides the
  * paper and ink here inside `.storefront`). Type: Libre Franklin for display and body, Geist Mono
  * for codes. The dashboard and platform keep their own tokens. */
 :root {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Libre_Franklin } from "next/font/google";
+import { Geist, Geist_Mono, Libre_Franklin, Newsreader } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,6 +17,14 @@ const franklin = Libre_Franklin({
   variable: "--font-franklin",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
+});
+
+// Public site display serif (Altair): a wide editorial serif for names and headlines.
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  axes: ["opsz"],
 });
 
 // Product fallback only: dashboard routes carry the shared dashboard identity and
@@ -37,7 +45,7 @@ export default function RootLayout({
         <link href="/favicon.svg" rel="icon" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${franklin.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${franklin.variable} ${newsreader.variable} antialiased`}
       >
         {children}
       </body>

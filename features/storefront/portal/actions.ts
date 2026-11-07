@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { keystoneContext } from '@/features/keystone/context'
 import { revokePortalSession } from '@/features/keystone/lib/portal-auth'
 import { acceptPortalInvitation, redeemPortalSignInLink, requestPortalSignInLink } from '@/features/keystone/mutations/portalWorkflows'
-import { startPortalPayment, reconcilePortalPayment } from '@/features/keystone/mutations/portalPayments'
+import { startPortalPayment } from '@/features/keystone/mutations/portalPayments'
 import { isEmailDeliveryConfigured, sendPortalSignInEmail } from '@/features/keystone/lib/mail'
 import { PORTAL_SESSION_COOKIE, type PortalAcceptState, type PortalSignInState } from './constants'
 

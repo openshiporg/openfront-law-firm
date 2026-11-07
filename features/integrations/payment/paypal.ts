@@ -1,10 +1,10 @@
 type PaymentWebhookInput = {
-  event: any;
+  event: { event_type?: string; resource?: unknown } & Record<string, unknown>;
   headers: Record<string, string>;
 };
 
 type CreatePaymentInput = {
-  cart?: any;
+  cart?: { id?: string | null } | null;
   amount: number;
   currency: string;
 };

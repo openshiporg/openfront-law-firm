@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
 import { initialCommandState, type CommandState } from './commandState'
-import { fieldClass, labelClass, pillDangerClass, pillPrimaryClass, textareaClass, trackClass, trackItemClass, segmentClass, segmentItemClass } from './ui'
+import { fieldClass, labelClass, pillDangerClass, pillPrimaryClass, textareaClass, trackClass, segmentClass, segmentItemClass } from './ui'
 
 type CommandAction = (previous: CommandState, formData: FormData) => Promise<CommandState>
 

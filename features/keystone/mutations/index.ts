@@ -108,7 +108,7 @@ import {
   transitionRetentionPolicy,
 } from "./retentionWorkflows";
 import redirectToInit from "./redirectToInit";
-import { consultationCatalog, consultationCatalogPage, consultationService, consultationAvailability, registerConsultationAccount, bookClientConsultation, customerConsultations, customerConsultationPage, customerConsultation } from "./customerConsultations";
+import { consultationCatalog, consultationCatalogPage, consultationService, consultationAvailability, consultationOpenTimes, registerConsultationAccount, bookClientConsultation, customerConsultations, customerConsultationPage, customerConsultation } from "./customerConsultations";
 
 const graphql = String.raw;
 
@@ -794,6 +794,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
       type ConsultationCatalogPage { services: [ConsultationService!]!, nextCursor: String }
       type ConsultationSlot { startsAt: String!, endsAt: String! }
       type ConsultationAvailability { timezone: String!, slots: [ConsultationSlot!]! }
+      type ConsultationServiceOpenTimes { serviceId: ID!, slots: [ConsultationSlot!]! }
+      type ConsultationOpenTimes { timezone: String!, services: [ConsultationServiceOpenTimes!]! }
       type CustomerConsultation { id: ID!, serviceTitle: String!, feeMinor: Int!, currencyCode: String!, status: String!, startsAt: String, endsAt: String, timezone: String!, paymentState: String! }
       type ConsultationPaymentStart { url: String, paymentId: ID!, status: String! }
       type ConsultationPaymentStatus { status: String! }
@@ -804,6 +806,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         consultationCatalogPage(cursor: String): ConsultationCatalogPage!
         consultationService(slug: String, id: ID): ConsultationService
         consultationAvailability(serviceId: ID!): ConsultationAvailability!
+        consultationOpenTimes(serviceId: ID): ConsultationOpenTimes!
         customerConsultations: [CustomerConsultation!]!
         customerConsultationPage(cursor: String): CustomerConsultationPage!
         customerConsultation(id: ID!): CustomerConsultation
@@ -1411,6 +1414,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         consultationCatalogPage,
         consultationService,
         consultationAvailability,
+        consultationOpenTimes,
         customerConsultations,
         customerConsultationPage,
         customerConsultation,

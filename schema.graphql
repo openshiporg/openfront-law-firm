@@ -9182,6 +9182,8 @@ type Mutation {
   scheduleConsultation(consultationId: ID!, startsAt: DateTime!, endsAt: DateTime!, hostId: ID!, officeId: ID, location: String, reason: String): ControlledRecordProjection!
   transitionConsultation(consultationId: ID!, toStatus: String!, outcome: String, reason: String): ControlledRecordProjection!
   cancelOwnConsultation(consultationId: ID!, reason: String): ControlledRecordProjection!
+  startConsultationPayment(consultationId: ID!): ConsultationPaymentStart!
+  reconcileConsultationPayment(consultationId: ID!): ConsultationPaymentStatus!
   prepareRetainerAgreement(matterId: ID!, clientId: ID!, agreementNumber: String!, feeStructure: String!, currencyCode: String!, rateCardId: ID, trustLedgerAccountId: ID, initialRetainerMinor: Int, evergreenThresholdMinor: Int, replenishmentAmountMinor: Int, contingencyBasisPoints: Int, termsSummary: String): ControlledRecordProjection!
   transitionRetainerAgreement(retainerId: ID!, toStatus: String!, signedDocumentVersionId: ID, effectiveAt: DateTime, reason: String): ControlledRecordProjection!
   recordDocketEntry(docketId: ID!, title: String!, entryType: String!, occurredAt: DateTime!, filedAt: DateTime, enteredAt: DateTime, description: String, externalEntryId: String, sourceUrl: String, documentVersionId: ID): ControlledRecordProjection!
@@ -9471,6 +9473,7 @@ type Query {
   consultationCatalogPage(cursor: String): ConsultationCatalogPage!
   consultationService(slug: String, id: ID): ConsultationService
   consultationAvailability(serviceId: ID!): ConsultationAvailability!
+  consultationOpenTimes(serviceId: ID): ConsultationOpenTimes!
   customerConsultations: [CustomerConsultation!]!
   customerConsultationPage(cursor: String): CustomerConsultationPage!
   customerConsultation(id: ID!): CustomerConsultation
@@ -10402,6 +10405,16 @@ type ConsultationAvailability {
   slots: [ConsultationSlot!]!
 }
 
+type ConsultationServiceOpenTimes {
+  serviceId: ID!
+  slots: [ConsultationSlot!]!
+}
+
+type ConsultationOpenTimes {
+  timezone: String!
+  services: [ConsultationServiceOpenTimes!]!
+}
+
 type CustomerConsultation {
   id: ID!
   serviceTitle: String!
@@ -10411,6 +10424,17 @@ type CustomerConsultation {
   startsAt: String
   endsAt: String
   timezone: String!
+  paymentState: String!
+}
+
+type ConsultationPaymentStart {
+  url: String
+  paymentId: ID!
+  status: String!
+}
+
+type ConsultationPaymentStatus {
+  status: String!
 }
 
 type CustomerConsultationPage {

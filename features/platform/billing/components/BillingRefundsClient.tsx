@@ -137,7 +137,7 @@ function CardRefundRow({ payment }: { payment: CardRefundablePayment }) {
             Explanation
             <textarea name="explanation" required minLength={10} maxLength={4000} rows={2} className={textareaClass} />
           </label>
-          <p className="text-xs text-muted-foreground sm:col-span-2">The full amount goes back to the client's card and the invoice reopens.</p>
+          <p className="text-xs text-muted-foreground sm:col-span-2">The full amount goes back to the client&rsquo;s card and the invoice reopens.</p>
           <Track>
             <button type="submit" className={pillDangerClass} disabled={pending || state.ok}>{pending ? 'Refunding…' : `Refund ${formatMoneyLabel(payment.amountMinor, payment.currencyCode)}`}</button>
           </Track>

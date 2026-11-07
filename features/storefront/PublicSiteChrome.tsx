@@ -1,27 +1,34 @@
 import Link from "next/link"
 import { EmailText } from './EmailText'
-import type { CSSProperties } from "react"
 
 import {
   getStorefrontSettings,
   NEUTRAL_FIRM_NAME,
   type StorefrontSettings,
 } from "@/features/storefront/lib/storefront-settings"
-import { storefrontThemeVariables } from "@/features/storefront/lib/accent"
 import { StoreBrand as FirmLink } from './StoreBrand'
 import { MobilePublicMenu } from './MobilePublicMenu'
 import { StorefrontNav } from './StorefrontNav'
+import { officeLocality } from './lib/locality'
+
+const LEFT_NAV = [['Practice areas', '/practice-areas'], ['Attorneys', '/attorneys'], ['About', '/about']] as const
+const RIGHT_NAV = [['Contact', '/contact'], ['Client portal', '/portal']] as const
+
+/** The office's town for the masthead ("Portland, Maine"), read from Store Settings' active office. */
+export function firmPlace(settings: StorefrontSettings) {
+  const place = officeLocality(settings.officeAddress)
+  return place ? `${place.city}, ${place.state}` : null
+}
 
 export function PublicSiteHeader({ settings }: { settings: StorefrontSettings }) {
   return (
     <header className="sf-header">
-      <div className="sf-shell sf-header__bar">
-        <FirmLink settings={settings} />
-        <StorefrontNav />
+      <div className="sf-header__bar">
+        <StorefrontNav links={LEFT_NAV} />
+        <FirmLink settings={settings} place={firmPlace(settings)} />
         <div className="sf-header__actions">
           <div className="sf-track">
-            <Link href="/account" className="sf-pill">Your appointments</Link>
-            <Link href="/portal" className="sf-pill">Client portal</Link>
+            <StorefrontNav links={RIGHT_NAV} className="contents" label="Clients" />
             {settings.bookingEnabled ? <Link href="/practice-areas" className="sf-pill sf-pill--primary">Request a consultation</Link> : null}
           </div>
         </div>
@@ -40,9 +47,9 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
       <div className="sf-shell">
         <div className="sf-foot__grid">
           <div className="grid content-start gap-3">
-            <FirmLink settings={settings} />
-            {settings.tagline ? <p className="text-sm opacity-70">{settings.tagline}</p> : null}
-            {settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="text-sm underline underline-offset-4 opacity-90"><EmailText value={settings.supportEmail} /></a> : null}
+            <FirmLink settings={settings} place={firmPlace(settings)} />
+            {settings.tagline ? <p className="sf-fine max-w-[32ch]">{settings.tagline}</p> : null}
+            {settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="sf-link text-base"><EmailText value={settings.supportEmail} /></a> : null}
           </div>
           <nav className="sf-foot__col" aria-label="Firm">
             <p className="sf-label">Firm</p>
@@ -74,13 +81,13 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
   )
 }
 
-export async function PublicPage({ children, dock }: { children: React.ReactNode; dock?: React.ReactNode }) {
+export async function PublicPage({ children, dock, masthead }: { children: React.ReactNode; dock?: React.ReactNode; masthead?: React.ReactNode }) {
   const settings = await getStorefrontSettings()
-  const theme = storefrontThemeVariables(settings) as CSSProperties
   return (
-    <div className="storefront flex min-h-svh flex-col overflow-x-clip" style={theme}>
+    <div className="storefront flex min-h-svh flex-col overflow-x-clip">
       <a className="sf-skip-link" href="#public-main">Skip to main content</a>
       <PublicSiteHeader settings={settings} />
+      {masthead}
       <main id="public-main" tabIndex={-1} className="flex-1 outline-none">{children}</main>
       {dock ? <div className="sf-dock">{dock}</div> : null}
       <PublicSiteFooter settings={settings} />

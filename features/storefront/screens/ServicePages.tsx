@@ -1,14 +1,17 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { randomUUID } from 'node:crypto'
-import { ArrowUpRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { EmailText } from '../EmailText'
 import { PublicPage } from '../PublicSiteChrome'
-import { StoreLogo } from '../StoreLogo'
+import { AttorneyPortrait } from '../AttorneyPortrait'
+import { BookingBar } from '../BookingBar'
+import { getPublishedAttorneys } from '../lib/attorneys'
+import { firstAdmission, officeLocality } from '../lib/locality'
 import { getStorefrontSettings, NEUTRAL_FIRM_NAME } from '../lib/storefront-settings'
 import { firmMetadata } from '../lib/metadata'
 import { FIXTURE_FIRST_CONTACT_NOTICE, firstContactVersion } from '../lib/first-contact'
-import { appointmentNotice, appointmentPaymentState, appointmentStatus, reconcileConsultationFee, formatAppointmentTime, getConsultationAvailability, getConsultationCatalog, getConsultationService, getConsultationServiceById, getCustomerConsultation, getCustomerConsultations, type Service } from '../lib/consultation-data'
+import { appointmentNotice, appointmentPaymentState, appointmentStatus, reconcileConsultationFee, formatAppointmentTime, getConsultationAvailability, getConsultationCatalog, getConsultationService, getConsultationServiceById, getConsultationOpenTimes, getCustomerConsultation, slotLabel, slotsByDay, slotTimeLabel, spreadTimes, timezoneLabel, getCustomerConsultations, type Service } from '../lib/consultation-data'
 import { ConsultationBookingForm } from '../CustomerForms'
 import { CancelConsultationForm } from '../CancelConsultationForm'
 import { PayConsultationForm } from '../PayConsultationForm'
@@ -32,60 +35,87 @@ function PracticeIndex({ services, bookingEnabled }: { services: Service[]; book
   return <ol className="sf-index">
     {services.map(service => <li key={service.id} className="sf-index__row">
       <Link href={`/practice-areas/${encodeURIComponent(service.publicSlug)}`} className="sf-index__link"><h3 className="sf-h3">{service.name}</h3></Link>
-      {service.description ? <p className="sf-muted line-clamp-2 max-w-[60ch] text-sm leading-6">{service.description}</p> : null}
+      {service.description ? <p className="sf-muted line-clamp-2 max-w-[60ch] text-[1.0625rem] leading-7">{service.description}</p> : null}
       <p className="sf-index__meta sf-num"><span>{service.consultationMinutes} min consultation</span><span>{feeLabel(service)}</span></p>
-      {bookingEnabled ? <div className="sf-index__aside mt-3 md:mt-0"><div className="sf-track"><Link href={`/consultation?service=${encodeURIComponent(service.id)}`} className="sf-pill sf-pill--raised sf-pill--sm">Book</Link></div></div> : null}
+      {bookingEnabled ? <div className="sf-index__aside mt-3 md:mt-0"><div className="sf-track"><Link href={`/consultation?service=${encodeURIComponent(service.id)}`} className="sf-pill sf-pill--primary sf-pill--sm">Book</Link></div></div> : null}
     </li>)}
   </ol>
 }
 
 export async function homeMetadata() { return firmMetadata(null) }
+
+function ConsultationFacts({ service }: { service: Service }) {
+  return <span className="alt-practice__meta"><span>{service.consultationMinutes} min consultation</span><span>{feeLabel(service)}</span></span>
+}
+
+/** Home: the firm's people in black and white, the booking bar, practice areas and attorneys. */
 export async function HomePage() {
   const settings = await getStorefrontSettings()
   const published = settings.isConfigured && (settings.isLocalFictional || settings.publication.mode === 'live')
-  const catalog = published ? await getConsultationCatalog(null) : null
-  const services = catalog?.status === 'ok' ? catalog.data.services.slice(0, 6) : []
-  const about = settings.publication.aboutStatement?.split(/\n{2,}/)[0] ?? null
-  const name = settings.firmName
-  return <PublicPage dock={settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link href="/practice-areas" className="sf-pill sf-pill--primary sf-pill--lg">Request a consultation</Link></div> : undefined}>
-    <section className="sf-shell sf-hero" aria-labelledby="home-title">
-      <div className="sf-hero__grid">
-        <div className="sf-hero__body">
-          <h1 id="home-title" className="sf-display">{name ?? NEUTRAL_FIRM_NAME}</h1>
-          {published && settings.tagline ? <p className="sf-lede">{settings.tagline}</p> : null}
-          {settings.isLocalFictional ? <p className="sf-fine">Fictional local workspace</p> : null}
-          <dl className="sf-hero__facts">
-            {settings.bookingEnabled ? <div><dt>Consultations</dt><dd>Request a time online</dd></div> : null}
-            {settings.supportEmail ? <div><dt>Email</dt><dd><a className="sf-link" href={`mailto:${settings.supportEmail}`}><EmailText value={settings.supportEmail} /></a></dd></div> : null}
-            {settings.officePhone ? <div><dt>Phone</dt><dd><a className="sf-link" href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`}>{settings.officePhone}</a></dd></div> : null}
-            {settings.officeAddress.length ? <div><dt>Office</dt><dd>{settings.officeAddress.map((line) => <span key={line} className="block">{line}</span>)}</dd></div> : null}
-            <div><dt>Clients</dt><dd><Link className="sf-link" href="/portal">Client portal</Link></dd></div>
-          </dl>
-          <div className="sf-track">
-            {settings.bookingEnabled ? <><Link href="/practice-areas" className="sf-pill sf-pill--primary sf-pill--lg">Request a consultation</Link><Link href="/account" className="sf-pill sf-pill--raised sf-pill--lg">Your appointments</Link></> : settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="sf-pill sf-pill--primary sf-pill--lg">Email the firm</a> : <Link href="/contact" className="sf-pill sf-pill--primary sf-pill--lg">Contact the firm</Link>}
-          </div>
-        </div>
-        <aside className="sf-hero__seal" aria-labelledby="home-portal">
-          <div className="flex items-center gap-3"><StoreLogo icon={settings.logoIcon} hue={settings.logoColor} /><h2 id="home-portal" className="sf-h3">Client portal</h2></div>
-          <p className="sf-muted text-sm leading-6">Documents, invoices and messages your attorney has shared with you.</p>
-          <div className="sf-track"><Link href="/portal" className="sf-pill sf-pill--raised">Open portal</Link><Link href="/portal/accept" className="sf-pill">Use an invitation</Link></div>
-        </aside>
+  const [catalog, openTimes, attorneys] = await Promise.all([
+    published ? getConsultationCatalog(null) : Promise.resolve(null),
+    published && settings.bookingEnabled ? getConsultationOpenTimes(null) : Promise.resolve(null),
+    getPublishedAttorneys(published),
+  ])
+  const services = catalog?.status === 'ok' ? catalog.data.services : []
+  const name = settings.firmName ?? NEUTRAL_FIRM_NAME
+  const place = officeLocality(settings.officeAddress)
+  const times = openTimes?.status === 'ok' ? openTimes.data : null
+  const choices = services.map((service) => ({ id: service.id, name: service.name, consultationMinutes: service.consultationMinutes, fee: feeLabel(service), slots: times?.services.find((row) => row.serviceId === service.id)?.slots ?? [] }))
+  const team = attorneys ?? []
+  return <PublicPage dock={settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link href="/practice-areas" className="sf-pill sf-pill--lg">Request a consultation</Link></div> : undefined}>
+    <section className="alt-hero" aria-labelledby="home-title">
+      {/* eslint-disable-next-line @next/next/no-img-element -- first-paint hero, never lazy */}
+      <img className="alt-hero__img" src="/storefront-hero.jpg" alt={`The attorneys of ${name}`} width={1920} height={1280} fetchPriority="high" decoding="sync" />
+      <div className="alt-hero__body">
+        <h1 id="home-title" className="alt-hero__title">Calm, organized counsel. Free of surprises.</h1>
+        <span className="alt-rule" aria-hidden="true" />
+        {published && settings.tagline ? <p className="alt-hero__tagline">{settings.tagline}</p> : null}
       </div>
     </section>
 
-    <div className="sf-shell">
-      {published ? <section className="sf-section" aria-labelledby="home-practice">
-        <div className="sf-section__head"><h2 id="home-practice" className="sf-h2">Practice areas</h2><Link href="/practice-areas" className="sf-link inline-flex min-h-11 items-center gap-1 text-sm">All practice areas <ArrowUpRight className="size-4" aria-hidden="true" /></Link></div>
-        {catalog?.status !== 'ok' ? <p role="alert" className="sf-notice sf-notice--plain">Practice areas could not be loaded. <Link href="/" className="sf-link">Try again</Link></p>
-          : services.length ? <PracticeIndex services={services} bookingEnabled={settings.bookingEnabled} />
+    {settings.bookingEnabled && choices.length && times ? <BookingBar choices={choices} timezone={times.timezone} /> : null}
+
+    <div className="alt-lower">
+      <section aria-labelledby="home-practice">
+        <div className="alt-head alt-head--practice">
+          <p className="alt-caps">Practice areas</p>
+          <h2 id="home-practice" className="sf-h2">We handle core legal needs for families and businesses{place ? ` in ${place.state}` : ''}.</h2>
+        </div>
+        {!published ? <p className="sf-muted">Firm information is not yet published.</p>
+          : catalog?.status !== 'ok' ? <p role="alert" className="sf-notice sf-notice--plain">Practice areas could not be loaded. <Link href="/" className="sf-link">Try again</Link></p>
+          : services.length ? <ul className="alt-practice">
+            {services.map((service) => <li key={service.id} className="alt-practice__row">
+              <Link className="alt-practice__link" href={`/practice-areas/${encodeURIComponent(service.publicSlug)}`}>
+                <span className="alt-practice__name">{service.name}</span>
+                <ConsultationFacts service={service} />
+                <ChevronRight className="alt-practice__chev size-6" strokeWidth={1.25} aria-hidden="true" />
+              </Link>
+            </li>)}
+          </ul>
           : <p role="status" className="sf-muted">No practice areas are published.</p>}
-      </section> : null}
-
-      {about ? <section className="sf-section" aria-labelledby="home-about">
-        <div className="sf-section__head"><h2 id="home-about" className="sf-h2">About the firm</h2><Link href="/about" className="sf-link inline-flex min-h-11 items-center gap-1 text-sm">About <ArrowUpRight className="size-4" aria-hidden="true" /></Link></div>
-        <div className="sf-prose"><p>{about}</p></div>
-      </section> : null}
-
+        <ul className="alt-contact">
+          {settings.officeAddress.length ? <li>{settings.officeAddress.join(', ')}</li> : null}
+          {settings.officePhone ? <li><a href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`} className="sf-num">{settings.officePhone}</a></li> : null}
+          {settings.supportEmail ? <li><a href={`mailto:${settings.supportEmail}`}><EmailText value={settings.supportEmail} /></a></li> : null}
+        </ul>
+      </section>
+      <span className="alt-lower__divider" aria-hidden="true" />
+      {team.length ? <section aria-labelledby="home-attorneys">
+        <div className="alt-head">
+          <p className="alt-caps">Attorneys</p>
+          <h2 id="home-attorneys" className="sf-h2">Experienced counsel, a collaborative approach.</h2>
+        </div>
+        <ul className="alt-attorneys">
+          {team.slice(0, 4).map((person) => <li key={person.slug}><Link className="alt-attorney" href={`/attorneys/${encodeURIComponent(person.slug)}`}>
+            <AttorneyPortrait name={person.name} photoUrl={person.photoUrl} size="fill" className="alt-attorney__photo" />
+            <span className="alt-attorney__name">{person.name}</span>
+            {person.title ? <span className="alt-attorney__role">{person.title}</span> : null}
+            {person.focus ? <span className="alt-attorney__focus">{person.focus}</span> : null}
+            {firstAdmission(person.admissions) ? <span className="alt-attorney__admitted">Admitted {firstAdmission(person.admissions)}</span> : null}
+          </Link></li>)}
+        </ul>
+      </section> : <section aria-labelledby="home-about"><div className="alt-head"><p className="alt-caps">About</p><h2 id="home-about" className="sf-h2">{name}</h2></div>{settings.publication.aboutStatement ? <div className="sf-prose"><p>{settings.publication.aboutStatement.split(/\n{2,}/)[0]}</p></div> : null}</section>}
     </div>
   </PublicPage>
 }
@@ -117,36 +147,86 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
   if (result.status !== 'ok') return <ServiceUnavailable title="Practice areas" retryHref={`/practice-areas/${encodeURIComponent(slug)}`} />
   const service = result.data
   if (!service) notFound()
+  const published = settings.isLocalFictional || settings.publication.mode !== 'closed'
+  const [openTimes, attorneys] = await Promise.all([
+    settings.bookingEnabled ? getConsultationOpenTimes(service.id) : Promise.resolve(null),
+    getPublishedAttorneys(published),
+  ])
+  const times = openTimes?.status === 'ok' ? openTimes.data : null
+  const slots = times?.services.find((row) => row.serviceId === service.id)?.slots ?? []
+  const days = times ? slotsByDay(slots, times.timezone).slice(0, 2).map(({ day, slots: list }) => ({ day, slots: spreadTimes(list, times.timezone, 3) })) : []
+  const people = (attorneys ?? []).filter((person) => person.practiceAreas.some((area) => area.slug === service.publicSlug))
   const book = `/consultation?service=${encodeURIComponent(service.id)}`
-  return <PublicPage dock={settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link className="sf-pill sf-pill--primary sf-pill--lg" href={book}>Choose a time</Link></div> : undefined}><div className="sf-shell sf-page">
-    <nav aria-label="Breadcrumb" className="mb-8"><Link className="sf-link text-sm" href="/practice-areas">Practice areas</Link></nav>
-    <div className="sf-split">
-      <article className="grid gap-6">
-        <h1 className="sf-title">{service.name}</h1>
-        <p className="sf-label">{settings.isLocalFictional ? 'Fictional local appointment' : 'Consultation appointment'}</p>
-        {service.description ? <div className="sf-prose sf-prose--lead">{service.description.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : null}
+  const [lede, ...rest] = service.description ? service.description.split(/\n{2,}/) : []
+  const masthead = <div className="alt-masthead">
+    {settings.tagline ? <p>{settings.tagline}</p> : null}
+    <ul>
+      {settings.officeAddress.length ? <li>{settings.officeAddress.join(', ')}</li> : null}
+      {settings.officePhone ? <li><a href={`tel:${settings.officePhone.replace(/[^\d+]/g, '')}`}>{settings.officePhone}</a></li> : null}
+      {settings.supportEmail ? <li><a href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a></li> : null}
+    </ul>
+  </div>
+  return <PublicPage masthead={masthead} dock={settings.bookingEnabled ? <div className="sf-track sf-track--block"><Link className="sf-pill sf-pill--lg" href={book}>Request a consultation</Link></div> : undefined}>
+    {/* eslint-disable-next-line @next/next/no-img-element -- first-paint band, never lazy */}
+    <img className="alt-band" src="/storefront-coast.jpg" alt="" width={2400} height={800} fetchPriority="high" decoding="sync" />
+    <div className="alt-detail">
+      <article className="alt-detail__main">
+        <nav aria-label="Breadcrumb"><ol className="alt-crumbs"><li><Link href="/practice-areas">Practice areas</Link></li><li aria-current="page">{service.name}</li></ol></nav>
+        <h1 className="alt-detail__title">{service.name}</h1>
+        <span className="alt-rule" aria-hidden="true" />
+        {lede ? <p className="alt-detail__lede">{lede}</p> : null}
+        {rest.length ? <div className="sf-prose">{rest.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : null}
+        {people.length ? <section className="alt-who" aria-labelledby="who-handles">
+          <p id="who-handles" className="alt-caps alt-who__head">Who handles this</p>
+          <ul className="alt-who__list">
+            {people.map((person) => <li key={person.slug}><Link className="alt-who__person" href={`/attorneys/${encodeURIComponent(person.slug)}`}>
+              <AttorneyPortrait name={person.name} photoUrl={person.photoUrl} size="fill" className="alt-who__photo" />
+              <span className="grid content-start">
+                <span className="alt-who__name">{person.name}</span>
+                {person.title ? <span className="alt-who__role">{person.title}</span> : null}
+                {person.focus ? <span className="alt-who__focus">{person.focus}</span> : null}
+                {firstAdmission(person.admissions) ? <span className="alt-who__admitted">Admitted {firstAdmission(person.admissions)}</span> : null}
+              </span>
+            </Link></li>)}
+          </ul>
+        </section> : null}
       </article>
-      <aside className="sf-split__aside">
-        <div className="sf-card">
-          <div className="sf-card__body grid gap-5">
-            <dl className="sf-facts">
-              <div><dt>Length</dt><dd className="sf-num">{service.consultationMinutes} minutes</dd></div>
-              <div><dt>Consultation fee</dt><dd className="sf-num">{feeLabel(service)}</dd></div>
-              <div><dt>Payment</dt><dd>{service.consultationFeeMinor > 0 ? 'Paid by card when you book' : 'No payment needed'}</dd></div>
-            </dl>
-            {settings.bookingEnabled ? <div className="sf-track sf-track--block sf-docked"><Link className="sf-pill sf-pill--primary sf-pill--lg" href={book}>Choose a time</Link></div> : <p className="sf-notice sf-notice--plain">Online booking is closed.</p>}
-            <p className="sf-fine">A request does not create an attorney-client relationship. The firm runs a conflict check before confirming.</p>
-          </div>
-        </div>
+      <span className="alt-detail__divider" aria-hidden="true" />
+      <aside className="alt-bookcard" aria-labelledby="book-card">
+        <p className="alt-caps">Book a consultation</p>
+        <h2 id="book-card" className="alt-bookcard__name">{service.name}</h2>
+        <ul className="alt-bookcard__facts sf-num"><li>{service.consultationMinutes} minutes</li><li>{feeLabel(service)}</li></ul>
+        {!settings.bookingEnabled ? <p className="sf-notice sf-notice--plain">Online booking is closed. <Link className="sf-link" href="/contact">Contact the firm</Link></p>
+          : <form action="/consultation" method="get" className="grid gap-4">
+            <input type="hidden" name="service" value={service.id} />
+            {days.length && times ? <fieldset className="alt-slots">
+              <legend className="alt-caps">Available times this week</legend>
+              {days.map(({ day, slots: list }, dayIndex) => {
+                const [weekday, ...date] = day.split(' ')
+                return <div key={day} className="alt-slots__day">
+                  <span className="alt-slots__daylabel">{weekday}<br />{date.join(' ')}</span>
+                  <div className="alt-slots__times">
+                    {list.map((slot, index) => <label key={slot.startsAt} className="sf-seg"><input type="radio" name="at" value={slot.startsAt} defaultChecked={dayIndex === 0 && index === 0} aria-label={slotLabel(slot.startsAt, times.timezone)} /><span className="sf-pill sf-num">{slotTimeLabel(slot.startsAt, times.timezone)}</span></label>)}
+                  </div>
+                </div>
+              })}
+              <p className="alt-bookcard__zone">Times in {timezoneLabel(times.timezone)}. <Link className="sf-link" href={book}>More times</Link></p>
+            </fieldset> : <p role="status" className="sf-notice sf-notice--plain">{times ? 'No open times this week.' : 'Open times could not be loaded.'} <Link className="sf-link" href={book}>See all times</Link></p>}
+            <p className="alt-bookcard__check">The firm runs a conflict check before confirming.</p>
+            <button className="sf-pill sf-pill--solid">{days.length ? 'Request this time' : 'Request a consultation'}</button>
+          </form>}
+        <p className="alt-bookcard__fine">A request does not create an attorney-client relationship. Not for emergencies or deadline protection.</p>
       </aside>
     </div>
-  </div></PublicPage>
+  </PublicPage>
 }
 
 export async function bookingMetadata() { return firmMetadata('Request an appointment') }
-export async function BookingPage({ searchParams }: { searchParams: Promise<{ service?: string }> }) {
+export async function BookingPage({ searchParams }: { searchParams: Promise<{ service?: string; at?: string }> }) {
   const settings = await getStorefrontSettings()
-  const selected = (await searchParams).service
+  const query = await searchParams
+  const selected = query.service
+  const at = typeof query.at === 'string' ? query.at.slice(0, 40) : ''
   const lookup = selected ? await getConsultationServiceById(selected) : null
   if (lookup?.status === 'unavailable') return <ServiceUnavailable title="Choose an appointment" retryHref={`/consultation?service=${encodeURIComponent(selected ?? '')}`} />
   const service = lookup?.status === 'ok' ? lookup.data : null
@@ -164,21 +244,21 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
     </div></div></PublicPage>
   }
   const history = await getCustomerConsultations()
-  if (history.status === 'signed_out') redirect(`/account/signin?service=${encodeURIComponent(service.id)}`)
+  if (history.status === 'signed_out') redirect(`/account/signin?service=${encodeURIComponent(service.id)}${at ? `&at=${encodeURIComponent(at)}` : ''}`)
   if (history.status === 'unavailable') return <ServiceUnavailable title={service.name} retryHref={`/consultation?service=${encodeURIComponent(service.id)}`} />
   const availability = await getConsultationAvailability(service.id)
   if (availability.status !== 'ok') return <ServiceUnavailable title={service.name} retryHref={`/consultation?service=${encodeURIComponent(service.id)}`} />
   const slots = availability.data.slots
   const acknowledgmentVersion = firstContactVersion(settings.isLocalFictional ? 'fixture' : 'live', settings.publication.firstContactNoticeVersion)
   return <PublicPage><div className="sf-shell sf-page">
-    <nav aria-label="Breadcrumb" className="mb-8"><Link className="sf-link text-sm" href={`/practice-areas/${encodeURIComponent(service.publicSlug)}`}>{service.name}</Link></nav>
+    <nav aria-label="Breadcrumb"><ol className="alt-crumbs"><li><Link href="/practice-areas">Practice areas</Link></li><li><Link href={`/practice-areas/${encodeURIComponent(service.publicSlug)}`}>{service.name}</Link></li></ol></nav>
     <div className="sf-split sf-split--wide-aside">
       <div className="grid gap-8">
         <header className="grid gap-3">
           <h1 className="sf-title">Request a consultation</h1>
           <p className="sf-label">{settings.isLocalFictional ? 'Fictional local appointment' : 'Appointment request'}</p>
         </header>
-        <ConsultationBookingForm service={service} slots={slots} requestKey={randomUUID()} timezone={availability.data.timezone} notice={notice} acknowledgmentVersion={acknowledgmentVersion} />
+        <ConsultationBookingForm service={service} slots={slots} requestKey={randomUUID()} timezone={availability.data.timezone} notice={notice} acknowledgmentVersion={acknowledgmentVersion} initialStartsAt={at} />
       </div>
       <aside className="sf-split__aside order-first lg:order-none">
         <div className="sf-card"><div className="sf-card__body grid gap-4">
@@ -187,7 +267,7 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
             <div><dt>Length</dt><dd className="sf-num">{service.consultationMinutes} minutes</dd></div>
             <div><dt>Fee</dt><dd className="sf-num">{feeLabel(service)}</dd></div>
             {service.consultationFeeMinor > 0 ? <div><dt>Payment</dt><dd>Card, on the next step</dd></div> : null}
-            <div><dt>Time zone</dt><dd>{availability.data.timezone}</dd></div>
+            <div><dt>Time zone</dt><dd>{timezoneLabel(availability.data.timezone)}</dd></div>
           </dl>
         </div></div>
       </aside>
@@ -207,7 +287,7 @@ export async function AppointmentPage({ params, searchParams }: { params: Promis
   if (!row) notFound()
   const status = appointmentStatus(row.status)
   return <PublicPage><div className="sf-shell sf-page">
-    <nav aria-label="Breadcrumb" className="mb-8"><Link className="sf-link text-sm" href="/account">Your appointments</Link></nav>
+    <nav aria-label="Breadcrumb"><ol className="alt-crumbs"><li><Link href="/account">Your appointments</Link></li></ol></nav>
     <div className="sf-narrow grid gap-8">
       <header className="grid gap-4">
         <p className="sf-status"><span className={`sf-dot ${status.tone}`} aria-hidden="true" />{status.label}</p>

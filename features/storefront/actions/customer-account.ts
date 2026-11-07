@@ -14,6 +14,11 @@ function safeReturnPath(value: unknown) {
   const path = typeof value === 'string' ? value.trim() : ''
   return /^\/(account|consultation)(\/[A-Za-z0-9._~-]+)*\/?$/.test(path) ? path : null
 }
+/** A chosen open time carried through sign in; only an ISO instant passes. The booking command re-checks it. */
+function safeSlot(value: unknown) {
+  const at = typeof value === 'string' ? value.trim() : ''
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(at) ? at : null
+}
 export async function customerAuthenticate(_previous: AccountState, form: FormData): Promise<AccountState> {
   const email = String(form.get('email') || '').trim().toLowerCase()
   const password = String(form.get('password') || '')
@@ -32,7 +37,8 @@ export async function customerAuthenticate(_previous: AccountState, form: FormDa
   revalidatePath('/account')
   const service = String(form.get('service') || '')
   const from = safeReturnPath(form.get('from'))
-  redirect(service ? `/consultation?service=${encodeURIComponent(service)}` : from ?? '/account')
+  const at = safeSlot(form.get('at'))
+  redirect(service ? `/consultation?service=${encodeURIComponent(service)}${at ? `&at=${encodeURIComponent(at)}` : ''}` : from ?? '/account')
 }
 export async function customerSignOut() {
   ;(await cookies()).delete('keystonejs-session')

@@ -1,5 +1,5 @@
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
-import type { Service, CustomerConsultation, ServiceAvailability } from './consultation-presentation'
+import type { AvailabilitySlot, Service, CustomerConsultation, ServiceAvailability } from './consultation-presentation'
 export * from './consultation-presentation'
 
 /**
@@ -64,4 +64,11 @@ export async function getConsultationAvailability(serviceId: string): Promise<Cu
 export async function reconcileConsultationFee(id: string) {
   const result = await keystoneClient<{ reconcileConsultationPayment: { status: string } }>(`mutation($id: ID!) { reconcileConsultationPayment(consultationId: $id) { status } }`, { id })
   return result.success ? result.data.reconcileConsultationPayment.status : null
+}
+
+export type OpenTimes = { timezone: string; services: Array<{ serviceId: string; slots: AvailabilitySlot[] }> }
+/** Public open times for the coming week, per published practice area (read-only; booking re-checks). */
+export async function getConsultationOpenTimes(serviceId: string | null = null): Promise<CustomerResult<OpenTimes>> {
+  const result = await keystoneClient<{ consultationOpenTimes: OpenTimes }>(`query($serviceId: ID) { consultationOpenTimes(serviceId: $serviceId) { timezone services { serviceId slots { startsAt endsAt } } } }`, { serviceId })
+  return result.success ? { status: 'ok', data: result.data.consultationOpenTimes } : { status: 'unavailable' }
 }

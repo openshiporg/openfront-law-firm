@@ -7,12 +7,12 @@ export function isCurrent(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-/** Desktop section navigation: raised pill in a recessed track marks the current section. */
-export function StorefrontNav() {
+/** Desktop section navigation: letterspaced links; a brass underline marks the current section. */
+export function StorefrontNav({ links = publicNavigation, className = 'sf-header__nav', label = 'Public navigation' }: { links?: ReadonlyArray<readonly [string, string]>; className?: string; label?: string }) {
   const pathname = usePathname() ?? '/'
-  return <nav aria-label="Public navigation" className="sf-header__nav">
+  return <nav aria-label={label} className={className}>
     <div className="sf-track">
-      {publicNavigation.map(([label, href]) => <Link key={href} href={href} className="sf-pill" aria-current={isCurrent(pathname, href) ? 'page' : undefined}>{label}</Link>)}
+      {links.map(([text, href]) => <Link key={href} href={href} className="alt-navlink" aria-current={isCurrent(pathname, href) ? 'page' : undefined}>{text}</Link>)}
     </div>
   </nav>
 }

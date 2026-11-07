@@ -4,12 +4,12 @@ import Link from 'next/link'
 import { useActionState, useId, useState } from 'react'
 import { customerAuthenticate, bookConsultation } from './actions/customer-account'
 import { FIRST_CONTACT_ACKNOWLEDGMENT } from './lib/first-contact'
-import { type AvailabilitySlot, type Service } from './lib/consultation-presentation'
+import { slotLabel, slotsByDay, slotTimeLabel, timezoneLabel, type AvailabilitySlot, type Service } from './lib/consultation-presentation'
 
-export function CustomerAuthForm({ mode, service, from = '' }: { mode: 'signin' | 'signup'; service: string; from?: string }) {
+export function CustomerAuthForm({ mode, service, from = '', at = '' }: { mode: 'signin' | 'signup'; service: string; from?: string; at?: string }) {
   const [state, action, pending] = useActionState(customerAuthenticate, { error: null })
   return <form action={action} className="sf-form">
-    <input type="hidden" name="mode" value={mode} /><input type="hidden" name="service" value={service} /><input type="hidden" name="from" value={from} />
+    <input type="hidden" name="mode" value={mode} /><input type="hidden" name="service" value={service} /><input type="hidden" name="from" value={from} /><input type="hidden" name="at" value={at} />
     {mode === 'signup' && <label className="sf-field-label">Name<input className="sf-field" name="name" required maxLength={120} autoComplete="name" /></label>}
     <label className="sf-field-label">Email<input className="sf-field" name="email" type="email" required maxLength={320} autoComplete="email" /></label>
     <label className="sf-field-label">
@@ -17,43 +17,33 @@ export function CustomerAuthForm({ mode, service, from = '' }: { mode: 'signin' 
       <input className="sf-field" name="password" type="password" required minLength={12} maxLength={1000} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
     </label>
     {state.error && <p role="alert" className="sf-error">{state.error}</p>}
-    <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--primary sf-pill--lg" disabled={pending}>{pending ? 'Saving…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button></div>
+    <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--solid sf-pill--lg" disabled={pending}>{pending ? 'Saving…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button></div>
   </form>
 }
 
-function zoned(timezone: string, options: Intl.DateTimeFormatOptions) {
-  try { return new Intl.DateTimeFormat('en-US', { ...options, timeZone: timezone }) } catch { return new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }) }
-}
-
-/** Open times grouped by calendar day in the firm's time zone. */
-function groupSlots(slots: AvailabilitySlot[], timezone: string) {
-  const day = zoned(timezone, { weekday: 'long', month: 'short', day: 'numeric' })
-  const time = zoned(timezone, { hour: 'numeric', minute: '2-digit' })
-  const groups = new Map<string, Array<{ value: string; label: string }>>()
-  for (const slot of slots) {
-    const instant = new Date(slot.startsAt)
-    if (!Number.isFinite(instant.getTime())) continue
-    const key = day.format(instant)
-    groups.set(key, [...(groups.get(key) ?? []), { value: slot.startsAt, label: time.format(instant) }])
-  }
-  return [...groups.entries()]
-}
-
-/** Pick a day, then one of that day's times. The chosen time survives switching days. */
-function SlotPicker({ days, timezone, initial }: { days: ReturnType<typeof groupSlots>; timezone: string; initial: string }) {
-  const [startsAt, setStartsAt] = useState(initial)
-  const [activeDay, setActiveDay] = useState(() => days.find(([, times]) => times.some(slot => slot.value === initial))?.[0] ?? days[0][0])
-  const times = days.find(([day]) => day === activeDay)?.[1] ?? days[0][1]
-  const chosen = days.flatMap(([day, list]) => list.map(slot => ({ day, ...slot }))).find(slot => slot.value === startsAt)
+/**
+ * Open times as rows of days, each with its times, in the firm's time zone. A time
+ * carried from the home booking bar starts selected when it is still open.
+ */
+function SlotPicker({ slots, timezone, initial }: { slots: AvailabilitySlot[]; timezone: string; initial: string }) {
+  const [startsAt, setStartsAt] = useState(() => slots.some((slot) => slot.startsAt === initial) ? initial : '')
+  const [showAll, setShowAll] = useState(false)
+  const days = slotsByDay(slots, timezone)
+  const chosenIndex = days.findIndex(({ slots: list }) => list.some((slot) => slot.startsAt === startsAt))
+  const visible = showAll ? days : days.slice(0, Math.max(3, chosenIndex + 1))
   return <div className="sf-slots">
     <input type="hidden" name="startsAt" value={startsAt} />
-    <div role="radiogroup" aria-label="Day" className="sf-track sf-slots__track">
-      {days.map(([day]) => <label key={day} className="sf-seg"><input type="radio" name="slotDay" value={day} checked={day === activeDay} onChange={() => setActiveDay(day)} /><span className="sf-pill">{day}</span></label>)}
-    </div>
-    <div role="radiogroup" aria-label={`Times on ${activeDay}`} className="sf-track sf-slots__track">
-      {times.map(slot => <label key={slot.value} className="sf-seg"><input type="radio" name="slotTime" value={slot.value} checked={slot.value === startsAt} onChange={() => setStartsAt(slot.value)} /><span className="sf-pill sf-num">{slot.label}</span></label>)}
-    </div>
-    <p className="sf-fine">{chosen ? `${chosen.day}, ${chosen.label} · ` : ''}Times in {timezone}</p>
+    {visible.map(({ day, slots: list }) => {
+      const [weekday, ...date] = day.split(' ')
+      return <div key={day} role="radiogroup" aria-label={day} className="alt-slots__day">
+        <span className="alt-slots__daylabel" aria-hidden="true">{weekday}<br />{date.join(' ')}</span>
+        <div className="alt-slots__times">
+          {list.map((slot) => <label key={slot.startsAt} className="sf-seg"><input type="radio" name="slotTime" value={slot.startsAt} checked={slot.startsAt === startsAt} onChange={() => setStartsAt(slot.startsAt)} /><span className="sf-pill sf-num">{slotTimeLabel(slot.startsAt, timezone)}</span></label>)}
+        </div>
+      </div>
+    })}
+    {days.length > visible.length ? <div className="sf-track"><button type="button" className="sf-pill" onClick={() => setShowAll(true)}>More days</button></div> : null}
+    <p className="sf-fine">{startsAt ? `${slotLabel(startsAt, timezone)} · ` : 'Choose a time · '}Times in {timezoneLabel(timezone)}</p>
   </div>
 }
 
@@ -62,11 +52,10 @@ function SlotPicker({ days, timezone, initial }: { days: ReturnType<typeof group
  * minimum conflict/fit fields follow, and the acknowledged notice version is
  * submitted for the booking command to verify and record.
  */
-export function ConsultationBookingForm({ service, slots, requestKey, timezone, notice, acknowledgmentVersion }: { service: Service; slots: AvailabilitySlot[]; requestKey: string; timezone: string; notice: string; acknowledgmentVersion: string }) {
+export function ConsultationBookingForm({ service, slots, requestKey, timezone, notice, acknowledgmentVersion, initialStartsAt = '' }: { service: Service; slots: AvailabilitySlot[]; requestKey: string; timezone: string; notice: string; acknowledgmentVersion: string; initialStartsAt?: string }) {
   const [state, action, pending] = useActionState(bookConsultation, { error: null, values: {}, revision: 0 })
   const noticeId = useId()
   const value = (name: string) => state.values[name] ?? ''
-  const days = groupSlots(slots, timezone)
   return <form key={state.revision} action={action} aria-describedby={noticeId} className="sf-form gap-8">
     <section id={noticeId} aria-label="Before you share any details" className="sf-card">
       <div className="sf-card__body grid gap-3 text-sm leading-6">
@@ -79,7 +68,7 @@ export function ConsultationBookingForm({ service, slots, requestKey, timezone, 
 
     <fieldset className="grid gap-4">
       <legend className="sf-h3 mb-4">1. Time</legend>
-      {days.length ? <SlotPicker days={days} timezone={timezone} initial={value('startsAt')} /> : <p role="status" className="sf-notice sf-notice--plain">No open times in the next two weeks.</p>}
+      {slots.length ? <SlotPicker slots={slots} timezone={timezone} initial={value('startsAt') || initialStartsAt} /> : <p role="status" className="sf-notice sf-notice--plain">No open times in the next two weeks.</p>}
     </fieldset>
 
     <fieldset className="grid gap-5">
@@ -97,6 +86,6 @@ export function ConsultationBookingForm({ service, slots, requestKey, timezone, 
 
     {state.error && <p role="alert" className="sf-error">{state.error}</p>}
     {state.outcome === 'unknown' ? <div role="status" className="sf-card"><div className="sf-card__body grid gap-3 text-sm"><p className="flex items-center gap-2 font-semibold"><span className="sf-dot sf-dot--amber" aria-hidden="true" />Request outcome unknown</p><p className="break-all font-mono text-xs">Reference: {state.requestKey}</p><p className="sf-muted">Keep this reference when contacting the firm. A missing appointment does not prove the request had no effect.</p><div className="sf-track"><Link href="/account" className="sf-pill sf-pill--raised">Check your appointments</Link></div></div></div> : null}
-    <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--primary sf-pill--lg" disabled={pending || !slots.length || state.outcome === 'unknown'}>{pending ? 'Sending request…' : state.outcome === 'unknown' ? 'Request needs reconciliation' : service.consultationFeeMinor > 0 ? 'Continue to payment' : 'Request appointment'}</button></div>
+    <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--solid sf-pill--lg" disabled={pending || !slots.length || state.outcome === 'unknown'}>{pending ? 'Sending request…' : state.outcome === 'unknown' ? 'Request needs reconciliation' : service.consultationFeeMinor > 0 ? 'Continue to payment' : 'Request appointment'}</button></div>
   </form>
 }
