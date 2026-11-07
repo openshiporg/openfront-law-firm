@@ -5,7 +5,7 @@ const path = require("node:path");
 
 // The lifecycle map is TypeScript; read it as data so this stays a plain node test.
 const source = fs.readFileSync(path.join(__dirname, "../features/keystone/lib/lifecycles.ts"), "utf8");
-const body = source.slice(source.indexOf("{"), source.indexOf("} as const"));
+const body = source.slice(source.indexOf("{", source.indexOf("export const lifecycles")), source.indexOf("} as const"));
 const lifecycles = Function(`return (${body}})`)();
 
 test("every transition targets a state the lifecycle defines", () => {
@@ -47,4 +47,25 @@ test("late provider capture clears the stale failure marks", () => {
   const src = fs.readFileSync(path.join(__dirname, "../features/keystone/mutations/portalPayments.ts"), "utf8");
   assert.match(src, /assertLifecycleTransition\("providerPayment", current\.status, "captured"\)/);
   assert.match(src, /status: "captured", capturedAt: new Date\(\), failedAt: null, failureReason: ""/);
+});
+
+test("graphql redaction keeps guard reasons and hides everything else", () => {
+  const ts = require("typescript");
+  const vm = require("node:vm");
+  const src = fs.readFileSync(path.join(__dirname, "../features/keystone/lib/graphql-security.ts"), "utf8");
+  const start = src.indexOf("// Codes whose message");
+  const end = src.indexOf("const graphqlNoIntrospectionPlugin");
+  const code = ts.transpileModule(`const { GraphQLError } = require("graphql");\n${src.slice(start, end)}\nmodule.exports = { redactGraphqlExecutionResult };`, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const m = { exports: {} };
+  vm.runInNewContext(code, { module: m, exports: m.exports, require, console });
+  const { GraphQLError } = require("graphql");
+  const out = m.exports.redactGraphqlExecutionResult({ errors: [
+    new GraphQLError("Matter cannot transition from closed to open.", { extensions: { code: "LIFECYCLE_REFUSED" } }),
+    new GraphQLError("You provided invalid data for this operation:\n  - Invoice.status: Invoice cannot transition from paid to draft.", { extensions: { code: "KS_VALIDATION_FAILURE" } }),
+    new GraphQLError("connect ECONNREFUSED 10.0.0.1:5432", { extensions: { code: "INTERNAL_SERVER_ERROR" } }),
+  ] }).errors;
+  assert.equal(out[0].message, "Matter cannot transition from closed to open.");
+  assert.equal(out[1].message, "Invoice.status: Invoice cannot transition from paid to draft.");
+  assert.match(out[2].message, /could not be completed/);
+  assert.doesNotMatch(out[2].message, /ECONNREFUSED/);
 });

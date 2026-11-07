@@ -8,7 +8,7 @@ import { applyInvoiceAllocation } from "./billingWorkflows";
 import { assertLifecycleTransition } from "../lib/lifecycles";
 import { recordAuditEvent } from "./workflow-helpers";
 
-function webBase(context: any) {
+function webBase() {
   const value = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000";
   return new URL(value).origin;
 }
@@ -45,7 +45,7 @@ export async function startPortalPayment(_root: unknown, args: { kind: "invoice"
   let payment = await prisma.payment.findFirst({ where: { firmId: identity.firmId, idempotencyKey: key } });
   if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...(args.kind === "invoice" ? { invoiceId: args.id } : { trustAccountId: (setup as any).retainer.trustLedgerAccount?.trustAccountId }), payerId: setup.payerId, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? (setup as any).invoice.currencyCode : (setup as any).retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
   const resource = args.kind === "invoice" ? { id: args.id, number: (setup as any).invoice.invoiceNumber, title: `Invoice ${(setup as any).invoice.invoiceNumber}`, email: (setup as any).invoice.client?.primaryEmail } : { id: args.id, number: (setup as any).retainer.agreementNumber, title: `Retainer ${(setup as any).retainer.agreementNumber}`, email: (setup as any).retainer.client?.primaryEmail };
-  const result = await createPayment({ provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: identity.firmId, idempotencyKey: key, successUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, cancelUrl: `${webBase(context)}/portal/payments/return?payment=${payment.id}`, ...(args.kind === "invoice" ? { invoice: resource } : { retainer: resource }) });
+  const result = await createPayment({ provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: identity.firmId, idempotencyKey: key, successUrl: `${webBase()}/portal/payments/return?payment=${payment.id}`, cancelUrl: `${webBase()}/portal/payments/return?payment=${payment.id}`, ...(args.kind === "invoice" ? { invoice: resource } : { retainer: resource }) });
   if (!result?.checkoutUrl) throw new Error("Payment provider did not return a checkout URL.");
   if (payment.providerPaymentId !== result.checkoutSessionId) payment = await prisma.payment.update({ where: { id: payment.id }, data: { providerPaymentId: result.checkoutSessionId } });
   return { url: result.checkoutUrl, paymentId: payment.id };

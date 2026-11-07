@@ -159,12 +159,26 @@ export const graphqlDepthRule: ValidationRule = (context) => ({
   },
 });
 
+// Codes whose message is written for the user (guard reasons), not internals.
+const REASON_CODES = new Set(["KS_VALIDATION_FAILURE", "LIFECYCLE_REFUSED"]);
+function reasonFromMessage(code: string, message: string) {
+  if (code !== "KS_VALIDATION_FAILURE") return message;
+  // Keystone prefixes "You provided invalid data for this operation:\n  - List.field: reason".
+  return message.split("\n").map((line) => line.replace(/^\s*-\s*/, "").trim()).filter(Boolean)
+    .filter((line) => !/^You provided invalid data/i.test(line)).join(" ").slice(0, 500) || message;
+}
+
 export function redactGraphqlExecutionResult(result: ExecutionResult): ExecutionResult {
   if (!result.errors?.length) return result;
   return {
     ...result,
     errors: result.errors.map((error) => {
       const code = typeof error.extensions?.code === "string" ? error.extensions.code : undefined;
+      if (code && REASON_CODES.has(code) && error.message) {
+        return new GraphQLError(reasonFromMessage(code, error.message), {
+          nodes: error.nodes, source: error.source, positions: error.positions, path: error.path, extensions: { code },
+        });
+      }
       return new GraphQLError("The request could not be completed. Check your access and submitted information, then try again.", {
         nodes: error.nodes,
         source: error.source,

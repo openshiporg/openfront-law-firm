@@ -17,7 +17,7 @@ function load(relative, mocks) {
     cache.set(filename, module);
     const req = (spec) => {
       if (Object.hasOwn(mocks, spec)) return mocks[spec];
-      if (spec.startsWith('node:')) return require(spec);
+      if (spec.startsWith('node:') || spec === 'graphql') return require(spec);
       throw new Error(`Unmocked dependency: ${spec}`);
     };
     vm.runInNewContext(output, { module, exports: module.exports, require: req, process: { env: {} }, console, URL }, { filename });

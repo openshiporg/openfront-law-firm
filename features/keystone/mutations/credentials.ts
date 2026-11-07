@@ -62,17 +62,6 @@ function futureExpiration(value: string | null | undefined, maxDays: number) {
   return expiresAt;
 }
 
-async function activeFirmUser(prisma: any, firmId: string, userId: string) {
-  return prisma.user.findFirst({
-    where: {
-      id: userId,
-      status: "active",
-      firmMemberships: { some: { firmId, status: "active", role: { status: "active" } } },
-    },
-    select: { id: true },
-  });
-}
-
 async function audit(tx: any, data: {
   firmId: string;
   eventType: string;

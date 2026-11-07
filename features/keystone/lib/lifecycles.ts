@@ -1,3 +1,4 @@
+import { GraphQLError } from "graphql";
 export const lifecycles = {
   firm: {
     onboarding: ["active", "closed"],
@@ -323,6 +324,12 @@ export function assertCommandTarget(command: string, target: unknown, allowedTar
   return target;
 }
 
+/** Refusals the user can act on. graphql-security.ts lets these (and Keystone validation failures) keep their message. */
+export const LIFECYCLE_REFUSED = "LIFECYCLE_REFUSED";
+export function lifecycleRefusal(message: string) {
+  return new GraphQLError(message, { extensions: { code: LIFECYCLE_REFUSED } });
+}
+
 export function assertLifecycleTransition(
   lifecycle: LifecycleKey,
   from: string,
@@ -330,7 +337,7 @@ export function assertLifecycleTransition(
 ) {
   if (!(lifecycle in lifecycles)) throw new Error(`Unknown lifecycle: ${lifecycle}`);
   if (!canTransition(lifecycle, from, to)) {
-    throw new Error(`${lifecycleLabel(lifecycle)} cannot transition from ${from} to ${to}.`);
+    throw lifecycleRefusal(`${lifecycleLabel(lifecycle)} cannot transition from ${from} to ${to}.`);
   }
   return to;
 }
