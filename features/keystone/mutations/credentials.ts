@@ -17,6 +17,7 @@ import {
   normalizeMachineScopes,
   normalizeRedirectUris,
 } from "../lib/machine-auth";
+import { assertLifecycleTransition } from "../lib/lifecycles";
 import { runSerializableTransaction } from "../lib/transactions";
 
 function requireHumanSession(context: Context, permission: "canManageMachineCredentials" | "canApproveAgentActions") {
@@ -341,6 +342,7 @@ export async function revokeAgentCredential(
     const credential = await tx.agentCredential.findFirst({ where: { id: args.id, firmId } });
     if (!credential) throw new Error("Agent credential was not found in the active firm.");
     if (credential.status === "revoked") return { credential, replayed: true };
+    assertLifecycleTransition("agentCredential", credential.status, "revoked");
     const revoked = await tx.agentCredential.update({
       where: { id: credential.id },
       data: { status: "revoked", revokedAt: new Date(), revokedById: session.itemId },

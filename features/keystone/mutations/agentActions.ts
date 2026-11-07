@@ -9,6 +9,7 @@ import {
   type PermissionKey,
 } from "../access";
 import { authorizeAgentAction, computeAgentApprovalDigest } from "../lib/agent-controls";
+import { assertLifecycleTransition } from "../lib/lifecycles";
 import { sha256Digest } from "../lib/digests";
 import {
   prismaWithoutGraphQLErrorConversion,
@@ -465,6 +466,7 @@ export async function reviewAgentAction(
     }
 
     const nextStatus = args.decision === "approve" ? "approved" : "rejected";
+    assertLifecycleTransition("agentAction", current.status, nextStatus);
     const reviewed = await tx.agentAction.update({
       where: { id: action.id },
       data: {

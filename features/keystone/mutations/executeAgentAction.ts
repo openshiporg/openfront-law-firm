@@ -1,5 +1,6 @@
 import type { Context } from ".keystone/types";
 import { assertCurrentCommandActor, assertCurrentAgentCredential } from "./command-authority";
+import { assertLifecycleTransition } from "../lib/lifecycles";
 
 import { permissions, type Session } from "../access";
 import {
@@ -96,6 +97,7 @@ async function recordAgentActionSucceeded(
 ) {
   const now = new Date();
   const resultDigest = sha256Digest(summary);
+  assertLifecycleTransition("agentAction", "executing", "succeeded");
   const updated = await tx.agentAction.updateMany({
     where: { id: action.id, status: "executing", startedAt: action.startedAt },
     data: { status: "succeeded", completedAt: now, resultDigest, resultEnvelope: summary },
@@ -388,6 +390,7 @@ export async function executeAgentAction(
     });
     if (!authorization.allowed) throw new Error(authorization.reason ?? "Agent action is not authorized.");
 
+    if (!recovering) assertLifecycleTransition("agentAction", "approved", "executing");
     const claimed = await tx.agentAction.updateMany({
       where: recovering
         ? { id: action.id, status: "executing", startedAt: action.startedAt }
@@ -425,6 +428,7 @@ export async function executeAgentAction(
     const message = error instanceof Error ? error.message : "Controlled action execution failed.";
     await runSerializableTransaction(prisma, async (tx: any) => {
       const now = new Date();
+      assertLifecycleTransition("agentAction", "executing", "failed");
       const failed = await tx.agentAction.updateMany({
         where: { id: claimed.action.id, status: "executing", startedAt: claimed.action.startedAt },
         data: {

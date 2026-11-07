@@ -26,6 +26,8 @@ function load(relative, mocks) {
   return loadFile(relative);
 }
 
+const loadReal = (rel) => load(rel, {});
+
 // Fake database holding one payment; the tx exposes only what reconcile touches.
 function fixture({ paymentType = 'operating', status = 'pending', providerAmount = 5000, providerCurrency = 'USD' } = {}) {
   const state = { payment: { id: 'pay1', firmId: 'f1', payerId: 'c1', paymentType, status, amountMinor: 5000, currencyCode: 'USD', providerPaymentId: 'cs_test_1', idempotencyKey: 'retainer:ret1:5000', paymentNumber: 'PAY-1', invoiceId: 'inv1', trustAccountId: 'ta1', paymentProvider: { id: 'pp1' } }, allocations: 0, postings: 0 };
@@ -35,7 +37,7 @@ function fixture({ paymentType = 'operating', status = 'pending', providerAmount
       findFirst: async () => ({ ...state.payment }),
       update: async ({ data }) => { Object.assign(state.payment, data); return state.payment; },
     },
-    invoice: { findFirst: async () => ({ id: 'inv1', matterId: 'm1', balanceDueMinor: 5000 }) },
+    invoice: { findFirst: async () => ({ id: 'inv1', matterId: 'm1', status: 'issued', balanceDueMinor: 5000 }) },
     retainerAgreement: { findFirst: async () => ({ id: 'ret1', trustLedgerAccountId: 'led1' }) },
     trustLedgerAccount: { findFirst: async () => ({ id: 'led1', trustAccountId: 'ta1', trustAccount: { id: 'ta1' } }) },
   };
@@ -46,6 +48,8 @@ function fixture({ paymentType = 'operating', status = 'pending', providerAmount
     '../lib/transactions': { prismaWithoutGraphQLErrorConversion: (p) => p, runSerializableTransaction: async (_p, cb) => cb(tx) },
     '../utils/paymentProviderAdapter': { createPayment: async () => { throw new Error('must not be called'); }, getPaymentStatus: async () => ({ status: 'succeeded', amount: providerAmount, currency: providerCurrency }) },
     './postTrustTransaction': { applyTrustPosting: async (_tx, _f, actor, data) => { assert.equal(actor, null); assert.equal(data.sourcePaymentId, 'pay1'); assert.equal(data.idempotencyKey, 'online-trust:pay1'); state.postings += 1; } },
+    '../lib/lifecycles': loadReal('features/keystone/lib/lifecycles.ts'),
+    './workflow-helpers': { recordAuditEvent: async () => undefined },
     './billingWorkflows': { applyInvoiceAllocation: async () => { state.allocations += 1; } },
   };
   state.prisma = { ...prisma, payment: { findFirst: async () => ({ ...state.payment, paymentProvider: { id: 'pp1' }, invoice: {} }), update: tx.payment.update } };
@@ -95,4 +99,21 @@ test('a foreign portal account cannot reconcile another client payment', async (
   state.prisma.payment.findFirst = async ({ where }) => where.payerId === 'c1' ? null : { ...state.payment };
   const { reconcilePortalPayment } = load('features/keystone/mutations/portalPayments.ts', mocks);
   await assert.rejects(() => reconcilePortalPayment(null, { paymentId: 'pay1', token: 'good' }, { prisma: state.prisma }), /not available/);
+});
+
+test('a charge confirmed after the checkout window ended is still captured and the failure marks are cleared', async () => {
+  const { state, mocks } = fixture({ status: 'cancelled' });
+  state.payment.failedAt = new Date(); state.payment.failureReason = 'Checkout window ended'; state.payment.idempotencyKey = 'consultation:c9';
+  const { reconcilePaymentByProviderId } = load('features/keystone/mutations/portalPayments.ts', mocks);
+  const result = await reconcilePaymentByProviderId(state.prisma, 'pay1', 'f1');
+  assert.equal(result.status, 'captured');
+  assert.equal(state.payment.status, 'captured');
+  assert.equal(state.payment.failedAt, null);
+  assert.equal(state.payment.failureReason, '');
+});
+
+test('a settled or reversed-out state is never rewritten by a late provider event', async () => {
+  const { mocks } = fixture();
+  const lifecycles = mocks['../lib/lifecycles'];
+  assert.throws(() => lifecycles.assertLifecycleTransition('providerPayment', 'settled', 'captured'), /cannot transition/);
 });

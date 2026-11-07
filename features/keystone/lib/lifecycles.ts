@@ -201,6 +201,17 @@ export const lifecycles = {
     failed: [],
     cancelled: [],
   },
+  // What the payment PROVIDER can do to a payment row. The provider is the source of truth for
+  // money: a confirmed charge is captured even if our side already gave up on it (a checkout
+  // window that ended, a failed attempt) so it is recorded and, for a released consultation, refunded.
+  providerPayment: {
+    pending: ["captured", "failed", "cancelled"],
+    authorized: ["captured", "failed", "cancelled"],
+    failed: ["captured"],
+    cancelled: ["captured"],
+    captured: ["settled"],
+    settled: [],
+  },
   refund: {
     requested: ["approved", "cancelled"],
     approved: ["processing", "cancelled"],

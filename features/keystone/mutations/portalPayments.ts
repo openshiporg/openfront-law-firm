@@ -5,6 +5,8 @@ import { prismaWithoutGraphQLErrorConversion, runSerializableTransaction } from 
 import { createPayment, getPaymentStatus } from "../utils/paymentProviderAdapter";
 import { applyTrustPosting } from "./postTrustTransaction";
 import { applyInvoiceAllocation } from "./billingWorkflows";
+import { assertLifecycleTransition } from "../lib/lifecycles";
+import { recordAuditEvent } from "./workflow-helpers";
 
 function webBase(context: any) {
   const value = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000";
@@ -68,14 +70,23 @@ export async function reconcilePaymentByProviderId(prisma: any, paymentId: strin
     const current = await tx.payment.findFirst({ where: { id: payment.id, firmId: payment.firmId, ...(payerId ? { payerId } : {}) } });
     if (!current) throw new Error("Payment is no longer available.");
     if (["captured", "settled"].includes(current.status)) return { status: current.status, paymentId: current.id, replayed: true };
-    if (current.status !== "pending" && current.status !== "authorized") throw new Error("Payment cannot be reconciled from its current state.");
-    await tx.payment.update({ where: { id: current.id }, data: { status: "captured", capturedAt: new Date(), providerPaymentId: payment.providerPaymentId } });
+    // The provider confirmed the charge above, so money exists whatever we recorded before: a
+    // cancelled/failed row (checkout window ended) is still captured, never left charged-but-unrecorded.
+    assertLifecycleTransition("providerPayment", current.status, "captured");
+    await tx.payment.update({ where: { id: current.id }, data: { status: "captured", capturedAt: new Date(), failedAt: null, failureReason: "", providerPaymentId: payment.providerPaymentId } });
     // A consultation fee is earned operating revenue with no invoice to allocate against.
     if (current.paymentType === "operating" && /^consultation:[^:]+$/.test(current.idempotencyKey ?? "")) return { status: "captured", paymentId: current.id, replayed: false };
     if (current.paymentType === "operating") {
       if (!current.invoiceId) throw new Error("Operating payment has no invoice.");
       const invoice = await tx.invoice.findFirst({ where: { id: current.invoiceId, firmId: current.firmId } });
       if (!invoice) throw new Error("Payment invoice was not found.");
+      // The client's card was charged. If the invoice was voided or settled while checkout was open,
+      // keep the capture (money exists) and leave it unallocated for staff to refund or apply. Throwing
+      // here would roll the capture back and make the provider retry a charge that can never be recorded.
+      if (!["issued", "partially_paid", "overdue"].includes(invoice.status) || invoice.balanceDueMinor <= 0) {
+        await recordAuditEvent(tx, { firmId: current.firmId, eventType: "payment.captured_unallocated", category: "financial", actorUserId: null, actorType: "system", matterId: invoice.matterId, invoiceId: invoice.id, paymentId: current.id, metadata: { invoiceStatus: invoice.status, amountMinor: current.amountMinor } });
+        return { status: "captured", paymentId: current.id, replayed: false, unallocated: true };
+      }
       await applyInvoiceAllocation(tx, { firmId: current.firmId, paymentId: current.id, invoiceId: invoice.id, amountMinor: Math.min(current.amountMinor, invoice.balanceDueMinor), idempotencyKey: `provider-settlement:${current.id}`, actorUserId: null, note: "Online payment settlement" });
     }
     if (current.paymentType === "trust_deposit") {
