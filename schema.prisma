@@ -207,7 +207,6 @@ model Firm {
   from_CommunicationThread_firm      CommunicationThread[]      @relation("CommunicationThread_firm")
   from_CommunicationParticipant_firm CommunicationParticipant[] @relation("CommunicationParticipant_firm")
   from_CommunicationMessage_firm     CommunicationMessage[]     @relation("CommunicationMessage_firm")
-  from_CommunicationDelivery_firm    CommunicationDelivery[]    @relation("CommunicationDelivery_firm")
   from_Document_firm                 Document[]                 @relation("Document_firm")
   from_DocumentVersion_firm          DocumentVersion[]          @relation("DocumentVersion_firm")
   from_SignatureRequest_firm         SignatureRequest[]         @relation("SignatureRequest_firm")
@@ -430,57 +429,56 @@ model OAuthToken {
 }
 
 model Contact {
-  id                                          String                     @id @default(cuid())
-  firm                                        Firm                       @relation("Contact_firm", fields: [firmId], references: [id])
-  firmId                                      String                     @map("firm")
-  contactType                                 ContactContactTypeType     @default(person)
-  status                                      ContactStatusType          @default(prospective_client)
-  firstName                                   String                     @default("")
-  middleName                                  String                     @default("")
-  lastName                                    String                     @default("")
-  organizationName                            String                     @default("")
-  preferredName                               String                     @default("")
-  primaryEmail                                String                     @default("")
-  primaryPhone                                String                     @default("")
-  dateOfBirth                                 DateTime?
-  governmentIdLastFour                        String                     @default("")
-  conflictSearchAliases                       Json?                      @default("[]")
-  privilegedNotes                             String                     @default("")
-  addresses                                   Address[]                  @relation("Address_contact")
-  contactMethods                              ContactMethod[]            @relation("ContactMethod_contact")
-  createdAt                                   DateTime                   @default(now())
-  updatedAt                                   DateTime                   @default(now()) @updatedAt
-  from_Intake_primaryContact                  Intake[]                   @relation("Intake_primaryContact")
-  from_IntakeParticipant_contact              IntakeParticipant[]        @relation("IntakeParticipant_contact")
-  from_IntakeSubmission_submittedByContact    IntakeSubmission[]         @relation("IntakeSubmission_submittedByContact")
-  from_Consultation_participants              Consultation[]             @relation("Consultation_participants")
-  from_ConflictSearchTerm_sourceContact       ConflictSearchTerm[]       @relation("ConflictSearchTerm_sourceContact")
-  from_ConflictMatch_matchedContact           ConflictMatch[]            @relation("ConflictMatch_matchedContact")
-  from_Matter_client                          Matter[]                   @relation("Matter_client")
-  from_MatterParty_contact                    MatterParty[]              @relation("MatterParty_contact")
-  from_MatterParty_representedBy              MatterParty[]              @relation("MatterParty_representedBy")
-  from_MatterParty_counselContact             MatterParty[]              @relation("MatterParty_counselContact")
-  from_Docket_judgeContact                    Docket[]                   @relation("Docket_judgeContact")
-  from_Docket_clerkContact                    Docket[]                   @relation("Docket_clerkContact")
-  from_CommunicationParticipant_contact       CommunicationParticipant[] @relation("CommunicationParticipant_contact")
-  from_CommunicationMessage_senderContact     CommunicationMessage[]     @relation("CommunicationMessage_senderContact")
-  from_CommunicationDelivery_recipientContact CommunicationDelivery[]    @relation("CommunicationDelivery_recipientContact")
-  from_Document_contact                       Document[]                 @relation("Document_contact")
-  from_DocumentSigner_contact                 DocumentSigner[]           @relation("DocumentSigner_contact")
-  from_Expense_vendor                         Expense[]                  @relation("Expense_vendor")
-  from_RetainerAgreement_client               RetainerAgreement[]        @relation("RetainerAgreement_client")
-  from_Invoice_client                         Invoice[]                  @relation("Invoice_client")
-  from_TrustLedgerAccount_client              TrustLedgerAccount[]       @relation("TrustLedgerAccount_client")
-  from_Payment_payer                          Payment[]                  @relation("Payment_payer")
-  from_PortalAccount_contact                  PortalAccount[]            @relation("PortalAccount_contact")
-  from_PortalMatterAccess_contact             PortalMatterAccess[]       @relation("PortalMatterAccess_contact")
-  from_PortalShare_contact                    PortalShare[]              @relation("PortalShare_contact")
-  from_PortalGrantIntent_contact              PortalGrantIntent[]        @relation("PortalGrantIntent_contact")
-  from_ExternalRecordLink_contact             ExternalRecordLink[]       @relation("ExternalRecordLink_contact")
-  from_RetentionHold_contact                  RetentionHold[]            @relation("RetentionHold_contact")
-  from_RetentionAction_contact                RetentionAction[]          @relation("RetentionAction_contact")
-  from_AuditEvent_contact                     AuditEvent[]               @relation("AuditEvent_contact")
-  from_AgentAction_contact                    AgentAction[]              @relation("AgentAction_contact")
+  id                                       String                     @id @default(cuid())
+  firm                                     Firm                       @relation("Contact_firm", fields: [firmId], references: [id])
+  firmId                                   String                     @map("firm")
+  contactType                              ContactContactTypeType     @default(person)
+  status                                   ContactStatusType          @default(prospective_client)
+  firstName                                String                     @default("")
+  middleName                               String                     @default("")
+  lastName                                 String                     @default("")
+  organizationName                         String                     @default("")
+  preferredName                            String                     @default("")
+  primaryEmail                             String                     @default("")
+  primaryPhone                             String                     @default("")
+  dateOfBirth                              DateTime?
+  governmentIdLastFour                     String                     @default("")
+  conflictSearchAliases                    Json?                      @default("[]")
+  privilegedNotes                          String                     @default("")
+  addresses                                Address[]                  @relation("Address_contact")
+  contactMethods                           ContactMethod[]            @relation("ContactMethod_contact")
+  createdAt                                DateTime                   @default(now())
+  updatedAt                                DateTime                   @default(now()) @updatedAt
+  from_Intake_primaryContact               Intake[]                   @relation("Intake_primaryContact")
+  from_IntakeParticipant_contact           IntakeParticipant[]        @relation("IntakeParticipant_contact")
+  from_IntakeSubmission_submittedByContact IntakeSubmission[]         @relation("IntakeSubmission_submittedByContact")
+  from_Consultation_participants           Consultation[]             @relation("Consultation_participants")
+  from_ConflictSearchTerm_sourceContact    ConflictSearchTerm[]       @relation("ConflictSearchTerm_sourceContact")
+  from_ConflictMatch_matchedContact        ConflictMatch[]            @relation("ConflictMatch_matchedContact")
+  from_Matter_client                       Matter[]                   @relation("Matter_client")
+  from_MatterParty_contact                 MatterParty[]              @relation("MatterParty_contact")
+  from_MatterParty_representedBy           MatterParty[]              @relation("MatterParty_representedBy")
+  from_MatterParty_counselContact          MatterParty[]              @relation("MatterParty_counselContact")
+  from_Docket_judgeContact                 Docket[]                   @relation("Docket_judgeContact")
+  from_Docket_clerkContact                 Docket[]                   @relation("Docket_clerkContact")
+  from_CommunicationParticipant_contact    CommunicationParticipant[] @relation("CommunicationParticipant_contact")
+  from_CommunicationMessage_senderContact  CommunicationMessage[]     @relation("CommunicationMessage_senderContact")
+  from_Document_contact                    Document[]                 @relation("Document_contact")
+  from_DocumentSigner_contact              DocumentSigner[]           @relation("DocumentSigner_contact")
+  from_Expense_vendor                      Expense[]                  @relation("Expense_vendor")
+  from_RetainerAgreement_client            RetainerAgreement[]        @relation("RetainerAgreement_client")
+  from_Invoice_client                      Invoice[]                  @relation("Invoice_client")
+  from_TrustLedgerAccount_client           TrustLedgerAccount[]       @relation("TrustLedgerAccount_client")
+  from_Payment_payer                       Payment[]                  @relation("Payment_payer")
+  from_PortalAccount_contact               PortalAccount[]            @relation("PortalAccount_contact")
+  from_PortalMatterAccess_contact          PortalMatterAccess[]       @relation("PortalMatterAccess_contact")
+  from_PortalShare_contact                 PortalShare[]              @relation("PortalShare_contact")
+  from_PortalGrantIntent_contact           PortalGrantIntent[]        @relation("PortalGrantIntent_contact")
+  from_ExternalRecordLink_contact          ExternalRecordLink[]       @relation("ExternalRecordLink_contact")
+  from_RetentionHold_contact               RetentionHold[]            @relation("RetentionHold_contact")
+  from_RetentionAction_contact             RetentionAction[]          @relation("RetentionAction_contact")
+  from_AuditEvent_contact                  AuditEvent[]               @relation("AuditEvent_contact")
+  from_AgentAction_contact                 AgentAction[]              @relation("AgentAction_contact")
 
   @@index([firmId])
 }
@@ -860,7 +858,6 @@ model Matter {
   from_CommunicationThread_matter      CommunicationThread[]      @relation("CommunicationThread_matter")
   from_CommunicationParticipant_matter CommunicationParticipant[] @relation("CommunicationParticipant_matter")
   from_CommunicationMessage_matter     CommunicationMessage[]     @relation("CommunicationMessage_matter")
-  from_CommunicationDelivery_matter    CommunicationDelivery[]    @relation("CommunicationDelivery_matter")
   from_Document_matter                 Document[]                 @relation("Document_matter")
   from_DocumentVersion_matter          DocumentVersion[]          @relation("DocumentVersion_matter")
   from_SignatureRequest_matter         SignatureRequest[]         @relation("SignatureRequest_matter")
@@ -1290,7 +1287,6 @@ model CommunicationMessage {
   receivedAt                         DateTime?
   metadata                           Json?
   attachments                        DocumentVersion[]                 @relation("CommunicationMessage_attachments")
-  deliveries                         CommunicationDelivery[]           @relation("CommunicationDelivery_message")
   createdAt                          DateTime                          @default(now())
   updatedAt                          DateTime                          @default(now()) @updatedAt
   from_DocumentVersion_sourceMessage DocumentVersion[]                 @relation("DocumentVersion_sourceMessage")
@@ -1303,40 +1299,6 @@ model CommunicationMessage {
   @@index([senderAgentId])
   @@index([externalMessageId])
   @@index([replyToMessageId])
-}
-
-model CommunicationDelivery {
-  id                      String                           @id @default(cuid())
-  firm                    Firm                             @relation("CommunicationDelivery_firm", fields: [firmId], references: [id])
-  firmId                  String                           @map("firm")
-  matter                  Matter?                          @relation("CommunicationDelivery_matter", fields: [matterId], references: [id])
-  matterId                String?                          @map("matter")
-  message                 CommunicationMessage             @relation("CommunicationDelivery_message", fields: [messageId], references: [id])
-  messageId               String                           @map("message")
-  integrationConnection   IntegrationConnection?           @relation("CommunicationDelivery_integrationConnection", fields: [integrationConnectionId], references: [id])
-  integrationConnectionId String?                          @map("integrationConnection")
-  channel                 CommunicationDeliveryChannelType
-  status                  CommunicationDeliveryStatusType  @default(pending)
-  recipientContact        Contact?                         @relation("CommunicationDelivery_recipientContact", fields: [recipientContactId], references: [id])
-  recipientContactId      String?                          @map("recipientContact")
-  recipientAddress        String                           @default("")
-  provider                String                           @default("")
-  providerMessageId       String                           @default("")
-  attemptCount            Int?                             @default(0)
-  lastAttemptAt           DateTime?
-  deliveredAt             DateTime?
-  errorCode               String                           @default("")
-  errorMessage            String                           @default("")
-  providerMetadata        Json?
-  createdAt               DateTime                         @default(now())
-  updatedAt               DateTime                         @default(now()) @updatedAt
-
-  @@index([firmId])
-  @@index([matterId])
-  @@index([messageId])
-  @@index([integrationConnectionId])
-  @@index([recipientContactId])
-  @@index([providerMessageId])
 }
 
 model Document {
@@ -2294,34 +2256,33 @@ model PortalGrantIntent {
 }
 
 model IntegrationConnection {
-  id                                               String                            @id @default(cuid())
-  firm                                             Firm                              @relation("IntegrationConnection_firm", fields: [firmId], references: [id])
-  firmId                                           String                            @map("firm")
-  office                                           Office?                           @relation("IntegrationConnection_office", fields: [officeId], references: [id])
-  officeId                                         String?                           @map("office")
-  owner                                            User?                             @relation("IntegrationConnection_owner", fields: [ownerId], references: [id])
-  ownerId                                          String?                           @map("owner")
-  name                                             String                            @default("")
-  provider                                         String                            @default("")
-  category                                         IntegrationConnectionCategoryType
-  status                                           IntegrationConnectionStatusType   @default(pending)
-  credentialsEncrypted                             String                            @default("")
-  oauthAccessToken                                 String                            @default("")
-  oauthRefreshToken                                String                            @default("")
-  webhookSecretDigest                              String                            @default("")
-  configuration                                    Json?
-  externalAccountId                                String                            @default("")
-  lastSyncedAt                                     DateTime?
-  lastErrorAt                                      DateTime?
-  lastError                                        String                            @default("")
-  externalLinks                                    ExternalRecordLink[]              @relation("ExternalRecordLink_connection")
-  webhookSubscriptions                             WebhookSubscription[]             @relation("WebhookSubscription_connection")
-  webhookDeliveries                                WebhookDelivery[]                 @relation("WebhookDelivery_connection")
-  createdAt                                        DateTime                          @default(now())
-  updatedAt                                        DateTime                          @default(now()) @updatedAt
-  from_CommunicationDelivery_integrationConnection CommunicationDelivery[]           @relation("CommunicationDelivery_integrationConnection")
-  from_SignatureRequest_integrationConnection      SignatureRequest[]                @relation("SignatureRequest_integrationConnection")
-  from_Payment_integrationConnection               Payment[]                         @relation("Payment_integrationConnection")
+  id                                          String                            @id @default(cuid())
+  firm                                        Firm                              @relation("IntegrationConnection_firm", fields: [firmId], references: [id])
+  firmId                                      String                            @map("firm")
+  office                                      Office?                           @relation("IntegrationConnection_office", fields: [officeId], references: [id])
+  officeId                                    String?                           @map("office")
+  owner                                       User?                             @relation("IntegrationConnection_owner", fields: [ownerId], references: [id])
+  ownerId                                     String?                           @map("owner")
+  name                                        String                            @default("")
+  provider                                    String                            @default("")
+  category                                    IntegrationConnectionCategoryType
+  status                                      IntegrationConnectionStatusType   @default(pending)
+  credentialsEncrypted                        String                            @default("")
+  oauthAccessToken                            String                            @default("")
+  oauthRefreshToken                           String                            @default("")
+  webhookSecretDigest                         String                            @default("")
+  configuration                               Json?
+  externalAccountId                           String                            @default("")
+  lastSyncedAt                                DateTime?
+  lastErrorAt                                 DateTime?
+  lastError                                   String                            @default("")
+  externalLinks                               ExternalRecordLink[]              @relation("ExternalRecordLink_connection")
+  webhookSubscriptions                        WebhookSubscription[]             @relation("WebhookSubscription_connection")
+  webhookDeliveries                           WebhookDelivery[]                 @relation("WebhookDelivery_connection")
+  createdAt                                   DateTime                          @default(now())
+  updatedAt                                   DateTime                          @default(now()) @updatedAt
+  from_SignatureRequest_integrationConnection SignatureRequest[]                @relation("SignatureRequest_integrationConnection")
+  from_Payment_integrationConnection          Payment[]                         @relation("Payment_integrationConnection")
 
   @@index([firmId])
   @@index([officeId])
@@ -3263,20 +3224,6 @@ enum CommunicationMessageStatusType {
   failed
   received
   cancelled
-}
-
-enum CommunicationDeliveryChannelType {
-  email
-  sms
-  portal
-}
-
-enum CommunicationDeliveryStatusType {
-  pending
-  sent
-  delivered
-  failed
-  bounced
 }
 
 enum DocumentStatusType {

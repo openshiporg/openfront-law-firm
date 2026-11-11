@@ -53,11 +53,11 @@ const desks: Record<DeskKind, DeskDefinition> = {
   },
   communications: {
     title: 'Communications',
-    description: 'Keep client threads, review-ready drafts, and delivery exceptions together with their matter scope.',
-    eyebrow: 'Client delivery',
-    notice: 'This desk records authorized thread and delivery state. Outbound or inbound email, SMS, and messaging workers are not represented as configured.',
-    sectionLabels: { drafts: 'Matter · channel · controlled delivery', threads: 'Matter or intake · channel · activity', delivery: 'Channel · delivery state · attempts' },
-    detailKind: { Message: 'message', Thread: 'thread', Delivery: 'delivery' },
+    description: 'Keep client threads and review-ready drafts together with their matter scope.',
+    eyebrow: 'Client communications',
+    notice: 'This desk records authorized threads and messages. The application does not send client email or SMS.',
+    sectionLabels: { drafts: 'Matter · channel · record state', threads: 'Matter or intake · channel · activity' },
+    detailKind: { Message: 'message', Thread: 'thread' },
   },
   'time-expenses': {
     title: 'Time & expenses',
@@ -90,21 +90,19 @@ export function deskTitle(desk: DeskKind) {
 export async function OperatingDesk({
   desk,
   workPages,
-  deliveryPage,
   documentPage,
   signaturePage,
   register,
 }: {
   desk: DeskKind
   workPages?: { deadlines: number; tasks: number }
-  deliveryPage?: number
   documentPage?: number
   signaturePage?: number
   register?: RegisterParams | null
 }) {
   const definition = { ...desks[desk], title: deskTitle(desk) }
   const [response, timeZone] = await Promise.all([
-    getPracticeWorkspace(desk, { ...workPages, delivery: deliveryPage, documents: documentPage, signatures: signaturePage }),
+    getPracticeWorkspace(desk, { ...workPages, documents: documentPage, signatures: signaturePage }),
     getFirmTimeZone(),
   ])
   const registerSection = register && response.success ? response.data.sections.find((section) => section.key === register.view) : undefined
@@ -182,7 +180,6 @@ function DeskLane({ desk, section, timeZone, paginationHrefs }: { desk: DeskKind
 function getPaginationHrefs(desk: DeskKind, section: PracticeWorkspaceSection, sections: PracticeWorkspaceSection[]) {
   if (!section.pagination) return undefined
   if (desk === 'work') return getWorkPageHrefs(section, sections)
-  if (desk === 'communications' && section.key === 'delivery') return getDeliveryPageHrefs(section)
   if (desk === 'documents') return getDocumentDeskPageHrefs(section, sections)
   return undefined
 }
@@ -198,15 +195,6 @@ function getDocumentDeskPageHrefs(section: PracticeWorkspaceSection, sections: P
     })
     return `/dashboard/platform/documents?${params.toString()}#${section.key}`
   }
-  return {
-    previous: section.pagination.hasPrevious ? href(section.pagination.page - 1) : null,
-    next: section.pagination.hasNext ? href(section.pagination.page + 1) : null,
-  }
-}
-
-function getDeliveryPageHrefs(section: PracticeWorkspaceSection) {
-  if (!section.pagination) return undefined
-  const href = (page: number) => `/dashboard/platform/communications?deliveryPage=${page}#delivery`
   return {
     previous: section.pagination.hasPrevious ? href(section.pagination.page - 1) : null,
     next: section.pagination.hasNext ? href(section.pagination.page + 1) : null,

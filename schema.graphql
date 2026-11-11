@@ -4082,8 +4082,6 @@ type CommunicationMessage {
   metadata: JSON
   attachments(where: DocumentVersionWhereInput! = {}, orderBy: [DocumentVersionOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: DocumentVersionWhereUniqueInput): [DocumentVersion!]
   attachmentsCount(where: DocumentVersionWhereInput! = {}): Int
-  deliveries(where: CommunicationDeliveryWhereInput! = {}, orderBy: [CommunicationDeliveryOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: CommunicationDeliveryWhereUniqueInput): [CommunicationDelivery!]
-  deliveriesCount(where: CommunicationDeliveryWhereInput! = {}): Int
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -4140,7 +4138,6 @@ input CommunicationMessageWhereInput {
   sentAt: DateTimeNullableFilter
   receivedAt: DateTimeNullableFilter
   attachments: DocumentVersionManyRelationFilter
-  deliveries: CommunicationDeliveryManyRelationFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 }
@@ -4170,12 +4167,6 @@ input DocumentVersionManyRelationFilter {
   every: DocumentVersionWhereInput
   some: DocumentVersionWhereInput
   none: DocumentVersionWhereInput
-}
-
-input CommunicationDeliveryManyRelationFilter {
-  every: CommunicationDeliveryWhereInput
-  some: CommunicationDeliveryWhereInput
-  none: CommunicationDeliveryWhereInput
 }
 
 input CommunicationMessageOrderByInput {
@@ -4285,100 +4276,6 @@ input CommunicationMessageRelateToOneForCreateInput {
 
 input DocumentVersionRelateToManyForCreateInput {
   connect: [DocumentVersionWhereUniqueInput!]
-}
-
-type CommunicationDelivery {
-  id: ID!
-  firm: Firm
-  matter: Matter
-  message: CommunicationMessage
-  integrationConnection: IntegrationConnection
-  channel: CommunicationDeliveryChannelType
-  status: CommunicationDeliveryStatusType
-  recipientContact: Contact
-  recipientAddress: String
-  provider: String
-  providerMessageId: String
-  attemptCount: Int
-  lastAttemptAt: DateTime
-  deliveredAt: DateTime
-  errorCode: String
-  errorMessage: String
-  providerMetadata: JSON
-  createdAt: DateTime
-  updatedAt: DateTime
-}
-
-enum CommunicationDeliveryChannelType {
-  email
-  sms
-  portal
-}
-
-enum CommunicationDeliveryStatusType {
-  pending
-  sent
-  delivered
-  failed
-  bounced
-}
-
-input CommunicationDeliveryWhereUniqueInput {
-  id: ID
-}
-
-input CommunicationDeliveryWhereInput {
-  AND: [CommunicationDeliveryWhereInput!]
-  OR: [CommunicationDeliveryWhereInput!]
-  NOT: [CommunicationDeliveryWhereInput!]
-  id: IDFilter
-  firm: FirmWhereInput
-  matter: MatterWhereInput
-  message: CommunicationMessageWhereInput
-  integrationConnection: IntegrationConnectionWhereInput
-  channel: CommunicationDeliveryChannelTypeNullableFilter
-  status: CommunicationDeliveryStatusTypeNullableFilter
-  recipientContact: ContactWhereInput
-  recipientAddress: StringFilter
-  provider: StringFilter
-  providerMessageId: StringFilter
-  attemptCount: IntNullableFilter
-  lastAttemptAt: DateTimeNullableFilter
-  deliveredAt: DateTimeNullableFilter
-  errorCode: StringFilter
-  errorMessage: StringFilter
-  createdAt: DateTimeFilter
-  updatedAt: DateTimeFilter
-}
-
-input CommunicationDeliveryChannelTypeNullableFilter {
-  equals: CommunicationDeliveryChannelType
-  in: [CommunicationDeliveryChannelType!]
-  notIn: [CommunicationDeliveryChannelType!]
-  not: CommunicationDeliveryChannelTypeNullableFilter
-}
-
-input CommunicationDeliveryStatusTypeNullableFilter {
-  equals: CommunicationDeliveryStatusType
-  in: [CommunicationDeliveryStatusType!]
-  notIn: [CommunicationDeliveryStatusType!]
-  not: CommunicationDeliveryStatusTypeNullableFilter
-}
-
-input CommunicationDeliveryOrderByInput {
-  id: OrderDirection
-  channel: OrderDirection
-  status: OrderDirection
-  recipientAddress: OrderDirection
-  provider: OrderDirection
-  providerMessageId: OrderDirection
-  attemptCount: OrderDirection
-  lastAttemptAt: OrderDirection
-  deliveredAt: OrderDirection
-  errorCode: OrderDirection
-  errorMessage: OrderDirection
-  createdAt: OrderDirection
-  updatedAt: OrderDirection
 }
 
 type Document {
@@ -9166,8 +9063,7 @@ type Mutation {
   rotateIntegrationCredential(connectionId: ID!, credentialType: String!, secret: String!): ControlledRecordProjection!
   transitionIntegrationConnection(connectionId: ID!, toStatus: String!, reason: String!): IntegrationTransitionResult!
   enqueueWebhookDelivery(connectionId: ID!, subscriptionId: ID!, eventId: String!, eventType: String!, matterId: ID, payload: JSON): ControlledRecordProjection!
-  queueCommunicationMessage(messageId: ID!, reason: String!): CommunicationMessageQueueResult!
-  transitionCommunicationDelivery(deliveryId: ID!, toStatus: String!, providerEventId: String!, providerMessageId: String, errorCode: String, errorMessage: String): CommunicationDeliveryTransitionResult!
+  retryWebhookDelivery(deliveryId: ID!): ControlledRecordProjection!
   transitionDocument(documentId: ID!, toStatus: DocumentCommandTarget!, reason: String!): DocumentTransitionResult!
   addDocumentSigner(requestId: ID!, contactId: ID, portalAccountId: ID, name: String!, email: String!, signingOrder: Int, providerSignerId: String): SignatureSignerSetupResult!
   transitionDocumentSigner(signerId: ID!, toStatus: String!, providerEventId: String!, evidenceDigest: String!): SignatureTransitionResult!
@@ -9178,7 +9074,6 @@ type Mutation {
   rotateWebhookSigningSecret(subscriptionId: ID!, secret: String!): ControlledRecordProjection!
   addCommunicationParticipant(threadId: ID!, participantRole: CommunicationParticipantRole!, userId: ID, contactId: ID, portalAccountId: ID, contactMethodId: ID): CommunicationParticipantResult!
   removeCommunicationParticipant(participantId: ID!, reason: String!): CommunicationParticipantResult!
-  prepareCommunicationDeliveries(messageId: ID!, participantIds: [ID!]!, integrationConnectionId: ID, reason: String!): CommunicationDeliveryPreparationResult!
   applyContactImport(connectionId: ID!, idempotencyKey: String!, rows: [ContactImportRowInput!]!): ContactImportResult!
   preparePracticeExport(scope: String!, idempotencyKey: String!, limit: Int): PracticeExportResult!
   startClientIntake(contactType: String!, firstName: String, lastName: String, organizationName: String, email: String, phone: String, title: String!, source: String, summary: String, adversePartySummary: String, officeId: ID, practiceAreaId: ID, assignedToId: ID): ClientIntakeStartResult!
@@ -9337,9 +9232,6 @@ type Query {
   communicationMessage(where: CommunicationMessageWhereUniqueInput!): CommunicationMessage
   communicationMessages(where: CommunicationMessageWhereInput! = {}, orderBy: [CommunicationMessageOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: CommunicationMessageWhereUniqueInput): [CommunicationMessage!]
   communicationMessagesCount(where: CommunicationMessageWhereInput! = {}): Int
-  communicationDelivery(where: CommunicationDeliveryWhereUniqueInput!): CommunicationDelivery
-  communicationDeliveries(where: CommunicationDeliveryWhereInput! = {}, orderBy: [CommunicationDeliveryOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: CommunicationDeliveryWhereUniqueInput): [CommunicationDelivery!]
-  communicationDeliveriesCount(where: CommunicationDeliveryWhereInput! = {}): Int
   document(where: DocumentWhereUniqueInput!): Document
   documents(where: DocumentWhereInput! = {}, orderBy: [DocumentOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: DocumentWhereUniqueInput): [Document!]
   documentsCount(where: DocumentWhereInput! = {}): Int
@@ -10041,16 +9933,6 @@ type IntegrationTransitionResult {
   replayed: Boolean!
 }
 
-type CommunicationDeliveryTransitionResult {
-  delivery: ControlledRecordProjection!
-  replayed: Boolean!
-}
-
-type CommunicationMessageQueueResult {
-  message: ControlledRecordProjection!
-  replayed: Boolean!
-}
-
 type SignatureSignerSetupResult {
   id: ID!
   status: String!
@@ -10104,12 +9986,6 @@ type SignatureRequestPreparationResult {
 
 type CommunicationParticipantResult {
   participant: ControlledRecordProjection!
-  replayed: Boolean!
-}
-
-type CommunicationDeliveryPreparationResult {
-  message: ControlledRecordProjection!
-  deliveries: [ControlledRecordProjection!]!
   replayed: Boolean!
 }
 

@@ -1,8 +1,13 @@
 "use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -15,7 +20,409 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// features/integrations/payment/stripe.ts
+var stripe_exports = {};
+__export(stripe_exports, {
+  capturePaymentFunction: () => capturePaymentFunction,
+  createPaymentFunction: () => createPaymentFunction,
+  generatePaymentLinkFunction: () => generatePaymentLinkFunction,
+  getPaymentStatusFunction: () => getPaymentStatusFunction,
+  handleWebhookFunction: () => handleWebhookFunction,
+  refundPaymentFunction: () => refundPaymentFunction
+});
+async function createPaymentFunction({ invoice, retainer, consultation, paymentId, firmId, amount, currency: currency2, successUrl, cancelUrl, idempotencyKey: idempotencyKey3, provider }) {
+  if (!Number.isSafeInteger(amount) || amount < 1 || !idempotencyKey3) throw new Error("Invalid payment amount or idempotency key");
+  const stripe = getStripeClient(provider);
+  const resource2 = invoice ?? retainer ?? consultation;
+  if (!resource2) throw new Error("Invoice, retainer or consultation details are required");
+  const metadata = { firmId, paymentId, ...invoice ? { invoiceId: invoice.id } : retainer ? { retainerId: retainer.id } : { consultationId: consultation.id } };
+  const base = new URL(successUrl).origin;
+  const returnUrl = consultation ? successUrl : `${base}/portal/payments/return?payment=${encodeURIComponent(paymentId)}`;
+  const joiner = returnUrl.includes("?") ? "&" : "?";
+  const fallbackName = invoice ? `Invoice ${resource2.number || ""}` : retainer ? `Retainer ${resource2.number || ""}` : "Consultation fee";
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    success_url: `${returnUrl}${joiner}session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: consultation ? cancelUrl : returnUrl,
+    customer_email: resource2.email || void 0,
+    line_items: [{ quantity: 1, price_data: { currency: currency2.toLowerCase(), unit_amount: amount, product_data: { name: resource2.title || fallbackName } } }],
+    metadata,
+    payment_intent_data: { metadata },
+    ...consultation ? { expires_at: Math.floor(Date.now() / 1e3) + 31 * 60 } : {}
+  }, { idempotencyKey: idempotencyKey3 });
+  return { status: "pending", checkoutSessionId: session.id, checkoutUrl: session.url, amount, currency: currency2.toUpperCase() };
+}
+async function capturePaymentFunction({ paymentId, amount, idempotencyKey: idempotencyKey3, provider }) {
+  const stripe = getStripeClient(provider);
+  const paymentIntent = await stripe.paymentIntents.capture(
+    paymentId,
+    { ...amount ? { amount_to_capture: amount } : {} },
+    idempotencyKey3 ? { idempotencyKey: idempotencyKey3 } : void 0
+  );
+  return {
+    status: paymentIntent.status,
+    amount: paymentIntent.amount_received,
+    currency: paymentIntent.currency,
+    data: paymentIntent
+  };
+}
+async function refundPaymentFunction({ paymentId, amount, idempotencyKey: idempotencyKey3, provider }) {
+  const stripe = getStripeClient(provider);
+  const refund = await stripe.refunds.create({
+    payment_intent: paymentId,
+    ...amount ? { amount } : {}
+  }, idempotencyKey3 ? { idempotencyKey: idempotencyKey3 } : void 0);
+  return {
+    status: refund.status,
+    amount: refund.amount,
+    currency: refund.currency,
+    data: refund
+  };
+}
+async function getPaymentStatusFunction({ paymentId, provider }) {
+  const stripe = getStripeClient(provider);
+  const session = await stripe.checkout.sessions.retrieve(paymentId, { expand: ["payment_intent"] });
+  const intent = session.payment_intent;
+  return {
+    status: session.payment_status === "paid" ? "succeeded" : session.status,
+    amount: session.amount_total ?? 0,
+    currency: (session.currency ?? "").toUpperCase(),
+    paymentIntentId: intent?.id,
+    data: session
+  };
+}
+async function generatePaymentLinkFunction({ paymentId, provider }) {
+  const stripe = getStripeClient(provider);
+  const session = await stripe.checkout.sessions.retrieve(paymentId);
+  return session.url;
+}
+async function handleWebhookFunction({ headers, provider }) {
+  const webhookEnv = typeof provider?.credentials?.webhookSecretEnv === "string" ? provider.credentials.webhookSecretEnv : "STRIPE_WEBHOOK_SECRET";
+  const webhookSecret = process.env[webhookEnv];
+  if (!webhookSecret) {
+    throw new Error("Stripe webhook secret is not configured");
+  }
+  const stripe = getStripeClient(provider);
+  try {
+    if (!headers.__rawBody) throw new Error("Raw webhook body is required");
+    const stripeEvent = stripe.webhooks.constructEvent(
+      headers.__rawBody,
+      headers["stripe-signature"],
+      webhookSecret
+    );
+    return {
+      isValid: true,
+      event: stripeEvent,
+      type: stripeEvent.type,
+      resource: stripeEvent.data.object
+    };
+  } catch (err) {
+    throw new Error(`Webhook signature verification failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+var import_stripe, getStripeClient;
+var init_stripe = __esm({
+  "features/integrations/payment/stripe.ts"() {
+    "use strict";
+    import_stripe = __toESM(require("stripe"));
+    getStripeClient = (provider) => {
+      const envName = typeof provider?.credentials?.secretKeyEnv === "string" ? provider.credentials.secretKeyEnv : "STRIPE_SECRET_KEY";
+      const stripeKey = process.env[envName];
+      if (!stripeKey) {
+        throw new Error("Stripe secret key not configured");
+      }
+      return new import_stripe.default(stripeKey, {
+        apiVersion: "2026-09-30.endive"
+      });
+    };
+  }
+});
+
+// features/integrations/payment/paypal.ts
+var paypal_exports = {};
+__export(paypal_exports, {
+  capturePaymentFunction: () => capturePaymentFunction2,
+  createPaymentFunction: () => createPaymentFunction2,
+  generatePaymentLinkFunction: () => generatePaymentLinkFunction2,
+  getPaymentStatusFunction: () => getPaymentStatusFunction2,
+  handleWebhookFunction: () => handleWebhookFunction2,
+  refundPaymentFunction: () => refundPaymentFunction2
+});
+async function handleWebhookFunction2({ event, headers }) {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  if (!webhookId) {
+    throw new Error("PayPal webhook ID is not configured");
+  }
+  const accessToken = await getPayPalAccessToken();
+  const baseUrl = getPayPalBaseUrl();
+  const response = await fetch(`${baseUrl}/v1/notifications/verify-webhook-signature`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({
+      auth_algo: headers["paypal-auth-algo"],
+      cert_url: headers["paypal-cert-url"],
+      transmission_id: headers["paypal-transmission-id"],
+      transmission_sig: headers["paypal-transmission-sig"],
+      transmission_time: headers["paypal-transmission-time"],
+      webhook_id: webhookId,
+      webhook_event: event
+    })
+  });
+  const verification = await response.json();
+  const isValid = verification.verification_status === "SUCCESS";
+  if (!isValid) {
+    throw new Error("Invalid webhook signature");
+  }
+  return {
+    isValid: true,
+    event,
+    type: event.event_type,
+    resource: event.resource
+  };
+}
+async function createPaymentFunction2({ cart, amount, currency: currency2 }) {
+  const accessToken = await getPayPalAccessToken();
+  const baseUrl = getPayPalBaseUrl();
+  const response = await fetch(
+    `${baseUrl}/v2/checkout/orders`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        ...cart?.id ? { "PayPal-Request-Id": `cart-${cart.id}-${amount}-${currency2.toUpperCase()}` } : {}
+      },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            custom_id: cart?.id,
+            amount: {
+              currency_code: currency2.toUpperCase(),
+              value: formatPayPalAmount(amount, currency2)
+            }
+          }
+        ]
+      })
+    }
+  );
+  const order = await response.json();
+  if (order.error) {
+    throw new Error(`PayPal order creation failed: ${order.error.message}`);
+  }
+  return {
+    orderId: order.id,
+    status: order.status
+  };
+}
+async function capturePaymentFunction2({ paymentId, idempotencyKey: idempotencyKey3 }) {
+  const accessToken = await getPayPalAccessToken();
+  const baseUrl = getPayPalBaseUrl();
+  const response = await fetch(
+    `${baseUrl}/v2/checkout/orders/${paymentId}/capture`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        ...idempotencyKey3 ? { "PayPal-Request-Id": idempotencyKey3 } : {}
+      }
+    }
+  );
+  const capture = await response.json();
+  if (capture.error) {
+    throw new Error(`PayPal capture failed: ${capture.error.message}`);
+  }
+  const capturedAmount = capture.purchase_units[0].payments.captures[0].amount;
+  return {
+    status: capture.status,
+    amount: parsePayPalAmount(capturedAmount.value, capturedAmount.currency_code),
+    currency: capturedAmount.currency_code,
+    data: capture
+  };
+}
+async function refundPaymentFunction2({ paymentId, amount = 0, currency: currency2 = "USD", idempotencyKey: idempotencyKey3 }) {
+  const accessToken = await getPayPalAccessToken();
+  const baseUrl = getPayPalBaseUrl();
+  const response = await fetch(
+    `${baseUrl}/v2/payments/captures/${paymentId}/refund`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        ...idempotencyKey3 ? { "PayPal-Request-Id": idempotencyKey3 } : {}
+      },
+      body: JSON.stringify({
+        amount: {
+          value: formatPayPalAmount(amount, currency2),
+          currency_code: currency2.toUpperCase()
+        }
+      })
+    }
+  );
+  const refund = await response.json();
+  if (refund.error) {
+    throw new Error(`PayPal refund failed: ${refund.error.message}`);
+  }
+  return {
+    status: refund.status,
+    amount: parsePayPalAmount(refund.amount.value, refund.amount.currency_code),
+    currency: refund.amount.currency_code,
+    data: refund
+  };
+}
+async function getPaymentStatusFunction2({ paymentId }) {
+  const accessToken = await getPayPalAccessToken();
+  const baseUrl = getPayPalBaseUrl();
+  const response = await fetch(
+    `${baseUrl}/v2/checkout/orders/${paymentId}`,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
+  const order = await response.json();
+  if (order.error) {
+    throw new Error(`PayPal status check failed: ${order.error.message}`);
+  }
+  const orderAmount = order.purchase_units[0].amount;
+  return {
+    status: order.status,
+    amount: parsePayPalAmount(orderAmount.value, orderAmount.currency_code),
+    currency: orderAmount.currency_code,
+    data: order
+  };
+}
+async function generatePaymentLinkFunction2({ paymentId }) {
+  return `https://www.paypal.com/activity/payment/${paymentId}`;
+}
+var NO_DIVISION_CURRENCIES, getPayPalBaseUrl, formatPayPalAmount, parsePayPalAmount, getPayPalAccessToken;
+var init_paypal = __esm({
+  "features/integrations/payment/paypal.ts"() {
+    "use strict";
+    NO_DIVISION_CURRENCIES = [
+      "JPY",
+      "KRW",
+      "VND",
+      "CLP",
+      "PYG",
+      "XAF",
+      "XOF",
+      "BIF",
+      "DJF",
+      "GNF",
+      "KMF",
+      "MGA",
+      "RWF",
+      "XPF",
+      "HTG",
+      "VUV",
+      "XAG",
+      "XDR",
+      "XAU"
+    ];
+    getPayPalBaseUrl = () => {
+      const isSandbox = process.env.NEXT_PUBLIC_PAYPAL_SANDBOX !== "false";
+      return isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+    };
+    formatPayPalAmount = (amount, currency2) => {
+      const upperCurrency = currency2.toUpperCase();
+      const isNoDivision = NO_DIVISION_CURRENCIES.includes(upperCurrency);
+      if (isNoDivision) {
+        return amount.toString();
+      }
+      return (amount / 100).toFixed(2);
+    };
+    parsePayPalAmount = (value, currency2) => {
+      const upperCurrency = currency2.toUpperCase();
+      const isNoDivision = NO_DIVISION_CURRENCIES.includes(upperCurrency);
+      if (isNoDivision) {
+        return parseInt(value, 10);
+      }
+      return Math.round(parseFloat(value) * 100);
+    };
+    getPayPalAccessToken = async () => {
+      const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+      const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        throw new Error("PayPal credentials not configured");
+      }
+      const baseUrl = getPayPalBaseUrl();
+      const response = await fetch(
+        `${baseUrl}/v1/oauth2/token`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Accept-Language": "en_US",
+            Authorization: `Basic ${Buffer.from(
+              `${clientId}:${clientSecret}`
+            ).toString("base64")}`
+          },
+          body: "grant_type=client_credentials"
+        }
+      );
+      const { access_token } = await response.json();
+      if (!access_token) {
+        throw new Error("Failed to get PayPal access token");
+      }
+      return access_token;
+    };
+  }
+});
+
+// features/integrations/payment/manual.ts
+var manual_exports = {};
+__export(manual_exports, {
+  capturePaymentFunction: () => capturePaymentFunction3,
+  createPaymentFunction: () => createPaymentFunction3,
+  generatePaymentLinkFunction: () => generatePaymentLinkFunction3,
+  getPaymentStatusFunction: () => getPaymentStatusFunction3,
+  handleWebhookFunction: () => handleWebhookFunction3,
+  refundPaymentFunction: () => refundPaymentFunction3
+});
+async function handleWebhookFunction3() {
+  throw new Error("Manual payment providers do not accept webhook ingress");
+}
+async function createPaymentFunction3({ amount, currency: currency2 }) {
+  if (!Number.isSafeInteger(amount) || amount < 1) throw new Error("Payment amount must be a positive integer in minor units");
+  return { status: "pending", amount, currency: currency2.toUpperCase() };
+}
+async function capturePaymentFunction3({ amount, currency: currency2 = "USD", idempotencyKey: idempotencyKey3 }) {
+  if (!idempotencyKey3) throw new Error("Manual capture requires an explicit staff receipt idempotency key");
+  if (!Number.isSafeInteger(amount) || (amount ?? 0) < 1) throw new Error("Payment amount must be a positive integer in minor units");
+  return { status: "captured", amount, currency: currency2.toUpperCase() };
+}
+async function refundPaymentFunction3() {
+  throw new Error("Manual refunds must be recorded and approved through the firm's refund workflow");
+}
+async function getPaymentStatusFunction3() {
+  return { status: "pending" };
+}
+async function generatePaymentLinkFunction3() {
+  return null;
+}
+var init_manual = __esm({
+  "features/integrations/payment/manual.ts"() {
+    "use strict";
+  }
+});
 
 // keystone.ts
 var keystone_exports = {};
@@ -26,7 +433,7 @@ module.exports = __toCommonJS(keystone_exports);
 
 // features/keystone/index.ts
 var import_auth = require("@keystone-6/auth");
-var import_core21 = require("@keystone-6/core");
+var import_core22 = require("@keystone-6/core");
 var import_session = require("@keystone-6/core/session");
 var import_config = require("dotenv/config");
 
@@ -400,44 +807,109 @@ var rules = {
 
 // features/keystone/lib/mail.ts
 var import_nodemailer = require("nodemailer");
+
+// features/keystone/lib/email-layout.ts
+var SUPPORT_EMAIL = "hello@law-firm.openship.org";
+var FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+var C = {
+  canvas: "#f4f4f5",
+  card: "#ffffff",
+  text: "#18181b",
+  muted: "#52525b",
+  subtle: "#71717a",
+  line: "#e4e4e7",
+  panel: "#fafafa",
+  button: "#18181b",
+  buttonText: "#ffffff",
+  link: "#18181b"
+};
+var escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+function storeNameFromEnv(fallback = "Law Firm") {
+  const match = /^\s*"?([^"<]+?)"?\s*</.exec(process.env.SMTP_FROM || "");
+  return match?.[1]?.trim() || fallback;
+}
+var p = (html, style = "") => `<p class="em-text" style="margin:0 0 16px;font-family:${FONT};font-size:16px;line-height:24px;color:${C.text};${style}">${html}</p>`;
+var emailParagraph = p;
+var emailMuted = (html) => `<p class="em-muted" style="margin:0 0 16px;font-family:${FONT};font-size:14px;line-height:22px;color:${C.muted};">${html}</p>`;
+function emailButton(label, href) {
+  return `<table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin:8px 0 24px;">
+<tr><td class="em-btn" align="center" bgcolor="${C.button}" style="border-radius:8px;background:${C.button};">
+<a class="em-btn-a" href="${escapeHtml(href)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${FONT};font-size:16px;font-weight:600;line-height:20px;color:${C.buttonText};text-decoration:none;border-radius:8px;">${escapeHtml(label)}</a>
+</td></tr></table>`;
+}
+function emailLayout(input) {
+  const store = escapeHtml(input.storeName || storeNameFromEnv());
+  const support = escapeHtml(input.supportEmail || SUPPORT_EMAIL);
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>${escapeHtml(input.title)}</title>
+<style>
+:root { color-scheme: light dark; supported-color-schemes: light dark; }
+body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
+a { color:${C.link}; }
+@media (max-width: 620px) { .em-pad { padding-left:20px !important; padding-right:20px !important; } }
+@media (prefers-color-scheme: dark) {
+  .em-canvas { background:#09090b !important; }
+  .em-card { background:#18181b !important; border-color:#27272a !important; }
+  .em-text { color:#fafafa !important; }
+  .em-muted { color:#a1a1aa !important; }
+  .em-line { border-color:#3f3f46 !important; }
+  .em-panel { background:#27272a !important; border-color:#3f3f46 !important; color:#fafafa !important; }
+  .em-btn { background:#fafafa !important; }
+  .em-btn-a { color:#18181b !important; }
+  .em-link { color:#fafafa !important; }
+}
+[data-ogsc] .em-text { color:#fafafa !important; }
+[data-ogsc] .em-muted { color:#a1a1aa !important; }
+[data-ogsb] .em-canvas { background:#09090b !important; }
+[data-ogsb] .em-card { background:#18181b !important; }
+</style>
+</head>
+<body class="em-canvas" style="margin:0;padding:0;background:${C.canvas};">
+${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(input.preheader)}</div>` : ""}
+<table role="presentation" class="em-canvas" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="${C.canvas}" style="background:${C.canvas};">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:600px;">
+<tr><td class="em-pad" style="padding:8px 32px 20px;font-family:${FONT};font-size:18px;line-height:24px;font-weight:700;letter-spacing:-0.01em;"><span class="em-text" style="color:${C.text};">${store}</span></td></tr>
+<tr><td class="em-card" bgcolor="${C.card}" style="background:${C.card};border:1px solid ${C.line};border-radius:12px;">
+<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr><td class="em-pad" style="padding:32px 32px 16px;">
+<h1 class="em-text" style="margin:0 0 16px;font-family:${FONT};font-size:24px;line-height:32px;font-weight:700;letter-spacing:-0.02em;color:${C.text};">${escapeHtml(input.title)}</h1>
+${input.body}
+</td></tr>
+</table>
+</td></tr>
+<tr><td class="em-pad" style="padding:20px 32px 8px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.subtle};">
+<span class="em-muted" style="color:${C.subtle};">${input.footerNote ? `${input.footerNote}<br>` : ""}Questions? Email <a class="em-link" href="mailto:${support}" style="color:${C.muted};text-decoration:underline;">${support}</a>.<br>${store}</span>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+// features/keystone/lib/mail.ts
 function getBaseUrlForEmails() {
   if (process.env.SMTP_STORE_LINK) {
     return process.env.SMTP_STORE_LINK;
   }
   throw new Error("Email link origin is not configured.");
 }
-function passwordResetEmail({ url }) {
-  const backgroundColor = "#f9f9f9";
-  const textColor = "#444444";
-  const mainBackgroundColor = "#ffffff";
-  const buttonBackgroundColor = "#346df1";
-  const buttonBorderColor = "#346df1";
-  const buttonTextColor = "#ffffff";
-  return `
-    <body style="background: ${backgroundColor};">
-      <table width="100%" border="0" cellspacing="20" cellpadding="0" style="background: ${mainBackgroundColor}; max-width: 600px; margin: auto; border-radius: 10px;">
-        <tr>
-          <td align="center" style="padding: 10px 0px 0px 0px; font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${textColor};">
-            Please click below to reset your password
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding: 20px 0;">
-            <table border="0" cellspacing="0" cellpadding="0">
-              <tr>
-                <td align="center" style="border-radius: 5px;" bgcolor="${buttonBackgroundColor}"><a href="${url}" target="_blank" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${buttonTextColor}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${buttonBorderColor}; display: inline-block; font-weight: bold;">Reset Password</a></td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding: 0px 0px 10px 0px; font-size: 16px; line-height: 22px; font-family: Helvetica, Arial, sans-serif; color: ${textColor};">
-            If you did not request this email you can safely ignore it.
-          </td>
-        </tr>
-      </table>
-    </body>
-  `;
+function passwordResetEmail({ url, heading, action, footnote }) {
+  return emailLayout({
+    preheader: heading,
+    title: action,
+    body: `${emailParagraph(escapeHtml(heading))}
+${emailButton(action, url)}
+${emailMuted(escapeHtml(footnote))}`
+  });
 }
 async function passwordResetPurpose(prisma, userId) {
   const user = await prisma.user.findUnique({
@@ -446,8 +918,39 @@ async function passwordResetPurpose(prisma, userId) {
   });
   return !user || user.bootstrapKey || user.firmMemberships?.length ? "staff" : "customer";
 }
+async function passwordEmailWording(prisma, userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { firmMemberships: { select: { status: true, firm: { select: { name: true, displayName: true } } } } }
+  });
+  const memberships = user?.firmMemberships ?? [];
+  const kind = memberships.length > 0 && memberships.every((m) => m.status === "invited") ? "invite" : "reset";
+  const named = (f) => f?.name?.trim() || f?.displayName?.trim() || null;
+  let firmName = memberships.map((m) => named(m.firm)).find(Boolean) ?? null;
+  if (!firmName) {
+    const firms = await prisma.firm.findMany({ where: { status: { equals: "active" } }, take: 2, select: { name: true, displayName: true } });
+    firmName = firms.length === 1 ? named(firms[0]) : null;
+  }
+  return { kind, firmName };
+}
+function passwordEmailCopy(kind, firmName) {
+  if (kind === "invite") {
+    return {
+      subject: firmName ? `Set up your ${firmName} sign-in` : "Set up your sign-in",
+      heading: firmName ? `You have been invited to the ${firmName} workspace. Choose a password to finish setting up your sign-in.` : "Choose a password to finish setting up your sign-in.",
+      action: "Set up sign-in",
+      footnote: "If you were not expecting this invitation you can ignore this email."
+    };
+  }
+  return {
+    subject: firmName ? `Reset your ${firmName} password` : "Reset your password",
+    heading: "Use the button below to choose a new password.",
+    action: "Reset password",
+    footnote: "If you did not ask to reset your password you can ignore this email."
+  };
+}
 var resetPaths = { staff: "/dashboard/reset", customer: "/account/reset" };
-async function sendPasswordResetEmail(resetToken, to, baseUrl, purpose = "staff") {
+async function sendPasswordResetEmail(resetToken, to, baseUrl, purpose = "staff", wording = { kind: "reset", firmName: null }) {
   const host = process.env.SMTP_HOST?.trim();
   const from = process.env.SMTP_FROM?.trim();
   const port = Number(process.env.SMTP_PORT);
@@ -462,13 +965,12 @@ async function sendPasswordResetEmail(resetToken, to, baseUrl, purpose = "staff"
   const resetUrl = new URL(resetPaths[purpose], origin.origin);
   resetUrl.searchParams.set("token", resetToken);
   const transport = (0, import_nodemailer.createTransport)({ host, port, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } });
+  const copy = passwordEmailCopy(wording.kind, wording.firmName);
   await transport.sendMail({
     to,
     from,
-    subject: "Your password reset token!",
-    html: passwordResetEmail({
-      url: resetUrl.href
-    })
+    subject: copy.subject,
+    html: passwordResetEmail({ url: resetUrl.href, heading: copy.heading, action: copy.action, footnote: copy.footnote })
   });
 }
 
@@ -505,6 +1007,7 @@ function accessibleMatterStorageWhere(firmId, userId) {
 }
 
 // features/keystone/lib/lifecycles.ts
+var import_graphql = require("graphql");
 var lifecycles = {
   firm: {
     onboarding: ["active", "closed"],
@@ -618,13 +1121,6 @@ var lifecycles = {
     received: [],
     cancelled: []
   },
-  communicationDelivery: {
-    pending: ["sent", "failed"],
-    sent: ["delivered", "failed", "bounced"],
-    delivered: [],
-    failed: ["pending"],
-    bounced: []
-  },
   document: {
     draft: ["active", "archived"],
     active: ["archived"],
@@ -708,6 +1204,17 @@ var lifecycles = {
     failed: [],
     cancelled: []
   },
+  // What the payment PROVIDER can do to a payment row. The provider is the source of truth for
+  // money: a confirmed charge is captured even if our side already gave up on it (a checkout
+  // window that ended, a failed attempt) so it is recorded and, for a released consultation, refunded.
+  providerPayment: {
+    pending: ["captured", "failed", "cancelled"],
+    authorized: ["captured", "failed", "cancelled"],
+    failed: ["captured"],
+    cancelled: ["captured"],
+    captured: ["settled"],
+    settled: []
+  },
   refund: {
     requested: ["approved", "cancelled"],
     approved: ["processing", "cancelled"],
@@ -740,11 +1247,11 @@ var lifecycles = {
     revoked: []
   },
   webhookDelivery: {
-    pending: ["processing", "failed"],
-    processing: ["succeeded", "failed"],
-    failed: ["pending", "dead_letter"],
+    pending: ["processing", "failed", "dead_letter"],
+    processing: ["succeeded", "failed", "dead_letter"],
+    failed: ["pending", "processing", "dead_letter"],
     succeeded: [],
-    dead_letter: []
+    dead_letter: ["processing"]
   },
   retentionPolicy: {
     draft: ["active", "retired"],
@@ -807,10 +1314,14 @@ function assertCommandTarget(command, target, allowedTargets) {
   }
   return target;
 }
+var LIFECYCLE_REFUSED = "LIFECYCLE_REFUSED";
+function lifecycleRefusal(message) {
+  return new import_graphql.GraphQLError(message, { extensions: { code: LIFECYCLE_REFUSED } });
+}
 function assertLifecycleTransition(lifecycle, from, to) {
   if (!(lifecycle in lifecycles)) throw new Error(`Unknown lifecycle: ${lifecycle}`);
   if (!canTransition(lifecycle, from, to)) {
-    throw new Error(`${lifecycleLabel(lifecycle)} cannot transition from ${from} to ${to}.`);
+    throw lifecycleRefusal(`${lifecycleLabel(lifecycle)} cannot transition from ${from} to ${to}.`);
   }
   return to;
 }
@@ -1012,10 +1523,10 @@ async function validateConnectedRelationships(args) {
       continue;
     }
     const targetHasMatter = modelHasField(relation.type, "matterId");
-    const select20 = targetHasMatter ? { id: true, matterId: true } : { id: true };
+    const select21 = targetHasMatter ? { id: true, matterId: true } : { id: true };
     const targets = await targetDelegate.findMany({
       where: { id: { in: ids }, firmId },
-      select: select20
+      select: select21
     });
     if (targets.length !== ids.length) {
       addValidationError(`Every ${relation.name} relationship must belong to the active firm.`);
@@ -1287,14 +1798,18 @@ var DashboardAdmission = import_core.graphql.object()({
   name: "UserDashboardAdmission",
   fields: {
     canAccessDashboard: import_core.graphql.field({ type: import_core.graphql.nonNull(import_core.graphql.Boolean) }),
-    canManageOnboarding: import_core.graphql.field({ type: import_core.graphql.nonNull(import_core.graphql.Boolean) })
+    canManageOnboarding: import_core.graphql.field({ type: import_core.graphql.nonNull(import_core.graphql.Boolean) }),
+    // The viewer's own current permission keys, so navigation can match the role.
+    // Display only: every list, query and command still enforces its own access.
+    permissions: import_core.graphql.field({ type: import_core.graphql.nonNull(import_core.graphql.list(import_core.graphql.nonNull(import_core.graphql.String))) })
   }
 });
 function viewerDashboardAdmission(session, userId) {
   if (!isHumanIdentitySession(session) || session.itemId !== userId) return null;
   return {
     canAccessDashboard: permissions.canAccessDashboard({ session }),
-    canManageOnboarding: permissions.canManageOnboarding({ session })
+    canManageOnboarding: permissions.canManageOnboarding({ session }),
+    permissions: permissionKeys.filter((key) => permissions[key]({ session }))
   };
 }
 var User = (0, import_core.list)({
@@ -1434,7 +1949,7 @@ var User = (0, import_core.list)({
         resolve: (item, _args, context) => viewerDashboardAdmission(context.session, String(item.id))
       }),
       ui: {
-        query: "{ canAccessDashboard canManageOnboarding }",
+        query: "{ canAccessDashboard canManageOnboarding permissions }",
         createView: { fieldMode: "hidden" },
         itemView: { fieldMode: "hidden" },
         listView: { fieldMode: "hidden" }
@@ -1541,7 +2056,7 @@ var Role = (0, import_core2.list)({
 var import_core3 = require("@keystone-6/core");
 var import_fields7 = require("@keystone-6/core/fields");
 
-// features/platform/store-settings/lib/untitled-logo-registry.ts
+// features/platform/store-settings/lib/icon-registry.ts
 var LOGO_ICONS = [
   {
     id: "3portals",
@@ -1797,7 +2312,7 @@ var LOGO_ICONS = [
   }
 ];
 
-// features/shared/sanitize-store-logo.ts
+// features/keystone/utils/storeLogo.ts
 var ALLOWED_ELEMENTS = /* @__PURE__ */ new Set([
   "svg",
   "g",
@@ -1859,8 +2374,12 @@ var ATTRIBUTE_PATTERN = /\s+([A-Za-z_:][\w:.-]*)\s*=\s*("[^"]*"|'[^']*')/g;
 var TAG_PATTERN = /<\/?\s*([A-Za-z][\w:-]*)([^<>]*)>/g;
 function sanitizeStoreLogoSvg(svg) {
   const source = svg.trim();
-  if (!source.startsWith("<svg") || !source.endsWith("</svg>") || source.length > 1e5) return "";
-  if (/<!|<\?|\b(?:javascript|data|vbscript):|\bon[a-z]+\s*=|\b(?:href|src|style)\s*=/i.test(source)) return "";
+  if (!source.startsWith("<svg") || !source.endsWith("</svg>") || source.length > 1e5) {
+    return "";
+  }
+  if (/<!|<\?|\b(?:javascript|data|vbscript):|\bon[a-z]+\s*=|\b(?:href|src|style)\s*=/i.test(source)) {
+    return "";
+  }
   let tagCount = 0;
   let match;
   TAG_PATTERN.lastIndex = 0;
@@ -1890,7 +2409,7 @@ function sanitizeStoreLogoSvg(svg) {
 }
 
 // features/shared/store-logo.ts
-var DEFAULT_STORE_LOGO_ICON = LOGO_ICONS[0].lightSvg;
+var DEFAULT_STORE_LOGO_ICON = LOGO_ICONS.find((icon) => icon.id === "hexsmith").lightSvg;
 function normalizeStoreLogoColor(value) {
   const numeric = Number(String(value ?? "0"));
   if (!Number.isFinite(numeric)) return "0";
@@ -1995,6 +2514,11 @@ var Office = (0, import_core3.list)({
     timezone: (0, import_fields7.text)({ defaultValue: "UTC", validation: { isRequired: true } }),
     email: (0, import_fields7.text)({ access: { read: permissions.canReadPeople } }),
     phone: (0, import_fields7.text)({ access: { read: permissions.canReadPeople } }),
+    address: (0, import_fields7.text)({
+      db: { isNullable: true },
+      ui: { displayMode: "textarea", description: "Street address, one line per row, e.g. 48 Cedar Street / Portland, ME 04101. Shown on the public site." },
+      validation: { length: { max: 500 } }
+    }),
     primaryMemberships: readOnlyRelationship("FirmMembership.primaryOffice", true),
     allowedMemberships: readOnlyRelationship("FirmMembership.allowedOffices", true),
     ...trackingFields
@@ -2679,8 +3203,8 @@ var ConflictCheck = (0, import_core7.list)({
     startedAt: (0, import_fields15.timestamp)(),
     completedAt: (0, import_fields15.timestamp)(),
     reviewedAt: (0, import_fields15.timestamp)(),
-    summary: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, ui: { displayMode: "textarea" } }),
-    failureReason: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, ui: { displayMode: "textarea" } }),
+    summary: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, ui: { itemView: { fieldMode: "hidden" } } }),
+    failureReason: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, ui: { itemView: { fieldMode: "hidden" } } }),
     terms: readOnlyRelationship("ConflictSearchTerm.check", true),
     matches: readOnlyRelationship("ConflictMatch.check", true),
     dispositions: readOnlyRelationship("ConflictDisposition.check", true),
@@ -2751,7 +3275,7 @@ var ConflictMatch = (0, import_core7.list)({
     matchedMatterParty: (0, import_fields15.relationship)({ ref: "MatterParty.conflictMatches" }),
     score: (0, import_fields15.integer)({ validation: { min: 0, max: 100 } }),
     matchedValue: (0, import_fields15.text)({ access: { read: denyAll }, graphql: { omit: { read: true } } }),
-    evidenceExcerpt: (0, import_fields15.text)({ access: { read: denyAll }, graphql: { omit: { read: true } }, ui: { displayMode: "textarea" } }),
+    evidenceExcerpt: (0, import_fields15.text)({ access: { read: denyAll }, graphql: { omit: { read: true } }, ui: { itemView: { fieldMode: "hidden" } } }),
     sourceType: (0, import_fields15.text)({ access: { read: denyAll }, graphql: { omit: { read: true } } }),
     sourceId: (0, import_fields15.text)({ access: { read: denyAll }, graphql: { omit: { read: true } } }),
     reviewedBy: (0, import_fields15.relationship)({ ref: "User" }),
@@ -2798,9 +3322,9 @@ var ConflictDisposition = (0, import_core7.list)({
       validation: { isRequired: true }
     }),
     reviewer: requiredRelationship("User"),
-    rationale: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, validation: { isRequired: true }, ui: { displayMode: "textarea" } }),
-    conditions: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, ui: { displayMode: "textarea" } }),
-    policyReference: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } } }),
+    rationale: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, validation: { isRequired: true }, ui: { itemView: { fieldMode: "hidden" } } }),
+    conditions: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, ui: { itemView: { fieldMode: "hidden" } } }),
+    policyReference: (0, import_fields15.text)({ access: withheldConflictNarrative, graphql: { omit: { read: true } }, ui: { itemView: { fieldMode: "hidden" } } }),
     decidedAt: (0, import_fields15.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
     ...trackingFields
   }
@@ -2913,7 +3437,7 @@ var PracticeArea = (0, import_core8.list)({
       }
     }
   },
-  ui: { listView: { initialColumns: ["name", "code", "publicSlug", "isPublic", "status"] } },
+  ui: { listView: { initialColumns: ["name", "code", "publicSlug", "isPublic", "sortOrder", "status"] } },
   fields: {
     firm: firmRelationship(),
     name: (0, import_fields17.text)({ validation: { isRequired: true } }),
@@ -2936,6 +3460,8 @@ var PracticeArea = (0, import_core8.list)({
     }),
     consultationFeeMinor: (0, import_fields17.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0, max: 2147483647 } }),
     consultationMinutes: (0, import_fields17.integer)({ defaultValue: 30, validation: { isRequired: true, min: 15, max: 120 } }),
+    // Public listing order (lowest first); ties fall back to the web address.
+    sortOrder: (0, import_fields17.integer)({ defaultValue: 0, validation: { isRequired: true, min: -1e4, max: 1e4 } }),
     // Read-only inverse: `matters: { set: [] }` would unlink hidden matters without
     // Matter's own access or hooks; matters choose their practice area themselves.
     matters: readOnlyRelationship("Matter.practiceArea", true),
@@ -3763,55 +4289,6 @@ var CommunicationMessage = (0, import_core10.list)({
       many: true,
       access: { create: canManageCommunications, update: denyAll }
     }),
-    deliveries: readOnlyRelationship("CommunicationDelivery.message", true),
-    ...trackingFields
-  }
-});
-var CommunicationDelivery = (0, import_core10.list)({
-  access: {
-    ...communicationAccess,
-    operation: { ...communicationAccess.operation, update: denyAll },
-    filter: { ...communicationAccess.filter, update: () => false }
-  },
-  graphql: { omit: { create: true, update: true, delete: true } },
-  hooks: firmOwnedHooks({ lifecycle: "communicationDelivery", controlledStatus: true }),
-  ui: { listView: { initialColumns: ["message", "channel", "status", "recipientAddress", "attemptCount"] } },
-  fields: {
-    firm: firmRelationship(),
-    matter: (0, import_fields21.relationship)({ ref: "Matter" }),
-    message: requiredRelationship("CommunicationMessage.deliveries"),
-    integrationConnection: (0, import_fields21.relationship)({ ref: "IntegrationConnection" }),
-    channel: (0, import_fields21.select)({
-      type: "enum",
-      options: [
-        { label: "Email", value: "email" },
-        { label: "SMS", value: "sms" },
-        { label: "Portal", value: "portal" }
-      ],
-      validation: { isRequired: true }
-    }),
-    status: (0, import_fields21.select)({
-      type: "enum",
-      options: [
-        { label: "Pending", value: "pending" },
-        { label: "Sent", value: "sent" },
-        { label: "Delivered", value: "delivered" },
-        { label: "Failed", value: "failed" },
-        { label: "Bounced", value: "bounced" }
-      ],
-      defaultValue: "pending",
-      validation: { isRequired: true }
-    }),
-    recipientContact: (0, import_fields21.relationship)({ ref: "Contact" }),
-    recipientAddress: (0, import_fields21.text)({ access: messageFieldAccess }),
-    provider: (0, import_fields21.text)(),
-    providerMessageId: (0, import_fields21.text)({ isIndexed: true }),
-    attemptCount: (0, import_fields21.integer)({ defaultValue: 0, validation: { min: 0 } }),
-    lastAttemptAt: (0, import_fields21.timestamp)(),
-    deliveredAt: (0, import_fields21.timestamp)(),
-    errorCode: (0, import_fields21.text)(),
-    errorMessage: (0, import_fields21.text)({ access: messageFieldAccess, ui: { displayMode: "textarea" } }),
-    providerMetadata: (0, import_fields21.json)({ access: messageFieldAccess }),
     ...trackingFields
   }
 });
@@ -5093,6 +5570,7 @@ var Payment = (0, import_core14.list)({
     refundedMinor: (0, import_fields29.integer)({ defaultValue: 0, validation: { min: 0 } }),
     currencyCode: (0, import_fields29.text)({ defaultValue: "USD", validation: { isRequired: true, ...currencyValidation3 } }),
     providerCode: (0, import_fields29.text)(),
+    paymentProvider: (0, import_fields29.relationship)({ ref: "PaymentProvider" }),
     integrationConnection: (0, import_fields29.relationship)({ ref: "IntegrationConnection" }),
     providerPaymentId: (0, import_fields29.text)({ isIndexed: true }),
     authorizedAt: (0, import_fields29.timestamp)(),
@@ -5230,9 +5708,35 @@ var Refund = (0, import_core14.list)({
   }
 });
 
-// features/keystone/models/portal.ts
+// features/keystone/models/PaymentProvider.ts
 var import_core15 = require("@keystone-6/core");
 var import_fields31 = require("@keystone-6/core/fields");
+var PaymentProvider = (0, import_core15.list)({
+  access: { operation: { query: ({ session }) => permissions.canReadPayments({ session }) || permissions.canManagePayments({ session }), create: permissions.canManagePayments, update: permissions.canManagePayments, delete: permissions.canManagePayments } },
+  // One provider per code per firm (each firm has its own operating and trust accounts).
+  db: uniqueConstraints(["firmId", "code"]),
+  hooks: firmOwnedHooks(),
+  fields: {
+    firm: firmRelationship(),
+    name: (0, import_fields31.text)({ validation: { isRequired: true } }),
+    code: (0, import_fields31.text)({ isIndexed: true, validation: { isRequired: true, match: { regex: /^pp_[a-zA-Z0-9-_]+$/ } } }),
+    account: (0, import_fields31.select)({ type: "enum", options: [{ label: "Operating", value: "operating" }, { label: "Trust / IOLTA", value: "trust" }], validation: { isRequired: true } }),
+    isInstalled: (0, import_fields31.checkbox)({ defaultValue: false }),
+    credentials: (0, import_fields31.json)({ defaultValue: {} }),
+    metadata: (0, import_fields31.json)({ defaultValue: {} }),
+    createPaymentFunction: (0, import_fields31.text)({ validation: { isRequired: true } }),
+    capturePaymentFunction: (0, import_fields31.text)({ validation: { isRequired: true } }),
+    refundPaymentFunction: (0, import_fields31.text)({ validation: { isRequired: true } }),
+    getPaymentStatusFunction: (0, import_fields31.text)({ validation: { isRequired: true } }),
+    generatePaymentLinkFunction: (0, import_fields31.text)({ validation: { isRequired: true } }),
+    handleWebhookFunction: (0, import_fields31.text)({ validation: { isRequired: true } }),
+    ...trackingFields
+  }
+});
+
+// features/keystone/models/portal.ts
+var import_core16 = require("@keystone-6/core");
+var import_fields33 = require("@keystone-6/core/fields");
 
 // features/keystone/lib/agent-controls.ts
 var import_node_crypto4 = require("node:crypto");
@@ -6004,7 +6508,7 @@ var portalShareHooks = {
     }
   }
 };
-var PortalAccount = (0, import_core15.list)({
+var PortalAccount = (0, import_core16.list)({
   db: uniqueConstraints(["firmId", "email"]),
   access: portalAccountEvidenceAccess,
   graphql: systemEvidenceGraphql,
@@ -6013,9 +6517,9 @@ var PortalAccount = (0, import_core15.list)({
   fields: {
     firm: firmRelationship(),
     contact: requiredRelationship("Contact"),
-    user: (0, import_fields31.relationship)({ ref: "User" }),
-    email: (0, import_fields31.text)({ access: portalPiiAccess, validation: { isRequired: true }, isIndexed: true }),
-    status: (0, import_fields31.select)({
+    user: (0, import_fields33.relationship)({ ref: "User" }),
+    email: (0, import_fields33.text)({ access: portalPiiAccess, validation: { isRequired: true }, isIndexed: true }),
+    status: (0, import_fields33.select)({
       type: "enum",
       options: [
         { label: "Invited", value: "invited" },
@@ -6026,7 +6530,7 @@ var PortalAccount = (0, import_core15.list)({
       defaultValue: "invited",
       validation: { isRequired: true }
     }),
-    inviteTokenDigest: (0, import_fields31.text)({
+    inviteTokenDigest: (0, import_fields33.text)({
       isIndexed: "unique",
       defaultValue: null,
       db: { isNullable: true },
@@ -6038,22 +6542,22 @@ var PortalAccount = (0, import_core15.list)({
         listView: { fieldMode: "hidden" }
       }
     }),
-    inviteTokenPrefix: (0, import_fields31.text)({ isIndexed: true }),
+    inviteTokenPrefix: (0, import_fields33.text)({ isIndexed: true }),
     resetTokenDigest: secretText("Reset token digest"),
-    inviteExpiresAt: (0, import_fields31.timestamp)(),
-    resetExpiresAt: (0, import_fields31.timestamp)(),
-    invitedAt: (0, import_fields31.timestamp)(),
-    acceptedAt: (0, import_fields31.timestamp)(),
-    lastLoginAt: (0, import_fields31.timestamp)(),
-    suspendedAt: (0, import_fields31.timestamp)(),
-    closedAt: (0, import_fields31.timestamp)(),
-    matterAccesses: (0, import_fields31.relationship)({ ref: "PortalMatterAccess.portalAccount", many: true }),
-    shares: (0, import_fields31.relationship)({ ref: "PortalShare.portalAccount", many: true }),
+    inviteExpiresAt: (0, import_fields33.timestamp)(),
+    resetExpiresAt: (0, import_fields33.timestamp)(),
+    invitedAt: (0, import_fields33.timestamp)(),
+    acceptedAt: (0, import_fields33.timestamp)(),
+    lastLoginAt: (0, import_fields33.timestamp)(),
+    suspendedAt: (0, import_fields33.timestamp)(),
+    closedAt: (0, import_fields33.timestamp)(),
+    matterAccesses: (0, import_fields33.relationship)({ ref: "PortalMatterAccess.portalAccount", many: true }),
+    shares: (0, import_fields33.relationship)({ ref: "PortalShare.portalAccount", many: true }),
     sessions: readOnlyRelationship("PortalSession.portalAccount", true),
     ...trackingFields
   }
 });
-var PortalMatterAccess = (0, import_core15.list)({
+var PortalMatterAccess = (0, import_core16.list)({
   access: portalMatterEvidenceAccess,
   graphql: systemEvidenceGraphql,
   hooks: firmOwnedHooks({ lifecycle: "portalMatterAccess", controlledStatus: true }),
@@ -6063,10 +6567,10 @@ var PortalMatterAccess = (0, import_core15.list)({
     matter: requiredRelationship("Matter"),
     portalAccount: requiredRelationship("PortalAccount.matterAccesses"),
     // Zero marks pre-policy legacy evidence; never automatically infer approval.
-    policyRevision: (0, import_fields31.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
-    version: (0, import_fields31.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
-    contact: (0, import_fields31.relationship)({ ref: "Contact" }),
-    status: (0, import_fields31.select)({
+    policyRevision: (0, import_fields33.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
+    version: (0, import_fields33.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
+    contact: (0, import_fields33.relationship)({ ref: "Contact" }),
+    status: (0, import_fields33.select)({
       type: "enum",
       options: [
         { label: "Active", value: "active" },
@@ -6076,21 +6580,21 @@ var PortalMatterAccess = (0, import_core15.list)({
       defaultValue: "active",
       validation: { isRequired: true }
     }),
-    canReadDocuments: (0, import_fields31.checkbox)({ defaultValue: false }),
-    canUploadDocuments: (0, import_fields31.checkbox)({ defaultValue: false }),
-    canReadInvoices: (0, import_fields31.checkbox)({ defaultValue: false }),
-    canReadMessages: (0, import_fields31.checkbox)({ defaultValue: false }),
+    canReadDocuments: (0, import_fields33.checkbox)({ defaultValue: false }),
+    canUploadDocuments: (0, import_fields33.checkbox)({ defaultValue: false }),
+    canReadInvoices: (0, import_fields33.checkbox)({ defaultValue: false }),
+    canReadMessages: (0, import_fields33.checkbox)({ defaultValue: false }),
     grantedBy: requiredRelationship("User"),
-    grantedAt: (0, import_fields31.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
-    expiresAt: (0, import_fields31.timestamp)(),
-    revokedBy: (0, import_fields31.relationship)({ ref: "User" }),
-    revokedAt: (0, import_fields31.timestamp)(),
-    revocationReason: (0, import_fields31.text)({ access: portalPiiAccess }),
-    shares: (0, import_fields31.relationship)({ ref: "PortalShare.matterAccess", many: true }),
+    grantedAt: (0, import_fields33.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    expiresAt: (0, import_fields33.timestamp)(),
+    revokedBy: (0, import_fields33.relationship)({ ref: "User" }),
+    revokedAt: (0, import_fields33.timestamp)(),
+    revocationReason: (0, import_fields33.text)({ access: portalPiiAccess }),
+    shares: (0, import_fields33.relationship)({ ref: "PortalShare.matterAccess", many: true }),
     ...trackingFields
   }
 });
-var PortalShare = (0, import_core15.list)({
+var PortalShare = (0, import_core16.list)({
   access: portalMatterEvidenceAccess,
   graphql: systemEvidenceGraphql,
   hooks: portalShareHooks,
@@ -6102,10 +6606,10 @@ var PortalShare = (0, import_core15.list)({
     matterAccess: requiredRelationship("PortalMatterAccess.shares"),
     // Immutable disclosure anchors for new shares. Zero/null retain legacy
     // evidence; never backfill a policy approval or contact identity.
-    grantVersion: (0, import_fields31.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
-    policyRevision: (0, import_fields31.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
-    contact: (0, import_fields31.relationship)({ ref: "Contact" }),
-    status: (0, import_fields31.select)({
+    grantVersion: (0, import_fields33.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
+    policyRevision: (0, import_fields33.integer)({ defaultValue: 0, validation: { isRequired: true, min: 0 } }),
+    contact: (0, import_fields33.relationship)({ ref: "Contact" }),
+    status: (0, import_fields33.select)({
       type: "enum",
       options: [
         { label: "Active", value: "active" },
@@ -6115,7 +6619,7 @@ var PortalShare = (0, import_core15.list)({
       defaultValue: "active",
       validation: { isRequired: true }
     }),
-    resourceType: (0, import_fields31.select)({
+    resourceType: (0, import_fields33.select)({
       type: "enum",
       options: [
         { label: "Document", value: "document" },
@@ -6125,19 +6629,19 @@ var PortalShare = (0, import_core15.list)({
       ],
       validation: { isRequired: true }
     }),
-    document: (0, import_fields31.relationship)({ ref: "Document" }),
-    documentVersion: (0, import_fields31.relationship)({ ref: "DocumentVersion" }),
-    invoice: (0, import_fields31.relationship)({ ref: "Invoice" }),
-    communicationThread: (0, import_fields31.relationship)({ ref: "CommunicationThread" }),
+    document: (0, import_fields33.relationship)({ ref: "Document" }),
+    documentVersion: (0, import_fields33.relationship)({ ref: "DocumentVersion" }),
+    invoice: (0, import_fields33.relationship)({ ref: "Invoice" }),
+    communicationThread: (0, import_fields33.relationship)({ ref: "CommunicationThread" }),
     grantedBy: requiredRelationship("User"),
-    grantedAt: (0, import_fields31.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
-    expiresAt: (0, import_fields31.timestamp)(),
-    revokedBy: (0, import_fields31.relationship)({ ref: "User" }),
-    revokedAt: (0, import_fields31.timestamp)(),
+    grantedAt: (0, import_fields33.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    expiresAt: (0, import_fields33.timestamp)(),
+    revokedBy: (0, import_fields33.relationship)({ ref: "User" }),
+    revokedAt: (0, import_fields33.timestamp)(),
     ...trackingFields
   }
 });
-var PortalSession = (0, import_core15.list)({
+var PortalSession = (0, import_core16.list)({
   access: portalAccountEvidenceAccess,
   graphql: systemEvidenceGraphql,
   hooks: firmOwnedHooks(),
@@ -6150,7 +6654,7 @@ var PortalSession = (0, import_core15.list)({
   fields: {
     firm: firmRelationship(),
     portalAccount: requiredRelationship("PortalAccount.sessions"),
-    tokenDigest: (0, import_fields31.text)({
+    tokenDigest: (0, import_fields33.text)({
       isIndexed: "unique",
       validation: { isRequired: true },
       graphql: { omit: { read: true } },
@@ -6161,8 +6665,8 @@ var PortalSession = (0, import_core15.list)({
         listView: { fieldMode: "hidden" }
       }
     }),
-    tokenPrefix: (0, import_fields31.text)({ isIndexed: true, validation: { isRequired: true } }),
-    status: (0, import_fields31.select)({
+    tokenPrefix: (0, import_fields33.text)({ isIndexed: true, validation: { isRequired: true } }),
+    status: (0, import_fields33.select)({
       type: "enum",
       options: [
         { label: "Active", value: "active" },
@@ -6172,17 +6676,17 @@ var PortalSession = (0, import_core15.list)({
       defaultValue: "active",
       validation: { isRequired: true }
     }),
-    expiresAt: (0, import_fields31.timestamp)({ validation: { isRequired: true } }),
-    lastUsedAt: (0, import_fields31.timestamp)(),
-    revokedAt: (0, import_fields31.timestamp)(),
+    expiresAt: (0, import_fields33.timestamp)({ validation: { isRequired: true } }),
+    lastUsedAt: (0, import_fields33.timestamp)(),
+    revokedAt: (0, import_fields33.timestamp)(),
     ...trackingFields
   }
 });
 
 // features/keystone/models/portalPolicy.ts
-var import_core16 = require("@keystone-6/core");
-var import_fields33 = require("@keystone-6/core/fields");
-var PortalDiscoveryPolicy = (0, import_core16.list)({
+var import_core17 = require("@keystone-6/core");
+var import_fields35 = require("@keystone-6/core/fields");
+var PortalDiscoveryPolicy = (0, import_core17.list)({
   db: uniqueConstraints(["firmId", "revision"]),
   graphql: systemEvidenceGraphql,
   access: {
@@ -6192,17 +6696,17 @@ var PortalDiscoveryPolicy = (0, import_core16.list)({
   hooks: firmOwnedHooks(),
   fields: {
     firm: firmRelationship(),
-    revision: (0, import_fields33.integer)({ validation: { isRequired: true, min: 1 } }),
-    mode: (0, import_fields33.text)({ validation: { isRequired: true } }),
-    statuses: (0, import_fields33.json)(),
-    admission: (0, import_fields33.text)({ validation: { isRequired: true } }),
-    reasonDigest: (0, import_fields33.text)({ validation: { isRequired: true } }),
+    revision: (0, import_fields35.integer)({ validation: { isRequired: true, min: 1 } }),
+    mode: (0, import_fields35.text)({ validation: { isRequired: true } }),
+    statuses: (0, import_fields35.json)(),
+    admission: (0, import_fields35.text)({ validation: { isRequired: true } }),
+    reasonDigest: (0, import_fields35.text)({ validation: { isRequired: true } }),
     recordedBy: requiredRelationship("User"),
-    recordedAt: (0, import_fields33.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    recordedAt: (0, import_fields35.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
     ...trackingFields
   }
 });
-var PortalGrantIntent = (0, import_core16.list)({
+var PortalGrantIntent = (0, import_core17.list)({
   db: uniqueConstraints(["firmId", "actorId", "idempotencyKey"]),
   graphql: systemEvidenceGraphql,
   access: {
@@ -6220,19 +6724,19 @@ var PortalGrantIntent = (0, import_core16.list)({
     portalAccount: requiredRelationship("PortalAccount"),
     contact: requiredRelationship("Contact"),
     grant: requiredRelationship("PortalMatterAccess"),
-    idempotencyKey: (0, import_fields33.text)({ validation: { isRequired: true }, isFilterable: false, isOrderable: false }),
-    intentDigest: (0, import_fields33.text)({ validation: { isRequired: true } }),
-    operation: (0, import_fields33.text)({ validation: { isRequired: true } }),
-    policyRevision: (0, import_fields33.integer)({ validation: { isRequired: true } }),
-    resultVersion: (0, import_fields33.integer)({ validation: { isRequired: true } }),
-    completedAt: (0, import_fields33.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    idempotencyKey: (0, import_fields35.text)({ validation: { isRequired: true }, isFilterable: false, isOrderable: false }),
+    intentDigest: (0, import_fields35.text)({ validation: { isRequired: true } }),
+    operation: (0, import_fields35.text)({ validation: { isRequired: true } }),
+    policyRevision: (0, import_fields35.integer)({ validation: { isRequired: true } }),
+    resultVersion: (0, import_fields35.integer)({ validation: { isRequired: true } }),
+    completedAt: (0, import_fields35.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/integrations.ts
-var import_core17 = require("@keystone-6/core");
-var import_fields35 = require("@keystone-6/core/fields");
+var import_core18 = require("@keystone-6/core");
+var import_fields37 = require("@keystone-6/core/fields");
 var canReadIntegrations = ({ session }) => permissions.canReadIntegrations({ session }) || permissions.canManageIntegrations({ session });
 var canManageIntegrations = ({ session }) => permissions.canManageIntegrations({ session });
 var integrationAccess = scopedAccess("canReadIntegrations", "canManageIntegrations");
@@ -6259,17 +6763,17 @@ var controlledDeliveryEvidenceAccess = {
   create: denyAll,
   update: denyAll
 };
-var IntegrationConnection = (0, import_core17.list)({
+var IntegrationConnection = (0, import_core18.list)({
   access: integrationAccess,
   hooks: firmOwnedHooks({ lifecycle: "integrationConnection", controlledStatus: true }),
   ui: { listView: { initialColumns: ["name", "provider", "category", "status", "office", "lastSyncedAt"] } },
   fields: {
     firm: firmRelationship(),
-    office: (0, import_fields35.relationship)({ ref: "Office" }),
-    owner: (0, import_fields35.relationship)({ ref: "User" }),
-    name: (0, import_fields35.text)({ validation: { isRequired: true } }),
-    provider: (0, import_fields35.text)({ validation: { isRequired: true } }),
-    category: (0, import_fields35.select)({
+    office: (0, import_fields37.relationship)({ ref: "Office" }),
+    owner: (0, import_fields37.relationship)({ ref: "User" }),
+    name: (0, import_fields37.text)({ validation: { isRequired: true } }),
+    provider: (0, import_fields37.text)({ validation: { isRequired: true } }),
+    category: (0, import_fields37.select)({
       type: "enum",
       options: [
         { label: "Email", value: "email" },
@@ -6283,7 +6787,7 @@ var IntegrationConnection = (0, import_core17.list)({
       ],
       validation: { isRequired: true }
     }),
-    status: (0, import_fields35.select)({
+    status: (0, import_fields37.select)({
       type: "enum",
       options: [
         { label: "Pending", value: "pending" },
@@ -6299,21 +6803,21 @@ var IntegrationConnection = (0, import_core17.list)({
     oauthAccessToken: secretText("OAuth access token envelope"),
     oauthRefreshToken: secretText("OAuth refresh token envelope"),
     webhookSecretDigest: secretText("Webhook secret digest"),
-    configuration: (0, import_fields35.json)({
+    configuration: (0, import_fields37.json)({
       access: integrationFieldAccess,
       ui: { description: "Non-secret provider configuration only. Secret material belongs in omitted credential fields." }
     }),
-    externalAccountId: (0, import_fields35.text)({ access: integrationFieldAccess }),
-    lastSyncedAt: (0, import_fields35.timestamp)(),
-    lastErrorAt: (0, import_fields35.timestamp)(),
-    lastError: (0, import_fields35.text)({ access: integrationFieldAccess, ui: { displayMode: "textarea" } }),
+    externalAccountId: (0, import_fields37.text)({ access: integrationFieldAccess }),
+    lastSyncedAt: (0, import_fields37.timestamp)(),
+    lastErrorAt: (0, import_fields37.timestamp)(),
+    lastError: (0, import_fields37.text)({ access: integrationFieldAccess, ui: { displayMode: "textarea" } }),
     externalLinks: readOnlyRelationship("ExternalRecordLink.connection", true),
     webhookSubscriptions: readOnlyRelationship("WebhookSubscription.connection", true),
     webhookDeliveries: readOnlyRelationship("WebhookDelivery.connection", true),
     ...trackingFields
   }
 });
-var ExternalRecordLink = (0, import_core17.list)({
+var ExternalRecordLink = (0, import_core18.list)({
   db: uniqueConstraints(["connectionId", "resourceType", "externalId"]),
   access: integrationMatterAccess,
   hooks: firmOwnedHooks(),
@@ -6321,7 +6825,7 @@ var ExternalRecordLink = (0, import_core17.list)({
   fields: {
     firm: firmRelationship(),
     connection: requiredRelationship("IntegrationConnection.externalLinks"),
-    resourceType: (0, import_fields35.select)({
+    resourceType: (0, import_fields37.select)({
       type: "enum",
       options: [
         { label: "Contact", value: "contact" },
@@ -6335,9 +6839,9 @@ var ExternalRecordLink = (0, import_core17.list)({
       ],
       validation: { isRequired: true }
     }),
-    externalId: (0, import_fields35.text)({ validation: { isRequired: true }, isIndexed: true }),
-    externalUrl: (0, import_fields35.text)(),
-    status: (0, import_fields35.select)({
+    externalId: (0, import_fields37.text)({ validation: { isRequired: true }, isIndexed: true }),
+    externalUrl: (0, import_fields37.text)(),
+    status: (0, import_fields37.select)({
       type: "enum",
       options: [
         { label: "Linked", value: "linked" },
@@ -6346,33 +6850,33 @@ var ExternalRecordLink = (0, import_core17.list)({
       ],
       defaultValue: "linked"
     }),
-    contact: (0, import_fields35.relationship)({ ref: "Contact" }),
-    intake: (0, import_fields35.relationship)({ ref: "Intake" }),
-    matter: (0, import_fields35.relationship)({ ref: "Matter" }),
-    document: (0, import_fields35.relationship)({ ref: "Document" }),
-    invoice: (0, import_fields35.relationship)({ ref: "Invoice" }),
-    payment: (0, import_fields35.relationship)({ ref: "Payment" }),
-    docket: (0, import_fields35.relationship)({ ref: "Docket" }),
-    fingerprint: (0, import_fields35.text)({ access: integrationFieldAccess }),
-    providerMetadata: (0, import_fields35.json)({
+    contact: (0, import_fields37.relationship)({ ref: "Contact" }),
+    intake: (0, import_fields37.relationship)({ ref: "Intake" }),
+    matter: (0, import_fields37.relationship)({ ref: "Matter" }),
+    document: (0, import_fields37.relationship)({ ref: "Document" }),
+    invoice: (0, import_fields37.relationship)({ ref: "Invoice" }),
+    payment: (0, import_fields37.relationship)({ ref: "Payment" }),
+    docket: (0, import_fields37.relationship)({ ref: "Docket" }),
+    fingerprint: (0, import_fields37.text)({ access: integrationFieldAccess }),
+    providerMetadata: (0, import_fields37.json)({
       access: integrationFieldAccess,
       ui: { description: "Bounded sync provenance; never credentials or unrestricted provider records." }
     }),
-    lastSyncedAt: (0, import_fields35.timestamp)(),
-    lastError: (0, import_fields35.text)({ access: integrationFieldAccess }),
+    lastSyncedAt: (0, import_fields37.timestamp)(),
+    lastError: (0, import_fields37.text)({ access: integrationFieldAccess }),
     ...trackingFields
   }
 });
-var WebhookSubscription = (0, import_core17.list)({
+var WebhookSubscription = (0, import_core18.list)({
   access: integrationAccess,
   hooks: firmOwnedHooks(),
   ui: { listView: { initialColumns: ["name", "connection", "status", "endpointUrl", "lastDeliveredAt"] } },
   fields: {
     firm: firmRelationship(),
-    office: (0, import_fields35.relationship)({ ref: "Office" }),
+    office: (0, import_fields37.relationship)({ ref: "Office" }),
     connection: requiredRelationship("IntegrationConnection.webhookSubscriptions"),
-    name: (0, import_fields35.text)({ validation: { isRequired: true } }),
-    status: (0, import_fields35.select)({
+    name: (0, import_fields37.text)({ validation: { isRequired: true } }),
+    status: (0, import_fields37.select)({
       type: "enum",
       options: [
         { label: "Active", value: "active" },
@@ -6382,8 +6886,8 @@ var WebhookSubscription = (0, import_core17.list)({
       defaultValue: "active",
       validation: { isRequired: true }
     }),
-    endpointUrl: (0, import_fields35.text)({ access: integrationFieldAccess, validation: { isRequired: true } }),
-    eventTypes: (0, import_fields35.multiselect)({
+    endpointUrl: (0, import_fields37.text)({ access: integrationFieldAccess, validation: { isRequired: true } }),
+    eventTypes: (0, import_fields37.multiselect)({
       type: "enum",
       options: [
         { label: "Matter changed", value: "matter_changed" },
@@ -6397,12 +6901,12 @@ var WebhookSubscription = (0, import_core17.list)({
     signingSecretDigest: secretText("Signing secret digest"),
     // A digest cannot produce outbound HMACs; the dispatcher decrypts this server-side only.
     signingSecretEncrypted: secretText("Encrypted outbound signing secret envelope"),
-    lastDeliveredAt: (0, import_fields35.timestamp)(),
+    lastDeliveredAt: (0, import_fields37.timestamp)(),
     deliveries: readOnlyRelationship("WebhookDelivery.subscription", true),
     ...trackingFields
   }
 });
-var WebhookDelivery = (0, import_core17.list)({
+var WebhookDelivery = (0, import_core18.list)({
   db: uniqueConstraints(["firmId", "eventId"]),
   access: {
     ...integrationMatterAccess,
@@ -6414,12 +6918,12 @@ var WebhookDelivery = (0, import_core17.list)({
   ui: { listView: { initialColumns: ["eventId", "eventType", "subscription", "status", "attemptCount", "nextAttemptAt"] } },
   fields: {
     firm: firmRelationship(),
-    matter: (0, import_fields35.relationship)({ ref: "Matter" }),
+    matter: (0, import_fields37.relationship)({ ref: "Matter" }),
     connection: requiredRelationship("IntegrationConnection.webhookDeliveries"),
     subscription: requiredRelationship("WebhookSubscription.deliveries"),
-    eventId: (0, import_fields35.text)({ isIndexed: true, validation: { isRequired: true } }),
-    eventType: (0, import_fields35.text)({ validation: { isRequired: true } }),
-    status: (0, import_fields35.select)({
+    eventId: (0, import_fields37.text)({ isIndexed: true, validation: { isRequired: true } }),
+    eventType: (0, import_fields37.text)({ validation: { isRequired: true } }),
+    status: (0, import_fields37.select)({
       type: "enum",
       options: [
         { label: "Pending", value: "pending" },
@@ -6431,17 +6935,17 @@ var WebhookDelivery = (0, import_core17.list)({
       defaultValue: "pending",
       validation: { isRequired: true }
     }),
-    payload: (0, import_fields35.json)({ access: integrationFieldAccess }),
-    destinationUrl: (0, import_fields35.text)({ access: controlledDeliveryEvidenceAccess }),
-    attemptCount: (0, import_fields35.integer)({ access: controlledDeliveryEvidenceAccess, defaultValue: 0, validation: { min: 0 } }),
-    nextAttemptAt: (0, import_fields35.timestamp)({ access: controlledDeliveryEvidenceAccess }),
-    completedAt: (0, import_fields35.timestamp)({ access: controlledDeliveryEvidenceAccess }),
-    lastError: (0, import_fields35.text)({ access: controlledDeliveryEvidenceAccess, ui: { displayMode: "textarea" } }),
+    payload: (0, import_fields37.json)({ access: integrationFieldAccess }),
+    destinationUrl: (0, import_fields37.text)({ access: controlledDeliveryEvidenceAccess }),
+    attemptCount: (0, import_fields37.integer)({ access: controlledDeliveryEvidenceAccess, defaultValue: 0, validation: { min: 0 } }),
+    nextAttemptAt: (0, import_fields37.timestamp)({ access: controlledDeliveryEvidenceAccess }),
+    completedAt: (0, import_fields37.timestamp)({ access: controlledDeliveryEvidenceAccess }),
+    lastError: (0, import_fields37.text)({ access: controlledDeliveryEvidenceAccess, ui: { displayMode: "textarea" } }),
     attempts: readOnlyRelationship("WebhookDeliveryAttempt.delivery", true),
     ...trackingFields
   }
 });
-var WebhookDeliveryAttempt = (0, import_core17.list)({
+var WebhookDeliveryAttempt = (0, import_core18.list)({
   db: uniqueConstraints(["deliveryId", "attemptNumber"]),
   access: {
     operation: {
@@ -6466,14 +6970,14 @@ var WebhookDeliveryAttempt = (0, import_core17.list)({
   },
   fields: {
     firm: firmRelationship(),
-    matter: (0, import_fields35.relationship)({ ref: "Matter" }),
+    matter: (0, import_fields37.relationship)({ ref: "Matter" }),
     delivery: requiredRelationship("WebhookDelivery.attempts"),
-    attemptNumber: (0, import_fields35.integer)({ validation: { isRequired: true, min: 1 } }),
-    attemptedAt: (0, import_fields35.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
-    requestDigest: (0, import_fields35.text)({ validation: { isRequired: true } }),
-    responseStatus: (0, import_fields35.integer)(),
-    responseDigest: (0, import_fields35.text)(),
-    succeeded: (0, import_fields35.select)({
+    attemptNumber: (0, import_fields37.integer)({ validation: { isRequired: true, min: 1 } }),
+    attemptedAt: (0, import_fields37.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    requestDigest: (0, import_fields37.text)({ validation: { isRequired: true } }),
+    responseStatus: (0, import_fields37.integer)(),
+    responseDigest: (0, import_fields37.text)(),
+    succeeded: (0, import_fields37.select)({
       type: "enum",
       options: [
         { label: "Yes", value: "yes" },
@@ -6481,15 +6985,15 @@ var WebhookDeliveryAttempt = (0, import_core17.list)({
       ],
       validation: { isRequired: true }
     }),
-    errorCode: (0, import_fields35.text)(),
-    errorMessage: (0, import_fields35.text)({ access: integrationFieldAccess, ui: { displayMode: "textarea" } }),
+    errorCode: (0, import_fields37.text)(),
+    errorMessage: (0, import_fields37.text)({ access: integrationFieldAccess, ui: { displayMode: "textarea" } }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/governance.ts
-var import_core18 = require("@keystone-6/core");
-var import_fields37 = require("@keystone-6/core/fields");
+var import_core19 = require("@keystone-6/core");
+var import_fields39 = require("@keystone-6/core/fields");
 var retentionAccess = scopedAccess("canReadRetention", "canManageRetention");
 var retentionMatterAccess = {
   operation: {
@@ -6542,7 +7046,7 @@ var retentionPolicyHooks = {
     }
   }
 };
-var RetentionPolicy = (0, import_core18.list)({
+var RetentionPolicy = (0, import_core19.list)({
   db: uniqueConstraints(["firmId", "code"]),
   access: retentionAccess,
   graphql: { omit: { delete: true } },
@@ -6550,9 +7054,9 @@ var RetentionPolicy = (0, import_core18.list)({
   ui: { listView: { initialColumns: ["name", "code", "status", "recordClass", "retentionDays"] } },
   fields: {
     firm: firmRelationship(),
-    name: (0, import_fields37.text)({ validation: { isRequired: true } }),
-    code: (0, import_fields37.text)({ isIndexed: true, validation: { isRequired: true } }),
-    status: (0, import_fields37.select)({
+    name: (0, import_fields39.text)({ validation: { isRequired: true } }),
+    code: (0, import_fields39.text)({ isIndexed: true, validation: { isRequired: true } }),
+    status: (0, import_fields39.select)({
       type: "enum",
       access: controlledPolicyStatusAccess,
       graphql: { omit: { update: true } },
@@ -6564,7 +7068,7 @@ var RetentionPolicy = (0, import_core18.list)({
       defaultValue: "draft",
       validation: { isRequired: true }
     }),
-    recordClass: (0, import_fields37.select)({
+    recordClass: (0, import_fields39.select)({
       type: "enum",
       options: [
         { label: "Matter", value: "matter" },
@@ -6577,7 +7081,7 @@ var RetentionPolicy = (0, import_core18.list)({
       ],
       validation: { isRequired: true }
     }),
-    trigger: (0, import_fields37.select)({
+    trigger: (0, import_fields39.select)({
       type: "enum",
       options: [
         { label: "Matter closed", value: "matter_closed" },
@@ -6587,10 +7091,10 @@ var RetentionPolicy = (0, import_core18.list)({
       ],
       validation: { isRequired: true }
     }),
-    retentionDays: (0, import_fields37.integer)({ validation: { isRequired: true, min: 0 } }),
-    practiceArea: (0, import_fields37.relationship)({ ref: "PracticeArea" }),
-    description: (0, import_fields37.text)({ access: retentionFieldAccess, ui: { displayMode: "textarea" } }),
-    jurisdictionReference: (0, import_fields37.text)({
+    retentionDays: (0, import_fields39.integer)({ validation: { isRequired: true, min: 0 } }),
+    practiceArea: (0, import_fields39.relationship)({ ref: "PracticeArea" }),
+    description: (0, import_fields39.text)({ access: retentionFieldAccess, ui: { displayMode: "textarea" } }),
+    jurisdictionReference: (0, import_fields39.text)({
       access: retentionFieldAccess,
       ui: { description: "Firm-entered reference only; this platform does not determine jurisdictional requirements." }
     }),
@@ -6600,7 +7104,7 @@ var RetentionPolicy = (0, import_core18.list)({
     ...trackingFields
   }
 });
-var RetentionHold = (0, import_core18.list)({
+var RetentionHold = (0, import_core19.list)({
   access: {
     ...retentionMatterAccess,
     operation: { ...retentionMatterAccess.operation, create: denyAll, update: denyAll },
@@ -6611,9 +7115,9 @@ var RetentionHold = (0, import_core18.list)({
   ui: { listView: { initialColumns: ["name", "status", "matter", "document", "contact", "createdBy"] } },
   fields: {
     firm: firmRelationship(),
-    policy: (0, import_fields37.relationship)({ ref: "RetentionPolicy.holds" }),
-    name: (0, import_fields37.text)({ validation: { isRequired: true } }),
-    status: (0, import_fields37.select)({
+    policy: (0, import_fields39.relationship)({ ref: "RetentionPolicy.holds" }),
+    name: (0, import_fields39.text)({ validation: { isRequired: true } }),
+    status: (0, import_fields39.select)({
       type: "enum",
       options: [
         { label: "Active", value: "active" },
@@ -6622,21 +7126,21 @@ var RetentionHold = (0, import_core18.list)({
       defaultValue: "active",
       validation: { isRequired: true }
     }),
-    matter: (0, import_fields37.relationship)({ ref: "Matter", access: immutableHoldTargetAccess }),
-    document: (0, import_fields37.relationship)({ ref: "Document", access: immutableHoldTargetAccess }),
-    contact: (0, import_fields37.relationship)({ ref: "Contact", access: immutableHoldTargetAccess }),
-    reason: (0, import_fields37.text)({ access: retentionFieldAccess, validation: { isRequired: true }, ui: { displayMode: "textarea" } }),
-    authorityReference: (0, import_fields37.text)({ access: retentionFieldAccess }),
+    matter: (0, import_fields39.relationship)({ ref: "Matter", access: immutableHoldTargetAccess }),
+    document: (0, import_fields39.relationship)({ ref: "Document", access: immutableHoldTargetAccess }),
+    contact: (0, import_fields39.relationship)({ ref: "Contact", access: immutableHoldTargetAccess }),
+    reason: (0, import_fields39.text)({ access: retentionFieldAccess, validation: { isRequired: true }, ui: { displayMode: "textarea" } }),
+    authorityReference: (0, import_fields39.text)({ access: retentionFieldAccess }),
     createdBy: requiredRelationship("User"),
-    effectiveAt: (0, import_fields37.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
-    releasedBy: (0, import_fields37.relationship)({ ref: "User" }),
-    releasedAt: (0, import_fields37.timestamp)(),
-    releaseReason: (0, import_fields37.text)({ access: retentionFieldAccess, ui: { displayMode: "textarea" } }),
+    effectiveAt: (0, import_fields39.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    releasedBy: (0, import_fields39.relationship)({ ref: "User" }),
+    releasedAt: (0, import_fields39.timestamp)(),
+    releaseReason: (0, import_fields39.text)({ access: retentionFieldAccess, ui: { displayMode: "textarea" } }),
     actions: readOnlyRelationship("RetentionAction.hold", true),
     ...trackingFields
   }
 });
-var RetentionAction = (0, import_core18.list)({
+var RetentionAction = (0, import_core19.list)({
   access: {
     operation: {
       query: permissions.canReadRetention,
@@ -6660,9 +7164,9 @@ var RetentionAction = (0, import_core18.list)({
   },
   fields: {
     firm: firmRelationship(),
-    policy: (0, import_fields37.relationship)({ ref: "RetentionPolicy.actions" }),
-    hold: (0, import_fields37.relationship)({ ref: "RetentionHold.actions" }),
-    actionType: (0, import_fields37.select)({
+    policy: (0, import_fields39.relationship)({ ref: "RetentionPolicy.actions" }),
+    hold: (0, import_fields39.relationship)({ ref: "RetentionHold.actions" }),
+    actionType: (0, import_fields39.select)({
       type: "enum",
       options: [
         { label: "Archived", value: "archived" },
@@ -6673,7 +7177,7 @@ var RetentionAction = (0, import_core18.list)({
       ],
       validation: { isRequired: true }
     }),
-    resourceType: (0, import_fields37.select)({
+    resourceType: (0, import_fields39.select)({
       type: "enum",
       options: [
         { label: "Matter", value: "matter" },
@@ -6684,24 +7188,24 @@ var RetentionAction = (0, import_core18.list)({
       ],
       validation: { isRequired: true }
     }),
-    matter: (0, import_fields37.relationship)({ ref: "Matter" }),
-    document: (0, import_fields37.relationship)({ ref: "Document" }),
-    contact: (0, import_fields37.relationship)({ ref: "Contact" }),
-    communicationThread: (0, import_fields37.relationship)({ ref: "CommunicationThread" }),
-    invoice: (0, import_fields37.relationship)({ ref: "Invoice" }),
-    performedBy: (0, import_fields37.relationship)({ ref: "User" }),
-    performedByAgent: (0, import_fields37.relationship)({ ref: "AgentPrincipal" }),
-    approvedBy: (0, import_fields37.relationship)({ ref: "User" }),
-    evidenceDigest: (0, import_fields37.text)({ validation: { isRequired: true } }),
-    occurredAt: (0, import_fields37.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
-    metadata: (0, import_fields37.json)({
+    matter: (0, import_fields39.relationship)({ ref: "Matter" }),
+    document: (0, import_fields39.relationship)({ ref: "Document" }),
+    contact: (0, import_fields39.relationship)({ ref: "Contact" }),
+    communicationThread: (0, import_fields39.relationship)({ ref: "CommunicationThread" }),
+    invoice: (0, import_fields39.relationship)({ ref: "Invoice" }),
+    performedBy: (0, import_fields39.relationship)({ ref: "User" }),
+    performedByAgent: (0, import_fields39.relationship)({ ref: "AgentPrincipal" }),
+    approvedBy: (0, import_fields39.relationship)({ ref: "User" }),
+    evidenceDigest: (0, import_fields39.text)({ validation: { isRequired: true } }),
+    occurredAt: (0, import_fields39.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    metadata: (0, import_fields39.json)({
       access: retentionFieldAccess,
       ui: { description: "Bounded disposal evidence; never record bodies, document content, or credentials." }
     }),
     ...trackingFields
   }
 });
-var AuditEvent = (0, import_core18.list)({
+var AuditEvent = (0, import_core19.list)({
   db: uniqueConstraints(["firmId", "eventId"]),
   access: {
     operation: {
@@ -6726,9 +7230,9 @@ var AuditEvent = (0, import_core18.list)({
   },
   fields: {
     firm: firmRelationship(),
-    eventId: (0, import_fields37.text)({ isIndexed: true, validation: { isRequired: true } }),
-    eventType: (0, import_fields37.text)({ validation: { isRequired: true } }),
-    category: (0, import_fields37.select)({
+    eventId: (0, import_fields39.text)({ isIndexed: true, validation: { isRequired: true } }),
+    eventType: (0, import_fields39.text)({ validation: { isRequired: true } }),
+    category: (0, import_fields39.select)({
       type: "enum",
       options: [
         { label: "Authentication", value: "authentication" },
@@ -6741,7 +7245,7 @@ var AuditEvent = (0, import_core18.list)({
       ],
       validation: { isRequired: true }
     }),
-    outcome: (0, import_fields37.select)({
+    outcome: (0, import_fields39.select)({
       type: "enum",
       options: [
         { label: "Succeeded", value: "succeeded" },
@@ -6750,21 +7254,21 @@ var AuditEvent = (0, import_core18.list)({
       ],
       validation: { isRequired: true }
     }),
-    actorUser: (0, import_fields37.relationship)({ ref: "User" }),
-    actorAgent: (0, import_fields37.relationship)({ ref: "AgentPrincipal" }),
-    actorType: (0, import_fields37.text)({ validation: { isRequired: true } }),
-    matter: (0, import_fields37.relationship)({ ref: "Matter" }),
-    contact: (0, import_fields37.relationship)({ ref: "Contact" }),
-    intake: (0, import_fields37.relationship)({ ref: "Intake" }),
-    document: (0, import_fields37.relationship)({ ref: "Document" }),
-    invoice: (0, import_fields37.relationship)({ ref: "Invoice" }),
-    payment: (0, import_fields37.relationship)({ ref: "Payment" }),
-    trustTransaction: (0, import_fields37.relationship)({ ref: "TrustTransaction" }),
-    agentAction: (0, import_fields37.relationship)({ ref: "AgentAction" }),
-    sourceIp: (0, import_fields37.text)({ access: { read: permissions.canViewAudit } }),
-    userAgent: (0, import_fields37.text)({ access: { read: permissions.canViewAudit } }),
-    occurredAt: (0, import_fields37.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
-    metadata: (0, import_fields37.json)({
+    actorUser: (0, import_fields39.relationship)({ ref: "User" }),
+    actorAgent: (0, import_fields39.relationship)({ ref: "AgentPrincipal" }),
+    actorType: (0, import_fields39.text)({ validation: { isRequired: true } }),
+    matter: (0, import_fields39.relationship)({ ref: "Matter" }),
+    contact: (0, import_fields39.relationship)({ ref: "Contact" }),
+    intake: (0, import_fields39.relationship)({ ref: "Intake" }),
+    document: (0, import_fields39.relationship)({ ref: "Document" }),
+    invoice: (0, import_fields39.relationship)({ ref: "Invoice" }),
+    payment: (0, import_fields39.relationship)({ ref: "Payment" }),
+    trustTransaction: (0, import_fields39.relationship)({ ref: "TrustTransaction" }),
+    agentAction: (0, import_fields39.relationship)({ ref: "AgentAction" }),
+    sourceIp: (0, import_fields39.text)({ access: { read: permissions.canViewAudit } }),
+    userAgent: (0, import_fields39.text)({ access: { read: permissions.canViewAudit } }),
+    occurredAt: (0, import_fields39.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    metadata: (0, import_fields39.json)({
       access: { read: permissions.canViewAudit },
       ui: { description: "Bounded event facts only; never privileged content or credential material." }
     }),
@@ -6773,8 +7277,8 @@ var AuditEvent = (0, import_core18.list)({
 });
 
 // features/keystone/models/publicSite.ts
-var import_core19 = require("@keystone-6/core");
-var import_fields39 = require("@keystone-6/core/fields");
+var import_core20 = require("@keystone-6/core");
+var import_fields41 = require("@keystone-6/core/fields");
 var humanFirmManager = (args) => permissions.canManageFirm(args) && isInteractiveHuman(args);
 var systemManaged = { create: denyAll, update: denyAll };
 var hiddenOnCreate = { createView: { fieldMode: "hidden" }, itemView: { fieldMode: "read" } };
@@ -6799,8 +7303,8 @@ function validatePublication(args) {
   const accounts = Boolean(value("publicAccountsEnabled"));
   const booking = Boolean(value("publicBookingEnabled"));
   for (const key of ["privacyNotice", "firstContactNotice", "aboutStatement"]) {
-    const text23 = value(key);
-    if (typeof text23 === "string" && text23.length > MAX_NOTICE) args.addValidationError(`${key} must be ${MAX_NOTICE} characters or fewer.`);
+    const text24 = value(key);
+    if (typeof text24 === "string" && text24.length > MAX_NOTICE) args.addValidationError(`${key} must be ${MAX_NOTICE} characters or fewer.`);
   }
   if (booking && !accounts) args.addValidationError("Consultation booking requires customer accounts to be enabled.");
   if (status === "published" && (accounts || booking)) {
@@ -6808,7 +7312,7 @@ function validatePublication(args) {
     if (booking && !String(value("firstContactNotice") ?? "").trim()) args.addValidationError("Publish the firm's first-contact notice before enabling consultation booking.");
   }
 }
-var PublicSitePolicy = (0, import_core19.list)({
+var PublicSitePolicy = (0, import_core20.list)({
   db: uniqueConstraints(["firmId"]),
   access: {
     operation: { query: permissions.canManageFirm, create: humanFirmManager, update: humanFirmManager, delete: denyAll },
@@ -6848,7 +7352,7 @@ var PublicSitePolicy = (0, import_core19.list)({
   },
   fields: {
     firm: firmRelationship(),
-    status: (0, import_fields39.select)({
+    status: (0, import_fields41.select)({
       type: "enum",
       options: [
         { label: "Draft", value: "draft" },
@@ -6857,15 +7361,15 @@ var PublicSitePolicy = (0, import_core19.list)({
       defaultValue: "draft",
       validation: { isRequired: true }
     }),
-    publicAccountsEnabled: (0, import_fields39.checkbox)({ defaultValue: false }),
-    publicBookingEnabled: (0, import_fields39.checkbox)({ defaultValue: false }),
-    privacyNotice: (0, import_fields39.text)({ ui: { displayMode: "textarea", description: "The firm's own privacy notice, shown at /privacy and linked before any customer collection." } }),
-    privacyNoticeVersion: (0, import_fields39.integer)({ defaultValue: 0, access: systemManaged, ui: hiddenOnCreate }),
-    firstContactNotice: (0, import_fields39.text)({ ui: { displayMode: "textarea", description: "Shown before a prospective client enters any details; each booking records the version acknowledged." } }),
-    firstContactNoticeVersion: (0, import_fields39.integer)({ defaultValue: 0, access: systemManaged, ui: hiddenOnCreate }),
-    aboutStatement: (0, import_fields39.text)({ ui: { displayMode: "textarea", description: "Firm-approved About text for the public site." } }),
-    publishedAt: (0, import_fields39.timestamp)({ access: systemManaged, ui: hiddenOnCreate }),
-    publishedByUserId: (0, import_fields39.text)({ access: systemManaged, ui: hiddenOnCreate }),
+    publicAccountsEnabled: (0, import_fields41.checkbox)({ defaultValue: false }),
+    publicBookingEnabled: (0, import_fields41.checkbox)({ defaultValue: false }),
+    privacyNotice: (0, import_fields41.text)({ ui: { displayMode: "textarea", description: "The firm's own privacy notice, shown at /privacy and linked before any customer collection." } }),
+    privacyNoticeVersion: (0, import_fields41.integer)({ defaultValue: 0, access: systemManaged, ui: hiddenOnCreate }),
+    firstContactNotice: (0, import_fields41.text)({ ui: { displayMode: "textarea", description: "Shown before a prospective client enters any details; each booking records the version acknowledged." } }),
+    firstContactNoticeVersion: (0, import_fields41.integer)({ defaultValue: 0, access: systemManaged, ui: hiddenOnCreate }),
+    aboutStatement: (0, import_fields41.text)({ ui: { displayMode: "textarea", description: "Firm-approved About text for the public site." } }),
+    publishedAt: (0, import_fields41.timestamp)({ access: systemManaged, ui: hiddenOnCreate }),
+    publishedByUserId: (0, import_fields41.text)({ access: systemManaged, ui: hiddenOnCreate }),
     ...trackingFields
   }
 });
@@ -6875,7 +7379,7 @@ function profileSlug(resolvedData, item) {
   if (!(resolvedData.slug ?? item?.slug)) resolvedData.slug = normalizePublicSlug(resolvedData.name ?? item?.name);
   return resolvedData;
 }
-var AttorneyProfile = (0, import_core19.list)({
+var AttorneyProfile = (0, import_core20.list)({
   db: uniqueConstraints(["firmId", "slug"]),
   access: {
     operation: { query: permissions.canManageFirm, create: humanFirmManager, update: humanFirmManager, delete: humanFirmManager },
@@ -6900,23 +7404,35 @@ var AttorneyProfile = (0, import_core19.list)({
   ui: { listView: { initialColumns: ["name", "title", "isPublic", "sortOrder"] } },
   fields: {
     firm: firmRelationship(),
-    name: (0, import_fields39.text)({ validation: { isRequired: true, length: { max: 200 } } }),
-    slug: (0, import_fields39.text)({ isIndexed: true, validation: { length: { max: 80 } }, ui: { description: "Public URL handle, e.g. jane-doe. Derived from the name when left empty." } }),
-    title: (0, import_fields39.text)({ validation: { length: { max: 120 } }, ui: { description: "e.g. Partner, Associate, Of counsel" } }),
-    focus: (0, import_fields39.text)({ validation: { length: { max: 200 } } }),
-    biography: (0, import_fields39.text)({ ui: { displayMode: "textarea" }, validation: { length: { max: 8e3 } } }),
-    admissions: (0, import_fields39.text)({ ui: { displayMode: "textarea", description: "Bar admissions as the firm verified them, one per line." }, validation: { length: { max: 2e3 } } }),
-    email: (0, import_fields39.text)({ validation: { length: { max: 320 } } }),
-    practiceAreas: (0, import_fields39.relationship)({ ref: "PracticeArea", many: true }),
-    isPublic: (0, import_fields39.checkbox)({ defaultValue: false }),
-    sortOrder: (0, import_fields39.integer)({ defaultValue: 0 }),
+    name: (0, import_fields41.text)({ validation: { isRequired: true, length: { max: 200 } } }),
+    slug: (0, import_fields41.text)({ isIndexed: true, validation: { length: { max: 80 } }, ui: { description: "Public URL handle, e.g. jane-doe. Derived from the name when left empty." } }),
+    title: (0, import_fields41.text)({ validation: { length: { max: 120 } }, ui: { description: "e.g. Partner, Associate, Of counsel" } }),
+    focus: (0, import_fields41.text)({ validation: { length: { max: 200 } } }),
+    biography: (0, import_fields41.text)({ ui: { displayMode: "textarea" }, validation: { length: { max: 8e3 } } }),
+    admissions: (0, import_fields41.text)({ ui: { displayMode: "textarea", description: "Bar admissions as the firm verified them, one per line." }, validation: { length: { max: 2e3 } } }),
+    email: (0, import_fields41.text)({ validation: { length: { max: 320 } } }),
+    photo: (0, import_fields41.image)({ storage: "my_images", label: "Portrait" }),
+    /** Signed portrait URL for the public site; null until a portrait is uploaded. */
+    photoUrl: (0, import_fields41.virtual)({
+      field: import_core20.graphql.field({
+        type: import_core20.graphql.String,
+        async resolve(item, _args, context) {
+          if (item.photo_id && item.photo_extension) return context.images("my_images").getUrl(item.photo_id, item.photo_extension);
+          return null;
+        }
+      }),
+      ui: { itemView: { fieldMode: "hidden" }, listView: { fieldMode: "hidden" } }
+    }),
+    practiceAreas: (0, import_fields41.relationship)({ ref: "PracticeArea", many: true }),
+    isPublic: (0, import_fields41.checkbox)({ defaultValue: false }),
+    sortOrder: (0, import_fields41.integer)({ defaultValue: 0 }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/agents.ts
-var import_core20 = require("@keystone-6/core");
-var import_fields41 = require("@keystone-6/core/fields");
+var import_core21 = require("@keystone-6/core");
+var import_fields43 = require("@keystone-6/core/fields");
 var agentAccess = scopedAccess("canReadAgents", "canManageAgents");
 var canReadAgents = ({ session }) => permissions.canReadAgents({ session }) || permissions.canManageAgents({ session });
 var canManageAgents = ({ session }) => permissions.canManageAgents({ session });
@@ -6997,20 +7513,20 @@ var agentGrantHooks = {
     }
   }
 };
-var AgentPrincipal = (0, import_core20.list)({
+var AgentPrincipal = (0, import_core21.list)({
   access: agentAccess,
   hooks: firmOwnedHooks({ lifecycle: "agentPrincipal" }),
   ui: { listView: { initialColumns: ["name", "agentType", "status", "owner", "provider"] } },
   fields: {
     firm: firmRelationship(),
-    owner: (0, import_fields41.relationship)({
+    owner: (0, import_fields43.relationship)({
       ref: "User",
       db: { foreignKey: true, extendPrismaSchema: requireRelationshipPrismaField },
       access: immutableAgentIdentityAccess,
       graphql: { omit: { update: true } }
     }),
-    name: (0, import_fields41.text)({ validation: { isRequired: true } }),
-    agentType: (0, import_fields41.select)({
+    name: (0, import_fields43.text)({ validation: { isRequired: true } }),
+    agentType: (0, import_fields43.select)({
       type: "enum",
       access: immutableAgentIdentityAccess,
       graphql: { omit: { update: true } },
@@ -7022,7 +7538,7 @@ var AgentPrincipal = (0, import_core20.list)({
       ],
       validation: { isRequired: true }
     }),
-    status: (0, import_fields41.select)({
+    status: (0, import_fields43.select)({
       type: "enum",
       access: immutableAgentIdentityAccess,
       graphql: { omit: { update: true } },
@@ -7035,10 +7551,10 @@ var AgentPrincipal = (0, import_core20.list)({
       defaultValue: "draft",
       validation: { isRequired: true }
     }),
-    provider: (0, import_fields41.text)(),
-    model: (0, import_fields41.text)(),
-    description: (0, import_fields41.text)({ access: agentFieldAccess, ui: { displayMode: "textarea" } }),
-    lastActiveAt: (0, import_fields41.timestamp)(),
+    provider: (0, import_fields43.text)(),
+    model: (0, import_fields43.text)(),
+    description: (0, import_fields43.text)({ access: agentFieldAccess, ui: { displayMode: "textarea" } }),
+    lastActiveAt: (0, import_fields43.timestamp)(),
     credentials: readOnlyRelationship("AgentCredential.agentPrincipal", true),
     grants: readOnlyRelationship("AgentGrant.agentPrincipal", true),
     actions: readOnlyRelationship("AgentAction.agentPrincipal", true),
@@ -7046,7 +7562,7 @@ var AgentPrincipal = (0, import_core20.list)({
     ...trackingFields
   }
 });
-var AgentCredential = (0, import_core20.list)({
+var AgentCredential = (0, import_core21.list)({
   access: {
     operation: {
       query: canReadAgents,
@@ -7066,10 +7582,10 @@ var AgentCredential = (0, import_core20.list)({
   fields: {
     firm: firmRelationship(),
     agentPrincipal: requiredRelationship("AgentPrincipal.credentials"),
-    name: (0, import_fields41.text)({ validation: { isRequired: true } }),
-    prefix: (0, import_fields41.text)({ isIndexed: "unique", validation: { isRequired: true } }),
+    name: (0, import_fields43.text)({ validation: { isRequired: true } }),
+    prefix: (0, import_fields43.text)({ isIndexed: "unique", validation: { isRequired: true } }),
     secretHash: secretText("Credential secret hash", true),
-    status: (0, import_fields41.select)({
+    status: (0, import_fields43.select)({
       type: "enum",
       options: [
         { label: "Active", value: "active" },
@@ -7079,16 +7595,16 @@ var AgentCredential = (0, import_core20.list)({
       defaultValue: "active",
       validation: { isRequired: true }
     }),
-    scopes: (0, import_fields41.multiselect)({ type: "string", options: capabilityOptions, defaultValue: [] }),
+    scopes: (0, import_fields43.multiselect)({ type: "string", options: capabilityOptions, defaultValue: [] }),
     createdBy: requiredRelationship("User"),
-    expiresAt: (0, import_fields41.timestamp)(),
-    lastUsedAt: (0, import_fields41.timestamp)(),
-    revokedAt: (0, import_fields41.timestamp)(),
-    revokedBy: (0, import_fields41.relationship)({ ref: "User" }),
+    expiresAt: (0, import_fields43.timestamp)(),
+    lastUsedAt: (0, import_fields43.timestamp)(),
+    revokedAt: (0, import_fields43.timestamp)(),
+    revokedBy: (0, import_fields43.relationship)({ ref: "User" }),
     ...trackingFields
   }
 });
-var AgentGrant = (0, import_core20.list)({
+var AgentGrant = (0, import_core21.list)({
   access: {
     operation: {
       query: canReadAgents,
@@ -7107,9 +7623,9 @@ var AgentGrant = (0, import_core20.list)({
   ui: { listView: { initialColumns: ["agentPrincipal", "matter", "status", "approvedBy", "expiresAt"] } },
   fields: {
     firm: firmRelationship(),
-    matter: (0, import_fields41.relationship)({ ref: "Matter" }),
+    matter: (0, import_fields43.relationship)({ ref: "Matter" }),
     agentPrincipal: requiredRelationship("AgentPrincipal.grants"),
-    status: (0, import_fields41.select)({
+    status: (0, import_fields43.select)({
       type: "enum",
       options: [
         { label: "Proposed", value: "proposed" },
@@ -7121,20 +7637,20 @@ var AgentGrant = (0, import_core20.list)({
       defaultValue: "proposed",
       validation: { isRequired: true }
     }),
-    capabilities: (0, import_fields41.multiselect)({ type: "string", options: capabilityOptions, defaultValue: [] }),
-    reason: (0, import_fields41.text)({ access: agentFieldAccess, validation: { isRequired: true }, ui: { displayMode: "textarea" } }),
+    capabilities: (0, import_fields43.multiselect)({ type: "string", options: capabilityOptions, defaultValue: [] }),
+    reason: (0, import_fields43.text)({ access: agentFieldAccess, validation: { isRequired: true }, ui: { displayMode: "textarea" } }),
     requestedBy: requiredRelationship("User"),
-    approvedBy: (0, import_fields41.relationship)({ ref: "User", access: controlledAgentApprovalAccess }),
-    approvedAt: (0, import_fields41.timestamp)({ access: controlledAgentApprovalAccess }),
-    startsAt: (0, import_fields41.timestamp)(),
-    expiresAt: (0, import_fields41.timestamp)(),
-    suspendedAt: (0, import_fields41.timestamp)(),
-    revokedAt: (0, import_fields41.timestamp)(),
+    approvedBy: (0, import_fields43.relationship)({ ref: "User", access: controlledAgentApprovalAccess }),
+    approvedAt: (0, import_fields43.timestamp)({ access: controlledAgentApprovalAccess }),
+    startsAt: (0, import_fields43.timestamp)(),
+    expiresAt: (0, import_fields43.timestamp)(),
+    suspendedAt: (0, import_fields43.timestamp)(),
+    revokedAt: (0, import_fields43.timestamp)(),
     actions: readOnlyRelationship("AgentAction.grant", true),
     ...trackingFields
   }
 });
-var AgentAction = (0, import_core20.list)({
+var AgentAction = (0, import_core21.list)({
   db: uniqueConstraints(["firmId", "actionNumber"]),
   access: {
     operation: {
@@ -7159,13 +7675,13 @@ var AgentAction = (0, import_core20.list)({
   },
   fields: {
     firm: firmRelationship(),
-    matter: (0, import_fields41.relationship)({ ref: "Matter" }),
+    matter: (0, import_fields43.relationship)({ ref: "Matter" }),
     agentPrincipal: requiredRelationship("AgentPrincipal.actions"),
     grant: requiredRelationship("AgentGrant.actions"),
-    actionNumber: (0, import_fields41.text)({ isIndexed: true, validation: { isRequired: true } }),
-    idempotencyKey: (0, import_fields41.text)({ isIndexed: "unique", validation: { isRequired: true } }),
-    actionType: (0, import_fields41.select)({ type: "string", options: capabilityOptions, validation: { isRequired: true } }),
-    status: (0, import_fields41.select)({
+    actionNumber: (0, import_fields43.text)({ isIndexed: true, validation: { isRequired: true } }),
+    idempotencyKey: (0, import_fields43.text)({ isIndexed: "unique", validation: { isRequired: true } }),
+    actionType: (0, import_fields43.select)({ type: "string", options: capabilityOptions, validation: { isRequired: true } }),
+    status: (0, import_fields43.select)({
       type: "enum",
       options: [
         { label: "Requested", value: "requested" },
@@ -7180,7 +7696,7 @@ var AgentAction = (0, import_core20.list)({
       defaultValue: "requested",
       validation: { isRequired: true }
     }),
-    riskLevel: (0, import_fields41.select)({
+    riskLevel: (0, import_fields43.select)({
       type: "enum",
       options: [
         { label: "Low", value: "low" },
@@ -7191,33 +7707,33 @@ var AgentAction = (0, import_core20.list)({
       defaultValue: "high",
       validation: { isRequired: true }
     }),
-    requestDigest: (0, import_fields41.text)({ validation: { isRequired: true } }),
-    requestEnvelope: (0, import_fields41.json)({ access: agentFieldAccess }),
-    requiresApproval: (0, import_fields41.checkbox)({ defaultValue: true }),
-    requestedByUser: (0, import_fields41.relationship)({ ref: "User" }),
-    approvedBy: (0, import_fields41.relationship)({ ref: "User" }),
-    approvalDigest: (0, import_fields41.text)(),
-    approvalExpiresAt: (0, import_fields41.timestamp)(),
-    reviewedAt: (0, import_fields41.timestamp)(),
-    rejectionReason: (0, import_fields41.text)({ access: agentFieldAccess }),
-    contact: (0, import_fields41.relationship)({ ref: "Contact" }),
-    intake: (0, import_fields41.relationship)({ ref: "Intake" }),
-    document: (0, import_fields41.relationship)({ ref: "Document" }),
-    invoice: (0, import_fields41.relationship)({ ref: "Invoice" }),
-    payment: (0, import_fields41.relationship)({ ref: "Payment" }),
-    trustTransaction: (0, import_fields41.relationship)({ ref: "TrustTransaction" }),
-    deadline: (0, import_fields41.relationship)({ ref: "Deadline" }),
-    task: (0, import_fields41.relationship)({ ref: "LegalTask" }),
-    startedAt: (0, import_fields41.timestamp)(),
-    completedAt: (0, import_fields41.timestamp)(),
-    resultDigest: (0, import_fields41.text)(),
-    resultEnvelope: (0, import_fields41.json)({ access: agentFieldAccess }),
-    errorMessage: (0, import_fields41.text)({ access: agentFieldAccess }),
+    requestDigest: (0, import_fields43.text)({ validation: { isRequired: true } }),
+    requestEnvelope: (0, import_fields43.json)({ access: agentFieldAccess }),
+    requiresApproval: (0, import_fields43.checkbox)({ defaultValue: true }),
+    requestedByUser: (0, import_fields43.relationship)({ ref: "User" }),
+    approvedBy: (0, import_fields43.relationship)({ ref: "User" }),
+    approvalDigest: (0, import_fields43.text)(),
+    approvalExpiresAt: (0, import_fields43.timestamp)(),
+    reviewedAt: (0, import_fields43.timestamp)(),
+    rejectionReason: (0, import_fields43.text)({ access: agentFieldAccess }),
+    contact: (0, import_fields43.relationship)({ ref: "Contact" }),
+    intake: (0, import_fields43.relationship)({ ref: "Intake" }),
+    document: (0, import_fields43.relationship)({ ref: "Document" }),
+    invoice: (0, import_fields43.relationship)({ ref: "Invoice" }),
+    payment: (0, import_fields43.relationship)({ ref: "Payment" }),
+    trustTransaction: (0, import_fields43.relationship)({ ref: "TrustTransaction" }),
+    deadline: (0, import_fields43.relationship)({ ref: "Deadline" }),
+    task: (0, import_fields43.relationship)({ ref: "LegalTask" }),
+    startedAt: (0, import_fields43.timestamp)(),
+    completedAt: (0, import_fields43.timestamp)(),
+    resultDigest: (0, import_fields43.text)(),
+    resultEnvelope: (0, import_fields43.json)({ access: agentFieldAccess }),
+    errorMessage: (0, import_fields43.text)({ access: agentFieldAccess }),
     events: readOnlyRelationship("AgentActionEvent.action", true),
     ...trackingFields
   }
 });
-var AgentActionEvent = (0, import_core20.list)({
+var AgentActionEvent = (0, import_core21.list)({
   access: {
     operation: {
       query: canReadAgents,
@@ -7241,16 +7757,16 @@ var AgentActionEvent = (0, import_core20.list)({
   },
   fields: {
     firm: firmRelationship(),
-    matter: (0, import_fields41.relationship)({ ref: "Matter" }),
+    matter: (0, import_fields43.relationship)({ ref: "Matter" }),
     action: requiredRelationship("AgentAction.events"),
-    eventType: (0, import_fields41.text)({ validation: { isRequired: true } }),
-    fromStatus: (0, import_fields41.text)(),
-    toStatus: (0, import_fields41.text)(),
-    actorUser: (0, import_fields41.relationship)({ ref: "User" }),
-    actorAgent: (0, import_fields41.relationship)({ ref: "AgentPrincipal.actionEvents" }),
-    reason: (0, import_fields41.text)({ access: agentFieldAccess }),
-    occurredAt: (0, import_fields41.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
-    metadata: (0, import_fields41.json)({
+    eventType: (0, import_fields43.text)({ validation: { isRequired: true } }),
+    fromStatus: (0, import_fields43.text)(),
+    toStatus: (0, import_fields43.text)(),
+    actorUser: (0, import_fields43.relationship)({ ref: "User" }),
+    actorAgent: (0, import_fields43.relationship)({ ref: "AgentPrincipal.actionEvents" }),
+    reason: (0, import_fields43.text)({ access: agentFieldAccess }),
+    occurredAt: (0, import_fields43.timestamp)({ defaultValue: { kind: "now" }, validation: { isRequired: true } }),
+    metadata: (0, import_fields43.json)({
       access: agentFieldAccess,
       ui: { description: "Bounded action evidence; never privileged content or credential material." }
     }),
@@ -7295,7 +7811,6 @@ var modelDefinitions = {
   CommunicationThread,
   CommunicationParticipant,
   CommunicationMessage,
-  CommunicationDelivery,
   Document,
   DocumentVersion,
   SignatureRequest,
@@ -7315,6 +7830,7 @@ var modelDefinitions = {
   TrustBalanceSnapshot,
   TrustReconciliation,
   Payment,
+  PaymentProvider,
   PaymentAllocation,
   Refund,
   PortalAccount,
@@ -7371,9 +7887,9 @@ function boundedReason(value, label = "Reason", minimum = 3, maximum = 2e3) {
   return reason;
 }
 function optionalBoundedText(value, label, maximum = 2e3) {
-  const text23 = value?.trim() || null;
-  if (text23 && text23.length > maximum) throw new Error(`${label} must be ${maximum} characters or fewer.`);
-  return text23;
+  const text24 = value?.trim() || null;
+  if (text24 && text24.length > maximum) throw new Error(`${label} must be ${maximum} characters or fewer.`);
+  return text24;
 }
 function workflowActor(context, userId) {
   const session = context.session;
@@ -7682,11 +8198,11 @@ var actionPermission = {
   "access.change": "canManageRoles"
 };
 function boundedText(value, label, min, max) {
-  const text23 = value?.trim();
-  if (!text23 || text23.length < min || text23.length > max) {
+  const text24 = value?.trim();
+  if (!text24 || text24.length < min || text24.length > max) {
     throw new Error(`${label} must be between ${min} and ${max} characters.`);
   }
-  return text23;
+  return text24;
 }
 async function assertMatterAccess2(prisma, firmId, matterId, userId) {
   const matter = await prisma.matter.findFirst({
@@ -8023,6 +8539,7 @@ async function reviewAgentAction(_root, args, context) {
       throw new Error(currentAuthorization.reason ?? "The agent grant is no longer valid for this request.");
     }
     const nextStatus = args.decision === "approve" ? "approved" : "rejected";
+    assertLifecycleTransition("agentAction", current.status, nextStatus);
     const reviewed = await tx.agentAction.update({
       where: { id: action.id },
       data: {
@@ -8066,6 +8583,56 @@ var GRAPHQL_INT_MAX = 2147483647;
 function isGraphqlInt(value) {
   return Number.isInteger(value) && value >= GRAPHQL_INT_MIN && value <= GRAPHQL_INT_MAX;
 }
+
+// features/integrations/payment/index.ts
+var paymentProviderAdapters = {
+  stripe: () => Promise.resolve().then(() => (init_stripe(), stripe_exports)),
+  paypal: () => Promise.resolve().then(() => (init_paypal(), paypal_exports)),
+  manual: () => Promise.resolve().then(() => (init_manual(), manual_exports))
+};
+
+// features/keystone/utils/paymentProviderAdapter.ts
+var ADAPTERS = new Set(Object.keys(paymentProviderAdapters));
+var OPERATIONS = /* @__PURE__ */ new Set(["createPaymentFunction", "capturePaymentFunction", "refundPaymentFunction", "getPaymentStatusFunction", "generatePaymentLinkFunction", "handleWebhookFunction"]);
+var INPUT_KEYS = /* @__PURE__ */ new Set(["invoice", "retainer", "consultation", "firmId", "paymentId", "amount", "currency", "idempotencyKey", "successUrl", "cancelUrl", "refundId", "event", "headers", "rawBody"]);
+function paymentAdapterPayload(provider, args) {
+  const input = {};
+  for (const [key, value] of Object.entries(args ?? {})) if (INPUT_KEYS.has(key) && value !== void 0) input[key] = value;
+  for (const key of ["invoice", "retainer", "consultation"]) {
+    const record = input[key];
+    if (record) input[key] = Object.fromEntries(["id", "number", "title", "email"].filter((field) => record[field] !== void 0).map((field) => [field, record[field]]));
+  }
+  if (input.headers && typeof input.headers === "object") {
+    input.headers = Object.fromEntries(Object.entries(input.headers).filter(([key]) => key.toLowerCase() === "stripe-signature" || key === "__rawBody"));
+  }
+  return { ...input, provider: { id: provider.id, code: provider.code, credentials: provider.credentials || {} } };
+}
+async function executeAdapterFunction({ provider, functionName, args }) {
+  if (!OPERATIONS.has(functionName)) throw new Error("Unknown payment adapter operation");
+  const selector = provider?.[functionName];
+  if (typeof selector !== "string") throw new Error("Payment adapter is not configured");
+  const payload = paymentAdapterPayload(provider, args);
+  if (/^https:/i.test(selector)) {
+    try {
+      const response = await fetch(selector, { method: "POST", redirect: "error", signal: AbortSignal.timeout(3e4), headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!response.ok) throw new Error();
+      return await response.json();
+    } catch {
+      throw new Error("External payment adapter request failed; reconcile the original attempt before retrying");
+    }
+  }
+  if (!ADAPTERS.has(selector)) throw new Error("Unknown registered payment adapter");
+  try {
+    const adapter = await paymentProviderAdapters[selector]();
+    if (typeof adapter[functionName] !== "function") throw new Error();
+    return await adapter[functionName](payload);
+  } catch {
+    throw new Error(`Payment adapter ${functionName} failed; reconcile the original attempt before retrying`);
+  }
+}
+var createPayment = (args) => executeAdapterFunction({ ...args, functionName: "createPaymentFunction", args });
+var refundPayment = (args) => executeAdapterFunction({ ...args, functionName: "refundPaymentFunction", args });
+var getPaymentStatus = (args) => executeAdapterFunction({ ...args, functionName: "getPaymentStatusFunction", args });
 
 // features/keystone/mutations/billingWorkflows.ts
 function idempotencyKey(value) {
@@ -8274,6 +8841,108 @@ function invoiceStatusAfterPayment(invoice, paidMinor, now) {
   if (paidMinor > 0) return "partially_paid";
   return invoice.dueAt && invoice.dueAt < now ? "overdue" : "issued";
 }
+async function applyInvoiceAllocation(tx, input) {
+  const { firmId, paymentId, invoiceId, amountMinor, idempotencyKey: key, actorUserId: userId } = input;
+  const note = input.note ?? void 0;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`allocation:${firmId}:${key}`}))`;
+  const replay = await tx.paymentAllocation.findFirst({
+    where: { firmId, idempotencyKey: key },
+    include: {
+      invoice: { select: { matterId: true } },
+      payment: { select: { matterId: true } }
+    }
+  });
+  if (replay) {
+    if (replay.paymentId !== paymentId || replay.invoiceId !== invoiceId || replay.amountMinor !== amountMinor || replay.allocationType !== "invoice" || replay.note !== (note ?? "")) {
+      throw new Error("Payment allocation idempotency key was reused with a different payload.");
+    }
+    if (!replay.invoice) throw new Error("Payment allocation replay invoice is unavailable.");
+    if (userId) {
+      await assertMatterAccess(tx, firmId, replay.invoice.matterId, userId);
+      await assertMatterTeamCapability(tx, firmId, replay.invoice.matterId, userId, "canBill");
+      if (replay.payment?.matterId) {
+        await assertMatterAccess(tx, firmId, replay.payment.matterId, userId);
+        await assertMatterTeamCapability(tx, firmId, replay.payment.matterId, userId, "canBill");
+      }
+    }
+    return { allocation: replay, replayed: true };
+  }
+  const [payment, invoice] = await Promise.all([
+    tx.payment.findFirst({ where: { id: paymentId, firmId } }),
+    tx.invoice.findFirst({ where: { id: invoiceId, firmId } })
+  ]);
+  if (!payment || !invoice) throw new Error("Payment and invoice must exist in the active firm.");
+  if (payment.matterId && payment.matterId !== invoice.matterId) {
+    throw new Error("Payment and invoice must use the same matter scope.");
+  }
+  if (userId) {
+    await assertMatterAccess(tx, firmId, invoice.matterId, userId);
+    await assertMatterTeamCapability(tx, firmId, invoice.matterId, userId, "canBill");
+  }
+  if (!(/* @__PURE__ */ new Set(["captured", "settled"])).has(payment.status)) {
+    throw new Error("Only a captured or settled payment can be allocated.");
+  }
+  if (payment.paymentType !== "operating") {
+    throw new Error("Trust deposits require a controlled trust-funds application and cannot use operating payment allocation.");
+  }
+  if (!(/* @__PURE__ */ new Set(["issued", "partially_paid", "overdue"])).has(invoice.status)) {
+    throw new Error("Payment can be allocated only to an open issued invoice.");
+  }
+  if (payment.currencyCode !== invoice.currencyCode) throw new Error("Payment and invoice currencies must match.");
+  const sums = await tx.paymentAllocation.groupBy({
+    by: ["allocationType"],
+    where: { paymentId: payment.id },
+    _sum: { amountMinor: true }
+  });
+  const allocated = sums.reduce((total, row) => total + (row.allocationType === "reversal" ? -(row._sum.amountMinor ?? 0) : row._sum.amountMinor ?? 0), 0);
+  const available = payment.amountMinor - payment.refundedMinor - allocated;
+  if (amountMinor > available) throw new Error("Payment allocation exceeds the unallocated payment amount.");
+  if (amountMinor > invoice.balanceDueMinor) throw new Error("Payment allocation exceeds the invoice balance.");
+  const now = /* @__PURE__ */ new Date();
+  const allocation = await tx.paymentAllocation.create({
+    data: {
+      firmId,
+      matterId: invoice.matterId,
+      paymentId: payment.id,
+      invoiceId: invoice.id,
+      idempotencyKey: key,
+      allocationType: "invoice",
+      amountMinor,
+      currencyCode: payment.currencyCode,
+      allocatedById: userId ?? null,
+      allocatedAt: now,
+      note: note ?? ""
+    }
+  });
+  const paidMinor = invoice.paidMinor + amountMinor;
+  const balanceDueMinor = invoice.totalMinor - paidMinor;
+  if (!isGraphqlInt(paidMinor) || !isGraphqlInt(balanceDueMinor) || balanceDueMinor < 0) {
+    throw new Error("Payment allocation exceeds the invoice integer range.");
+  }
+  const status = invoiceStatusAfterPayment(invoice, paidMinor, now);
+  assertLifecycleTransition("invoice", invoice.status, status);
+  await tx.invoice.update({
+    where: { id: invoice.id },
+    data: {
+      paidMinor,
+      balanceDueMinor,
+      status,
+      ...status === "paid" ? { paidAt: now } : {}
+    }
+  });
+  await recordAuditEvent(tx, {
+    firmId,
+    eventType: "payment.allocated",
+    category: "financial",
+    actorUserId: userId ?? null,
+    ...userId ? {} : { actorType: "system" },
+    matterId: invoice.matterId,
+    invoiceId: invoice.id,
+    paymentId: payment.id,
+    metadata: { allocationId: allocation.id, amountMinor, currencyCode: payment.currencyCode, ...userId ? {} : { source: "online" } }
+  });
+  return { allocation, replayed: false };
+}
 async function allocatePayment(_root, args, context) {
   const { firmId, userId } = requirePermission(context, "canManagePayments", { humanOnly: true });
   const key = idempotencyKey(args.idempotencyKey);
@@ -8284,99 +8953,15 @@ async function allocatePayment(_root, args, context) {
   const prisma = context.prisma;
   return runSerializableTransaction(prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManagePayments");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`allocation:${firmId}:${key}`}))`;
-    const replay = await tx.paymentAllocation.findFirst({
-      where: { firmId, idempotencyKey: key },
-      include: {
-        invoice: { select: { matterId: true } },
-        payment: { select: { matterId: true } }
-      }
-    });
-    if (replay) {
-      if (replay.paymentId !== args.paymentId || replay.invoiceId !== args.invoiceId || replay.amountMinor !== args.amountMinor || replay.allocationType !== "invoice" || replay.note !== (note ?? "")) {
-        throw new Error("Payment allocation idempotency key was reused with a different payload.");
-      }
-      if (!replay.invoice) throw new Error("Payment allocation replay invoice is unavailable.");
-      await assertMatterAccess(tx, firmId, replay.invoice.matterId, userId);
-      await assertMatterTeamCapability(tx, firmId, replay.invoice.matterId, userId, "canBill");
-      if (replay.payment?.matterId) {
-        await assertMatterAccess(tx, firmId, replay.payment.matterId, userId);
-        await assertMatterTeamCapability(tx, firmId, replay.payment.matterId, userId, "canBill");
-      }
-      return { allocation: replay, replayed: true };
-    }
-    const [payment, invoice] = await Promise.all([
-      tx.payment.findFirst({ where: { id: args.paymentId, firmId } }),
-      tx.invoice.findFirst({ where: { id: args.invoiceId, firmId } })
-    ]);
-    if (!payment || !invoice) throw new Error("Payment and invoice must exist in the active firm.");
-    if (payment.matterId && payment.matterId !== invoice.matterId) {
-      throw new Error("Payment and invoice must use the same matter scope.");
-    }
-    await assertMatterAccess(tx, firmId, invoice.matterId, userId);
-    await assertMatterTeamCapability(tx, firmId, invoice.matterId, userId, "canBill");
-    if (!(/* @__PURE__ */ new Set(["captured", "settled"])).has(payment.status)) {
-      throw new Error("Only a captured or settled payment can be allocated.");
-    }
-    if (payment.paymentType !== "operating") {
-      throw new Error("Trust deposits require a controlled trust-funds application and cannot use operating payment allocation.");
-    }
-    if (!(/* @__PURE__ */ new Set(["issued", "partially_paid", "overdue"])).has(invoice.status)) {
-      throw new Error("Payment can be allocated only to an open issued invoice.");
-    }
-    if (payment.currencyCode !== invoice.currencyCode) throw new Error("Payment and invoice currencies must match.");
-    const sums = await tx.paymentAllocation.groupBy({
-      by: ["allocationType"],
-      where: { paymentId: payment.id },
-      _sum: { amountMinor: true }
-    });
-    const allocated = sums.reduce((total, row) => total + (row.allocationType === "reversal" ? -(row._sum.amountMinor ?? 0) : row._sum.amountMinor ?? 0), 0);
-    const available = payment.amountMinor - payment.refundedMinor - allocated;
-    if (args.amountMinor > available) throw new Error("Payment allocation exceeds the unallocated payment amount.");
-    if (args.amountMinor > invoice.balanceDueMinor) throw new Error("Payment allocation exceeds the invoice balance.");
-    const now = /* @__PURE__ */ new Date();
-    const allocation = await tx.paymentAllocation.create({
-      data: {
-        firmId,
-        matterId: invoice.matterId,
-        paymentId: payment.id,
-        invoiceId: invoice.id,
-        idempotencyKey: key,
-        allocationType: "invoice",
-        amountMinor: args.amountMinor,
-        currencyCode: payment.currencyCode,
-        allocatedById: userId,
-        allocatedAt: now,
-        note: note ?? ""
-      }
-    });
-    const paidMinor = invoice.paidMinor + args.amountMinor;
-    const balanceDueMinor = invoice.totalMinor - paidMinor;
-    if (!isGraphqlInt(paidMinor) || !isGraphqlInt(balanceDueMinor) || balanceDueMinor < 0) {
-      throw new Error("Payment allocation exceeds the invoice integer range.");
-    }
-    const status = invoiceStatusAfterPayment(invoice, paidMinor, now);
-    assertLifecycleTransition("invoice", invoice.status, status);
-    await tx.invoice.update({
-      where: { id: invoice.id },
-      data: {
-        paidMinor,
-        balanceDueMinor,
-        status,
-        ...status === "paid" ? { paidAt: now } : {}
-      }
-    });
-    await recordAuditEvent(tx, {
+    return applyInvoiceAllocation(tx, {
       firmId,
-      eventType: "payment.allocated",
-      category: "financial",
+      paymentId: args.paymentId,
+      invoiceId: args.invoiceId,
+      amountMinor: args.amountMinor,
+      idempotencyKey: key,
       actorUserId: userId,
-      matterId: invoice.matterId,
-      invoiceId: invoice.id,
-      paymentId: payment.id,
-      metadata: { allocationId: allocation.id, amountMinor: args.amountMinor, currencyCode: payment.currencyCode }
+      note
     });
-    return { allocation, replayed: false };
   });
 }
 async function reversePaymentAllocation(_root, args, context) {
@@ -8774,6 +9359,115 @@ async function recordManualPayment(_root, args, context) {
     return { payment, replayed: false };
   });
 }
+async function refundCardPayment(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManagePayments", { humanOnly: true });
+  const key = idempotencyKey(args.idempotencyKey);
+  if (!refundReasons.has(args.reason)) throw new Error("Unsupported refund reason.");
+  const explanation = boundedReason(args.explanation, "Refund explanation", 10, 4e3);
+  const prisma = context.prisma;
+  const replay = await prisma.refund.findFirst({ where: { firmId, idempotencyKey: key } });
+  if (replay) {
+    if (replay.paymentId !== args.paymentId) throw new Error("Refund idempotency key was reused with a different payload.");
+    return { refund: replay, replayed: true };
+  }
+  const payment = await prisma.payment.findFirst({
+    where: { id: args.paymentId, firmId },
+    include: { paymentProvider: true, allocations: true, refunds: true }
+  });
+  if (!payment || !(/* @__PURE__ */ new Set(["captured", "settled"])).has(payment.status)) throw new Error("Only a captured or settled payment can be refunded.");
+  if (payment.paymentType !== "operating") throw new Error("Trust deposits are refunded through a trust disbursement.");
+  if (!payment.paymentProvider?.isInstalled || !String(payment.providerCode).startsWith("pp_stripe") || !payment.providerPaymentId) {
+    throw new Error("Only an online card payment can be refunded to the card.");
+  }
+  if (payment.refunds.some((row) => ["requested", "approved", "processing", "succeeded"].includes(row.status))) {
+    throw new Error("This payment already has a refund.");
+  }
+  const matterId = payment.matterId ?? null;
+  if (matterId) {
+    await assertMatterAccess(prisma, firmId, matterId, userId);
+    await assertMatterTeamCapability(prisma, firmId, matterId, userId, "canBill");
+  }
+  const amountMinor = payment.amountMinor - payment.refundedMinor;
+  if (amountMinor <= 0) throw new Error("Nothing is left to refund on this payment.");
+  const status = await getPaymentStatus({ provider: payment.paymentProvider, paymentId: payment.providerPaymentId });
+  const intentId = status?.paymentIntentId || (String(payment.providerPaymentId).startsWith("pi_") ? payment.providerPaymentId : null);
+  if (!intentId) throw new Error("The card payment has no settled charge to refund.");
+  const providerRefund = await refundPayment({ provider: payment.paymentProvider, paymentId: intentId, amount: amountMinor, idempotencyKey: `law-refund:${firmId}:${key}` });
+  const providerRefundId = String(providerRefund?.data?.id ?? "");
+  if (!["succeeded", "pending"].includes(providerRefund?.status) || providerRefund?.amount !== amountMinor || !providerRefundId) {
+    throw new Error("The card refund was not accepted; check the provider before retrying.");
+  }
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManagePayments");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`refund-payment:${firmId}:${payment.id}`}))`;
+    const again = await tx.refund.findFirst({ where: { firmId, idempotencyKey: key } });
+    if (again) return { refund: again, replayed: true };
+    const now = /* @__PURE__ */ new Date();
+    const live = await tx.paymentAllocation.findMany({
+      where: { paymentId: payment.id, firmId, allocationType: "invoice", reversalAllocations: { none: {} } },
+      include: { invoice: true }
+    });
+    for (const original of live) {
+      await tx.paymentAllocation.create({
+        data: {
+          firmId,
+          matterId: original.matterId,
+          paymentId: original.paymentId,
+          invoiceId: original.invoiceId,
+          idempotencyKey: `${key}:reverse:${original.id}`.slice(0, 160),
+          allocationType: "reversal",
+          amountMinor: original.amountMinor,
+          currencyCode: original.currencyCode,
+          allocatedById: userId,
+          allocatedAt: now,
+          reversesAllocationId: original.id,
+          note: "Card payment refunded"
+        }
+      });
+      if (original.invoice) {
+        const invoice = await tx.invoice.findUnique({ where: { id: original.invoice.id } });
+        const paidMinor = Math.max(0, invoice.paidMinor - original.amountMinor);
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: { paidMinor, balanceDueMinor: invoice.totalMinor - paidMinor, status: invoiceStatusAfterPayment(invoice, paidMinor, now), paidAt: null }
+        });
+      }
+    }
+    const refund = await tx.refund.create({
+      data: {
+        firmId,
+        matterId,
+        paymentId: payment.id,
+        invoiceId: payment.invoiceId,
+        refundNumber: `REF-${(0, import_node_crypto8.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+        idempotencyKey: key,
+        status: "succeeded",
+        reason: args.reason,
+        amountMinor,
+        currencyCode: payment.currencyCode,
+        explanation,
+        requestedById: userId,
+        requestedAt: now,
+        approvedById: userId,
+        approvedAt: now,
+        processedAt: now,
+        providerRefundId
+      }
+    });
+    await tx.payment.update({ where: { id: payment.id }, data: { refundedMinor: { increment: amountMinor } } });
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "refund.succeeded",
+      category: "financial",
+      actorUserId: userId,
+      matterId,
+      invoiceId: payment.invoiceId,
+      paymentId: payment.id,
+      metadata: { refundId: refund.id, providerRefundId, amountMinor, source: "card_refund" }
+    });
+    return { refund, replayed: false };
+  });
+}
 
 // features/keystone/lib/conflict-status.ts
 var blockingConflictCheckStatuses = ["requested", "running", "review_required", "conflict_found", "failed"];
@@ -8812,23 +9506,27 @@ var intakeClearancePath = {
   conflict_review: ["decision"],
   consultation: ["decision"]
 };
-async function advanceIntakeAfterConflictClearance(tx, context, input) {
+var intakeAutoPaths = {
+  conflict_review: { new: ["screening", "conflict_review"], screening: ["conflict_review"] },
+  consultation: { new: ["screening", "conflict_review", "consultation"], screening: ["conflict_review", "consultation"], conflict_review: ["consultation"] },
+  decision: intakeClearancePath
+};
+async function intakeAutomationActor(tx, context) {
   const session = context.session;
-  if (!isInteractiveHumanSession(session) || !permissions.canManageIntake({ session })) return null;
+  if (!isInteractiveHumanSession(session) || !permissions.canManageIntake({ session })) return false;
   try {
     await assertCurrentCommandActor(tx, context, "canManageIntake");
+    return true;
   } catch {
-    return null;
+    return false;
   }
+}
+async function walkIntake(tx, input) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`intake:${input.firmId}:${input.intakeId}`}))`;
   const intake = await tx.intake.findFirst({ where: { id: input.intakeId, firmId: input.firmId }, select: { id: true, status: true } });
-  const path = intake ? intakeClearancePath[intake.status] : void 0;
+  const path = intake ? intakeAutoPaths[input.target][intake.status] : void 0;
   if (!intake || !path) return null;
-  const [cleared, blocking] = await Promise.all([
-    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: "cleared" } }),
-    tx.conflictCheck.count({ where: { firmId: input.firmId, intakeId: intake.id, status: { in: [...blockingConflictCheckStatuses] } } })
-  ]);
-  if (!cleared || blocking) return null;
+  if (input.gate && !await input.gate(intake)) return null;
   let fromStatus = intake.status;
   for (const toStatus of path) {
     assertLifecycleTransition("intake", fromStatus, toStatus);
@@ -8838,14 +9536,47 @@ async function advanceIntakeAfterConflictClearance(tx, context, input) {
       category: "legal_workflow",
       actorUserId: input.userId,
       intakeId: intake.id,
-      metadata: { fromStatus, toStatus, cause: "conflict_check_cleared", conflictCheckId: input.checkId, reasonDigest: sha256Digest("Conflict check cleared.") }
+      metadata: { fromStatus, toStatus, cause: input.cause, ...input.metadata }
     });
     fromStatus = toStatus;
   }
-  await tx.intake.update({ where: { id: intake.id }, data: { status: "decision" } });
-  return { intakeId: intake.id, fromStatus: intake.status, toStatus: "decision" };
+  await tx.intake.update({ where: { id: intake.id }, data: { status: fromStatus } });
+  return { intakeId: intake.id, fromStatus: intake.status, toStatus: fromStatus };
 }
-function text22(value, label, maximum, required = true) {
+async function advanceIntakeOnConflictProgress(tx, context, input) {
+  if (!["running", "review_required"].includes(input.checkStatus)) return null;
+  if (!await intakeAutomationActor(tx, context)) return null;
+  return walkIntake(tx, { ...input, target: "conflict_review", cause: `conflict_check_${input.checkStatus}`, metadata: { conflictCheckId: input.checkId } });
+}
+async function conflictsClear(tx, firmId, intakeId) {
+  const [cleared, blocking] = await Promise.all([
+    tx.conflictCheck.count({ where: { firmId, intakeId, status: "cleared" } }),
+    tx.conflictCheck.count({ where: { firmId, intakeId, status: { in: [...blockingConflictCheckStatuses] } } })
+  ]);
+  return Boolean(cleared) && !blocking;
+}
+async function advanceIntakeAfterConsultation(tx, context, input) {
+  if (!await intakeAutomationActor(tx, context)) return null;
+  return walkIntake(tx, {
+    ...input,
+    target: "decision",
+    cause: "consultation_completed",
+    metadata: { consultationId: input.consultationId, outcome: input.outcome ?? null },
+    gate: (intake) => conflictsClear(tx, input.firmId, intake.id)
+  });
+}
+async function advanceIntakeAfterConflictClearance(tx, context, input) {
+  if (!await intakeAutomationActor(tx, context)) return null;
+  const openConsultations = await tx.consultation.count({ where: { firmId: input.firmId, intakeId: input.intakeId, status: { in: ["requested", "scheduled"] } } });
+  return walkIntake(tx, {
+    ...input,
+    target: openConsultations ? "consultation" : "decision",
+    cause: "conflict_check_cleared",
+    metadata: { conflictCheckId: input.checkId, reasonDigest: sha256Digest("Conflict check cleared.") },
+    gate: (intake) => conflictsClear(tx, input.firmId, intake.id)
+  });
+}
+function text23(value, label, maximum, required = true) {
   const result = typeof value === "string" ? value.trim() : "";
   if (required && !result || result.length > maximum) throw new Error(`${label} ${required ? "is required and " : ""}must be ${maximum} characters or fewer.`);
   return result || null;
@@ -8856,15 +9587,15 @@ async function startClientIntake(_root, args, context) {
     throw new Error("Starting an intake requires people-management and conflict-check permission.");
   }
   if (!["person", "organization"].includes(args.contactType)) throw new Error("Contact type must be person or organization.");
-  const firstName = text22(args.firstName, "First name", 120, args.contactType === "person");
-  const lastName = text22(args.lastName, "Last name", 120, args.contactType === "person");
-  const organizationName = text22(args.organizationName, "Organization name", 200, args.contactType === "organization");
-  const email = text22(args.email, "Email", 320, false)?.toLowerCase() ?? null;
+  const firstName = text23(args.firstName, "First name", 120, args.contactType === "person");
+  const lastName = text23(args.lastName, "Last name", 120, args.contactType === "person");
+  const organizationName = text23(args.organizationName, "Organization name", 200, args.contactType === "organization");
+  const email = text23(args.email, "Email", 320, false)?.toLowerCase() ?? null;
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Email must be valid.");
-  const phone = text22(args.phone, "Phone", 80, false);
-  const title = text22(args.title, "Intake title", 240);
-  const summary = text22(args.summary, "Intake summary", 4e3, false);
-  const adversePartySummary = text22(args.adversePartySummary, "Adverse-party summary", 2e3, false);
+  const phone = text23(args.phone, "Phone", 80, false);
+  const title = text23(args.title, "Intake title", 240);
+  const summary = text23(args.summary, "Intake summary", 4e3, false);
+  const adversePartySummary = text23(args.adversePartySummary, "Adverse-party summary", 2e3, false);
   const source = args.source?.trim() || "other";
   const contactName2 = args.contactType === "organization" ? organizationName : [firstName, lastName].filter(Boolean).join(" ");
   if (!contactName2) throw new Error("A conflict-search name is required.");
@@ -9299,6 +10030,9 @@ async function transitionConflictCheck(_root, args, context) {
       intakeId: check.intakeId,
       metadata: { checkId: check.id, fromStatus: check.status, toStatus: args.toStatus }
     });
+    if (check.intakeId) {
+      await advanceIntakeOnConflictProgress(tx, context, { firmId, userId, intakeId: check.intakeId, checkId: check.id, checkStatus: args.toStatus });
+    }
     return { check: updated, replayed: false };
   });
 }
@@ -9819,12 +10553,7 @@ function assertExactTrustSourcePosting(args) {
     throw new Error("A source refund posting must exactly debit client liability and credit bank control for the refund amount.");
   }
 }
-async function postTrustTransaction(_root, { data }, context) {
-  const session = context.session;
-  const firmId = activeFirmId(session);
-  if (!firmId || !session?.itemId || !permissions.canManageTrust({ session })) {
-    throw new Error("You do not have permission to post trust transactions.");
-  }
+async function applyTrustPosting(tx, firmId, userId, data, actor) {
   const description = requiredText(data.description, "Description", 2e3);
   if (!transactionTypes.has(data.transactionType)) throw new Error("Unsupported trust transaction type.");
   if (data.sourcePaymentId && data.sourceRefundId) {
@@ -9858,566 +10587,227 @@ async function postTrustTransaction(_root, { data }, context) {
   const ledgerIds = [...new Set(data.entries.flatMap(
     (entry) => entry.ledgerAccountId ? [entry.ledgerAccountId] : []
   ))];
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storedIdempotencyKey}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-account:${firmId}:${data.trustAccountId}`}))`;
+  const replay = await tx.trustTransaction.findUnique({
+    where: { idempotencyKey: storedIdempotencyKey },
+    include: { entries: true }
+  });
+  if (replay) {
+    if (replay.postingDigest !== postingDigest) {
+      throw new Error("Idempotency key was already used for a different trust posting.");
+    }
+    if (userId) await assertTrustReplayMatterAccess(tx, firmId, userId, replay.entries);
+    return { transaction: replay, replayed: true };
+  }
+  const account2 = await tx.trustAccount.findFirst({
+    where: { id: data.trustAccountId, firmId, status: "active" },
+    select: { id: true, currencyCode: true }
+  });
+  if (!account2) throw new Error("Active trust account not found in the active firm.");
+  if (account2.currencyCode !== data.currencyCode) {
+    throw new Error("Trust transaction currency must match the trust account currency.");
+  }
+  const completedPeriods = await tx.trustReconciliation.findMany({
+    where: {
+      firmId,
+      trustAccountId: account2.id,
+      status: "completed",
+      periodEnd: { gte: occurredAt }
+    },
+    select: { status: true, periodStart: true, periodEnd: true }
+  });
+  assertTrustPostingPeriodOpen(occurredAt, completedPeriods);
+  const ledgers = ledgerIds.length ? await tx.trustLedgerAccount.findMany({
+    where: {
+      id: { in: ledgerIds },
+      firmId,
+      trustAccountId: account2.id,
+      currencyCode: data.currencyCode,
+      status: "active",
+      ...userId ? matterAccessWhere(userId) : {}
+    },
+    select: { id: true, matterId: true }
+  }) : [];
+  if (ledgers.length !== ledgerIds.length) {
+    throw new Error("Every client ledger must be active, accessible, and belong to the selected trust account and firm.");
+  }
+  const ledgerById = new Map(ledgers.map((ledger) => [ledger.id, ledger]));
+  if (data.reversesTransactionId) {
+    if (data.transactionType !== "reversal") {
+      throw new Error("A transaction with a reversal reference must use the reversal type.");
+    }
+    const [original, priorReversal] = await Promise.all([
+      tx.trustTransaction.findFirst({
+        where: {
+          id: data.reversesTransactionId,
+          firmId,
+          trustAccountId: account2.id,
+          currencyCode: data.currencyCode
+        },
+        include: { entries: true }
+      }),
+      tx.trustTransaction.findFirst({
+        where: { firmId, reversesTransactionId: data.reversesTransactionId },
+        select: { id: true }
+      })
+    ]);
+    if (!original) throw new Error("Reversed transaction not found in the selected trust account and firm.");
+    if (priorReversal) throw new Error("The referenced trust transaction already has a reversal.");
+    assertExactReversal(original.entries, data.entries, data.currencyCode);
+  } else if (data.transactionType === "reversal") {
+    throw new Error("A reversal must reference the transaction it corrects.");
+  }
+  if (data.sourcePaymentId) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-source-payment:${firmId}:${data.sourcePaymentId}`}))`;
+    const payment = await tx.payment.findFirst({
+      where: { id: data.sourcePaymentId, firmId, ...userId ? matterAccessWhere(userId) : {} },
+      select: {
+        id: true,
+        matterId: true,
+        paymentType: true,
+        status: true,
+        amountMinor: true,
+        currencyCode: true,
+        trustAccountId: true,
+        trustTransactions: { select: { id: true } }
+      }
+    });
+    if (!payment) throw new Error("Payment not found in the accessible active-firm scope.");
+    assertExactTrustSourcePosting({
+      kind: "payment",
+      source: payment,
+      transactionType: data.transactionType,
+      trustAccountId: account2.id,
+      currencyCode: data.currencyCode,
+      ledgers,
+      entries: data.entries
+    });
+  }
+  if (data.sourceRefundId) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-source-refund:${firmId}:${data.sourceRefundId}`}))`;
+    const refund = await tx.refund.findFirst({
+      where: { id: data.sourceRefundId, firmId, ...userId ? matterAccessWhere(userId) : {} },
+      select: {
+        id: true,
+        matterId: true,
+        status: true,
+        amountMinor: true,
+        currencyCode: true,
+        trustTransactions: { select: { id: true } },
+        payment: { select: { paymentType: true, trustAccountId: true } }
+      }
+    });
+    if (!refund) throw new Error("Refund not found in the accessible active-firm scope.");
+    assertExactTrustSourcePosting({
+      kind: "refund",
+      source: refund,
+      transactionType: data.transactionType,
+      trustAccountId: account2.id,
+      currencyCode: data.currencyCode,
+      ledgers,
+      entries: data.entries
+    });
+  }
+  if (ledgerIds.length) {
+    const historicalEntries = await tx.trustLedgerEntry.findMany({
+      where: {
+        firmId,
+        ledgerAccountId: { in: ledgerIds },
+        accountingBucket: "client_liability"
+      },
+      select: { ledgerAccountId: true, direction: true, amountMinor: true, occurredAt: true }
+    });
+    assertTrustLedgerHistoricalMinimumBalances(
+      historicalEntries,
+      data.entries.flatMap((entry) => entry.accountingBucket === "client_liability" && entry.ledgerAccountId ? [{ ledgerAccountId: entry.ledgerAccountId, direction: entry.direction, amountMinor: entry.amountMinor, occurredAt }] : [])
+    );
+  }
+  const transaction = await tx.trustTransaction.create({
+    data: {
+      firmId,
+      transactionNumber: `TRUST-${(0, import_node_crypto10.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+      idempotencyKey: storedIdempotencyKey,
+      postingDigest,
+      trustAccountId: account2.id,
+      transactionType: data.transactionType,
+      status: "posted",
+      currencyCode: data.currencyCode,
+      description,
+      occurredAt,
+      postedAt: /* @__PURE__ */ new Date(),
+      postedById: userId,
+      postedByAgentId: actor?.agentPrincipalId ?? null,
+      sourcePaymentId: data.sourcePaymentId ?? null,
+      sourceRefundId: data.sourceRefundId ?? null,
+      reversesTransactionId: data.reversesTransactionId ?? null
+    }
+  });
+  await tx.trustLedgerEntry.createMany({
+    data: data.entries.map((entry) => {
+      const ledger = entry.ledgerAccountId ? ledgerById.get(entry.ledgerAccountId) : null;
+      return {
+        firmId,
+        matterId: ledger?.matterId ?? null,
+        transactionId: transaction.id,
+        trustAccountId: account2.id,
+        ledgerAccountId: entry.ledgerAccountId ?? null,
+        accountingBucket: entry.accountingBucket,
+        direction: entry.direction,
+        amountMinor: entry.amountMinor,
+        currencyCode: data.currencyCode,
+        memo: normalizedMemo(entry.memo),
+        occurredAt
+      };
+    })
+  });
+  const posted = await tx.trustTransaction.findUnique({
+    where: { id: transaction.id },
+    include: { entries: true }
+  });
+  if (!posted) throw new Error("Trust posting could not be reloaded after creation.");
+  const postedMatterIds = [...new Set(posted.entries.map((entry) => entry.matterId).filter(Boolean))];
+  await tx.auditEvent.create({
+    data: {
+      firmId,
+      eventId: `trust-posting:${storedIdempotencyKey}`,
+      eventType: "trust.transaction_posted",
+      category: "financial",
+      outcome: "succeeded",
+      ...actor?.audit ?? (userId ? { actorUserId: userId, actorType: "user" } : { actorUserId: null, actorType: "system" }),
+      trustTransactionId: posted.id,
+      matterId: postedMatterIds.length === 1 ? String(postedMatterIds[0]) : null,
+      occurredAt: /* @__PURE__ */ new Date(),
+      metadata: {
+        postingDigest,
+        transactionType: data.transactionType,
+        currencyCode: data.currencyCode,
+        entryCount: data.entries.length,
+        reversal: Boolean(data.reversesTransactionId)
+      }
+    }
+  });
+  return { transaction: posted, replayed: false };
+}
+async function postTrustTransaction(_root, { data }, context) {
+  const session = context.session;
+  const firmId = activeFirmId(session);
+  if (!firmId || !session?.itemId || !permissions.canManageTrust({ session })) {
+    throw new Error("You do not have permission to post trust transactions.");
+  }
   const prisma = context.prisma;
   return runSerializableTransaction(prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManageTrust");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storedIdempotencyKey}))`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-account:${firmId}:${data.trustAccountId}`}))`;
-    const replay = await tx.trustTransaction.findUnique({
-      where: { idempotencyKey: storedIdempotencyKey },
-      include: { entries: true }
+    return applyTrustPosting(tx, firmId, session.itemId, data, {
+      agentPrincipalId: session.agentPrincipalId ?? null,
+      audit: workflowActor(context, session.itemId)
     });
-    if (replay) {
-      if (replay.postingDigest !== postingDigest) {
-        throw new Error("Idempotency key was already used for a different trust posting.");
-      }
-      await assertTrustReplayMatterAccess(tx, firmId, session.itemId, replay.entries);
-      return { transaction: replay, replayed: true };
-    }
-    const account2 = await tx.trustAccount.findFirst({
-      where: { id: data.trustAccountId, firmId, status: "active" },
-      select: { id: true, currencyCode: true }
-    });
-    if (!account2) throw new Error("Active trust account not found in the active firm.");
-    if (account2.currencyCode !== data.currencyCode) {
-      throw new Error("Trust transaction currency must match the trust account currency.");
-    }
-    const completedPeriods = await tx.trustReconciliation.findMany({
-      where: {
-        firmId,
-        trustAccountId: account2.id,
-        status: "completed",
-        periodEnd: { gte: occurredAt }
-      },
-      select: { status: true, periodStart: true, periodEnd: true }
-    });
-    assertTrustPostingPeriodOpen(occurredAt, completedPeriods);
-    const ledgers = ledgerIds.length ? await tx.trustLedgerAccount.findMany({
-      where: {
-        id: { in: ledgerIds },
-        firmId,
-        trustAccountId: account2.id,
-        currencyCode: data.currencyCode,
-        status: "active",
-        ...matterAccessWhere(session.itemId)
-      },
-      select: { id: true, matterId: true }
-    }) : [];
-    if (ledgers.length !== ledgerIds.length) {
-      throw new Error("Every client ledger must be active, accessible, and belong to the selected trust account and firm.");
-    }
-    const ledgerById = new Map(ledgers.map((ledger) => [ledger.id, ledger]));
-    if (data.reversesTransactionId) {
-      if (data.transactionType !== "reversal") {
-        throw new Error("A transaction with a reversal reference must use the reversal type.");
-      }
-      const [original, priorReversal] = await Promise.all([
-        tx.trustTransaction.findFirst({
-          where: {
-            id: data.reversesTransactionId,
-            firmId,
-            trustAccountId: account2.id,
-            currencyCode: data.currencyCode
-          },
-          include: { entries: true }
-        }),
-        tx.trustTransaction.findFirst({
-          where: { firmId, reversesTransactionId: data.reversesTransactionId },
-          select: { id: true }
-        })
-      ]);
-      if (!original) throw new Error("Reversed transaction not found in the selected trust account and firm.");
-      if (priorReversal) throw new Error("The referenced trust transaction already has a reversal.");
-      assertExactReversal(original.entries, data.entries, data.currencyCode);
-    } else if (data.transactionType === "reversal") {
-      throw new Error("A reversal must reference the transaction it corrects.");
-    }
-    if (data.sourcePaymentId) {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-source-payment:${firmId}:${data.sourcePaymentId}`}))`;
-      const payment = await tx.payment.findFirst({
-        where: { id: data.sourcePaymentId, firmId, ...matterAccessWhere(session.itemId) },
-        select: {
-          id: true,
-          matterId: true,
-          paymentType: true,
-          status: true,
-          amountMinor: true,
-          currencyCode: true,
-          trustAccountId: true,
-          trustTransactions: { select: { id: true } }
-        }
-      });
-      if (!payment) throw new Error("Payment not found in the accessible active-firm scope.");
-      assertExactTrustSourcePosting({
-        kind: "payment",
-        source: payment,
-        transactionType: data.transactionType,
-        trustAccountId: account2.id,
-        currencyCode: data.currencyCode,
-        ledgers,
-        entries: data.entries
-      });
-    }
-    if (data.sourceRefundId) {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`trust-source-refund:${firmId}:${data.sourceRefundId}`}))`;
-      const refund = await tx.refund.findFirst({
-        where: { id: data.sourceRefundId, firmId, ...matterAccessWhere(session.itemId) },
-        select: {
-          id: true,
-          matterId: true,
-          status: true,
-          amountMinor: true,
-          currencyCode: true,
-          trustTransactions: { select: { id: true } },
-          payment: { select: { paymentType: true, trustAccountId: true } }
-        }
-      });
-      if (!refund) throw new Error("Refund not found in the accessible active-firm scope.");
-      assertExactTrustSourcePosting({
-        kind: "refund",
-        source: refund,
-        transactionType: data.transactionType,
-        trustAccountId: account2.id,
-        currencyCode: data.currencyCode,
-        ledgers,
-        entries: data.entries
-      });
-    }
-    if (ledgerIds.length) {
-      const historicalEntries = await tx.trustLedgerEntry.findMany({
-        where: {
-          firmId,
-          ledgerAccountId: { in: ledgerIds },
-          accountingBucket: "client_liability"
-        },
-        select: { ledgerAccountId: true, direction: true, amountMinor: true, occurredAt: true }
-      });
-      assertTrustLedgerHistoricalMinimumBalances(
-        historicalEntries,
-        data.entries.flatMap((entry) => entry.accountingBucket === "client_liability" && entry.ledgerAccountId ? [{ ledgerAccountId: entry.ledgerAccountId, direction: entry.direction, amountMinor: entry.amountMinor, occurredAt }] : [])
-      );
-    }
-    const transaction = await tx.trustTransaction.create({
-      data: {
-        firmId,
-        transactionNumber: `TRUST-${(0, import_node_crypto10.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
-        idempotencyKey: storedIdempotencyKey,
-        postingDigest,
-        trustAccountId: account2.id,
-        transactionType: data.transactionType,
-        status: "posted",
-        currencyCode: data.currencyCode,
-        description,
-        occurredAt,
-        postedAt: /* @__PURE__ */ new Date(),
-        postedById: session.itemId,
-        postedByAgentId: session.agentPrincipalId ?? null,
-        sourcePaymentId: data.sourcePaymentId ?? null,
-        sourceRefundId: data.sourceRefundId ?? null,
-        reversesTransactionId: data.reversesTransactionId ?? null
-      }
-    });
-    await tx.trustLedgerEntry.createMany({
-      data: data.entries.map((entry) => {
-        const ledger = entry.ledgerAccountId ? ledgerById.get(entry.ledgerAccountId) : null;
-        return {
-          firmId,
-          matterId: ledger?.matterId ?? null,
-          transactionId: transaction.id,
-          trustAccountId: account2.id,
-          ledgerAccountId: entry.ledgerAccountId ?? null,
-          accountingBucket: entry.accountingBucket,
-          direction: entry.direction,
-          amountMinor: entry.amountMinor,
-          currencyCode: data.currencyCode,
-          memo: normalizedMemo(entry.memo),
-          occurredAt
-        };
-      })
-    });
-    const posted = await tx.trustTransaction.findUnique({
-      where: { id: transaction.id },
-      include: { entries: true }
-    });
-    if (!posted) throw new Error("Trust posting could not be reloaded after creation.");
-    await tx.auditEvent.create({
-      data: {
-        firmId,
-        eventId: `trust-posting:${storedIdempotencyKey}`,
-        eventType: "trust.transaction_posted",
-        category: "financial",
-        outcome: "succeeded",
-        ...workflowActor(context, session.itemId),
-        trustTransactionId: posted.id,
-        occurredAt: /* @__PURE__ */ new Date(),
-        metadata: {
-          postingDigest,
-          transactionType: data.transactionType,
-          currencyCode: data.currencyCode,
-          entryCount: data.entries.length,
-          reversal: Boolean(data.reversesTransactionId)
-        }
-      }
-    });
-    return { transaction: posted, replayed: false };
   });
 }
 
-// features/keystone/mutations/communicationWorkflows.ts
-var COMMUNICATION_DELIVERY_SNAPSHOT_VERSION = 1;
-var MAX_RECIPIENTS = 50;
-var participantRoles = /* @__PURE__ */ new Set(["staff", "client", "external_counsel", "third_party"]);
-var singleEmailAddress = /^[^\s@<>,;()"]+@[^\s@<>,;()"]+\.[^\s@<>,;()"]+$/;
-function isSingleEmailAddress(value) {
-  return Boolean(value && value.length <= 254 && singleEmailAddress.test(value));
-}
-function communicationEnvelopeDigest(message) {
-  return sha256Digest({ subject: message.subject ?? "", body: message.body ?? "" });
-}
-function communicationQueueDigest(message, deliveries) {
-  return sha256Digest({
-    messageId: message.id,
-    firmId: message.firmId,
-    matterId: message.matterId ?? null,
-    threadId: message.threadId,
-    envelopeDigest: communicationEnvelopeDigest(message),
-    deliveries: deliveries.map((delivery) => ({
-      id: delivery.id,
-      channel: delivery.channel,
-      provider: delivery.provider,
-      integrationConnectionId: delivery.integrationConnectionId ?? null,
-      recipientAddress: delivery.recipientAddress,
-      participantId: delivery.providerMetadata?.participantId ?? null,
-      envelopeDigest: delivery.providerMetadata?.envelopeDigest ?? null,
-      snapshotVersion: delivery.providerMetadata?.snapshotVersion ?? null,
-      attachments: delivery.providerMetadata?.attachments ?? []
-    })).sort((a, b) => a.id.localeCompare(b.id))
-  });
-}
-async function lockThread(tx, firmId, threadId) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`communication-thread:${firmId}:${threadId}`}))`;
-}
-async function resolveParticipantIdentity(tx, firmId, thread, args) {
-  const identities = [args.userId, args.contactId, args.portalAccountId].filter(Boolean);
-  if (identities.length !== 1) throw new Error("Choose exactly one staff member, contact or portal account.");
-  if (args.contactMethodId && !args.contactId) throw new Error("A contact method can be chosen only for a contact participant.");
-  if (args.userId) {
-    if (args.participantRole !== "staff") throw new Error("Firm users can join a thread only as staff.");
-    const membership = await tx.firmMembership.findFirst({
-      where: { firmId, userId: args.userId, status: "active", user: { status: "active" }, role: { firmId, status: "active", canReadCommunications: true, ...thread.matterId ? { canReadMatters: true } : {} } },
-      select: { user: { select: { email: true } } }
-    });
-    if (!membership) throw new Error("Staff participant must be an active member of the active firm.");
-    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, args.userId);
-    return { userId: args.userId, displayAddress: membership.user?.email ?? "" };
-  }
-  if (args.participantRole === "staff") throw new Error("Staff participants must be firm users.");
-  if (args.portalAccountId) {
-    if (args.participantRole !== "client") throw new Error("Portal accounts can join a thread only as clients.");
-    const account2 = await tx.portalAccount.findFirst({
-      where: { id: args.portalAccountId, firmId, status: "active" },
-      select: { id: true, email: true, contactId: true, contact: { select: { firmId: true, status: true } } }
-    });
-    if (!account2 || account2.contact?.firmId !== firmId || account2.contact.status === "archived" || !thread.matterId) throw new Error("Portal participant must be a current account/contact on this matter.");
-    const identity = { firmId, portalAccountId: account2.id, contactId: account2.contactId };
-    let after;
-    let admitted = false;
-    for (let page = 0; page < 32 && !admitted; page++) {
-      const shares = await tx.portalShare.findMany({
-        where: { ...portalShareCandidateWhere(identity, /* @__PURE__ */ new Date()), matterId: thread.matterId, resourceType: "communication_thread", communicationThreadId: thread.id, ...after ? { id: { gt: after } } : {} },
-        select: portalShareHeaderSelect,
-        orderBy: { id: "asc" },
-        take: 32
-      });
-      for (const candidate of shares) {
-        const share = boundPortalShare(candidate, identity);
-        if (share && await portalShareIsCurrent(tx, share)) {
-          admitted = true;
-          break;
-        }
-      }
-      if (shares.length < 32) break;
-      after = shares[shares.length - 1].id;
-    }
-    if (!admitted) throw new Error("Portal recipient needs a current message-capable share of this exact thread.");
-    return { portalAccountId: account2.id, contactId: account2.contactId ?? null, displayAddress: account2.email ?? "" };
-  }
-  const contact = await tx.contact.findFirst({
-    where: { id: args.contactId, firmId, status: { not: "archived" } },
-    select: { id: true, primaryEmail: true }
-  });
-  if (!contact) throw new Error("Contact participant must be an active contact in the active firm.");
-  if (args.contactMethodId) {
-    const method2 = await tx.contactMethod.findFirst({
-      where: { id: args.contactMethodId, firmId, contactId: contact.id, methodType: "email", canContact: true },
-      select: { value: true }
-    });
-    if (!method2) throw new Error("Contact method must be a contactable email address of this contact.");
-    return { contactId: contact.id, displayAddress: method2.value };
-  }
-  const method = await tx.contactMethod.findFirst({
-    where: { firmId, contactId: contact.id, methodType: "email", value: args.address ?? contact.primaryEmail, canContact: true },
-    select: { value: true }
-  });
-  if (!method) throw new Error("Choose a currently contactable email method before preparing this recipient.");
-  return { contactId: contact.id, displayAddress: method.value };
-}
-async function assertCurrentCommunicationRecipient(tx, message, participantId, expectedAddress) {
-  await tx.$executeRaw`SELECT id FROM "Firm" WHERE id = ${message.firmId} FOR SHARE`;
-  await tx.$executeRaw`SELECT id FROM "CommunicationThread" WHERE id = ${message.threadId} AND firm = ${message.firmId} FOR SHARE`;
-  await tx.$executeRaw`SELECT id FROM "CommunicationParticipant" WHERE id = ${participantId} AND firm = ${message.firmId} FOR SHARE`;
-  if (message.matterId) {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`matter-team:${message.firmId}:${message.matterId}`}))`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ethical-wall-matter:${message.firmId}:${message.matterId}`}))`;
-    await tx.$executeRaw`SELECT id FROM "Matter" WHERE id = ${message.matterId} AND firm = ${message.firmId} FOR SHARE`;
-  }
-  const thread = await tx.communicationThread.findFirst({
-    where: { id: message.threadId, firmId: message.firmId, matterId: message.matterId, status: "open", firm: { status: "active" } },
-    select: { id: true, matterId: true }
-  });
-  const participant = await tx.communicationParticipant.findFirst({
-    where: { id: participantId, firmId: message.firmId, threadId: message.threadId, matterId: message.matterId, status: "active" }
-  });
-  if (!thread || !participant) throw new Error("Recipient or thread is no longer available.");
-  if (participant.userId) {
-    await tx.$executeRaw`SELECT u.id FROM "User" u JOIN "FirmMembership" m ON m."user" = u.id JOIN "Role" r ON r.id = m.role AND r.firm = m.firm WHERE u.id = ${participant.userId} AND m.firm = ${message.firmId} FOR SHARE OF u,m,r`;
-  }
-  if (participant.portalAccountId) {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-policy:${message.firmId}`}))`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-account:${message.firmId}:${participant.portalAccountId}`}))`;
-    await tx.$executeRaw`SELECT id FROM "PortalAccount" WHERE id = ${participant.portalAccountId} AND firm = ${message.firmId} FOR SHARE`;
-  }
-  if (participant.contactId) {
-    await tx.$executeRaw`SELECT id FROM "Contact" WHERE id = ${participant.contactId} AND firm = ${message.firmId} FOR SHARE`;
-    await tx.$executeRaw`SELECT id FROM "ContactMethod" WHERE contact = ${participant.contactId} AND firm = ${message.firmId} ORDER BY id FOR SHARE`;
-  }
-  const current = await resolveParticipantIdentity(tx, message.firmId, thread, {
-    participantRole: participant.participantRole,
-    userId: participant.userId,
-    portalAccountId: participant.portalAccountId,
-    contactId: participant.portalAccountId ? void 0 : participant.contactId,
-    address: expectedAddress ?? participant.displayAddress
-  });
-  const address = expectedAddress ?? participant.displayAddress;
-  if (!isSingleEmailAddress(current.displayAddress) || current.displayAddress !== address) throw new Error("Recipient address or contactability changed; prepare a new reviewed envelope.");
-  return participant;
-}
-async function addCommunicationParticipant(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  if (!participantRoles.has(args.participantRole)) throw new Error("Participant role is not available through this command.");
-  const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await lockThread(tx, firmId, args.threadId);
-    const thread = await tx.communicationThread.findFirst({
-      where: { id: args.threadId, firmId },
-      select: { id: true, status: true, matterId: true }
-    });
-    if (!thread) throw new Error("Communication thread was not found in the active firm.");
-    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, userId);
-    if (thread.status !== "open") throw new Error("Participants can be added only to open threads.");
-    const identity = await resolveParticipantIdentity(tx, firmId, thread, args);
-    const existing = await tx.communicationParticipant.findFirst({
-      where: {
-        firmId,
-        threadId: thread.id,
-        status: "active",
-        userId: identity.userId ?? null,
-        contactId: identity.contactId ?? null,
-        portalAccountId: identity.portalAccountId ?? null
-      }
-    });
-    if (existing) {
-      if (existing.participantRole !== args.participantRole) {
-        throw new Error("This identity already participates in the thread with a different role.");
-      }
-      await assertCurrentCommunicationRecipient(tx, { firmId, threadId: thread.id, matterId: thread.matterId }, existing.id, existing.displayAddress);
-      return { participant: existing, replayed: true };
-    }
-    const participant = await tx.communicationParticipant.create({
-      data: {
-        firmId,
-        matterId: thread.matterId ?? null,
-        threadId: thread.id,
-        userId: identity.userId ?? null,
-        contactId: identity.contactId ?? null,
-        portalAccountId: identity.portalAccountId ?? null,
-        participantRole: args.participantRole,
-        status: "active",
-        displayAddress: identity.displayAddress,
-        addedAt: /* @__PURE__ */ new Date()
-      }
-    });
-    await assertCurrentCommunicationRecipient(tx, { firmId, threadId: thread.id, matterId: thread.matterId }, participant.id, participant.displayAddress);
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.participant_added",
-      category: "legal_workflow",
-      ...workflowActor(context, userId),
-      matterId: thread.matterId ?? null,
-      contactId: identity.contactId ?? null,
-      metadata: {
-        threadId: thread.id,
-        participantId: participant.id,
-        participantRole: args.participantRole,
-        identityDigest: sha256Digest({ ...identity, participantRole: args.participantRole })
-      }
-    });
-    return { participant, replayed: false };
-  });
-}
-async function removeCommunicationParticipant(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  const reason = boundedReason(args.reason, "Participant removal reason", 5, 2e3);
-  const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    const identity = await tx.communicationParticipant.findFirst({
-      where: { id: args.participantId, firmId },
-      select: { threadId: true }
-    });
-    if (!identity) throw new Error("Communication participant was not found in the active firm.");
-    await lockThread(tx, firmId, identity.threadId);
-    const participant = await tx.communicationParticipant.findFirst({ where: { id: args.participantId, firmId } });
-    if (!participant) throw new Error("Communication participant was not found in the active firm.");
-    if (participant.matterId) await assertMatterAccess(tx, firmId, participant.matterId, userId);
-    if (participant.status === "removed") return { participant, replayed: true };
-    const removed = await tx.communicationParticipant.update({
-      where: { id: participant.id },
-      data: { status: "removed", removedAt: /* @__PURE__ */ new Date() }
-    });
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.participant_removed",
-      category: "legal_workflow",
-      ...workflowActor(context, userId),
-      matterId: participant.matterId ?? null,
-      contactId: participant.contactId ?? null,
-      metadata: { threadId: participant.threadId, participantId: participant.id, reasonDigest: sha256Digest(reason) }
-    });
-    return { participant: removed, replayed: false };
-  });
-}
-async function prepareCommunicationDeliveries(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  const reason = boundedReason(args.reason, "Delivery preparation reason", 5, 2e3);
-  const participantIds = [...new Set((args.participantIds ?? []).map((id2) => id2?.trim()).filter(Boolean))].sort();
-  if (!participantIds.length || participantIds.length > MAX_RECIPIENTS) {
-    throw new Error(`Choose between 1 and ${MAX_RECIPIENTS} thread participants.`);
-  }
-  const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`message:${firmId}:${args.messageId}`}))`;
-    const message = await tx.communicationMessage.findFirst({
-      where: { id: args.messageId, firmId },
-      include: {
-        attachments: {
-          select: { id: true, firmId: true, checksumSha256: true, byteSize: true, document: { select: { matterId: true, status: true } } }
-        },
-        deliveries: { select: { id: true, status: true, providerMetadata: true } }
-      }
-    });
-    if (!message) throw new Error("Communication message was not found in the active firm.");
-    if (message.matterId) await assertMatterAccess(tx, firmId, message.matterId, userId);
-    if (message.status !== "draft") throw new Error("Deliveries can be prepared only for draft messages.");
-    if (message.direction !== "outbound") throw new Error("Only outbound messages have deliveries.");
-    if (message.channel !== "email") {
-      throw new Error("Only email delivery preparation is available; portal and SMS delivery adapters are not configured.");
-    }
-    if (message.deliveries.some((delivery) => delivery.status !== "pending")) {
-      throw new Error("A message with delivery outcomes cannot be re-prepared.");
-    }
-    await lockThread(tx, firmId, message.threadId);
-    const participants = await tx.communicationParticipant.findMany({
-      where: { id: { in: participantIds }, firmId, threadId: message.threadId, status: "active" },
-      select: { id: true, userId: true, contactId: true, portalAccountId: true, displayAddress: true },
-      orderBy: { id: "asc" }
-    });
-    if (participants.length !== participantIds.length) {
-      throw new Error("Every recipient must be an active participant of this message's thread.");
-    }
-    for (const participant of participants) {
-      if (!isSingleEmailAddress(participant.displayAddress)) {
-        throw new Error("Every email recipient needs one valid email address on the thread participant.");
-      }
-      await assertCurrentCommunicationRecipient(tx, message, participant.id, participant.displayAddress);
-    }
-    const attachments = message.attachments.map((attachment) => {
-      if (attachment.firmId !== firmId || attachment.document?.status === "disposed" || message.matterId && attachment.document?.matterId !== message.matterId) {
-        throw new Error("Attachments must be current versions from this firm and matter.");
-      }
-      return { versionId: attachment.id, checksumSha256: attachment.checksumSha256, byteSize: attachment.byteSize };
-    }).sort((left, right) => left.versionId.localeCompare(right.versionId));
-    let connection = null;
-    if (args.integrationConnectionId) {
-      connection = await tx.integrationConnection.findFirst({
-        where: { id: args.integrationConnectionId, firmId, status: "active", category: "email" },
-        select: { id: true, provider: true }
-      });
-      if (!connection) throw new Error("Delivery connection must be an active email integration in the active firm.");
-    }
-    const provider = connection?.provider ?? "smtp";
-    const envelopeDigest = communicationEnvelopeDigest(message);
-    const snapshots = participants.map((participant) => ({
-      snapshotVersion: COMMUNICATION_DELIVERY_SNAPSHOT_VERSION,
-      participantId: participant.id,
-      envelopeDigest,
-      attachments,
-      destination: { channel: "email", provider, connectionId: connection?.id ?? null }
-    }));
-    const preparationDigest = sha256Digest({
-      messageId: message.id,
-      snapshots,
-      recipients: participants.map((participant) => participant.displayAddress)
-    });
-    if (message.deliveries.length === snapshots.length && message.deliveries.every((delivery) => delivery.providerMetadata?.preparationDigest === preparationDigest)) {
-      return { message, deliveries: message.deliveries, replayed: true };
-    }
-    const replaced = message.deliveries.length;
-    if (replaced) await tx.communicationDelivery.deleteMany({ where: { firmId, messageId: message.id, status: "pending" } });
-    const deliveries = [];
-    for (const [index, participant] of participants.entries()) {
-      deliveries.push(await tx.communicationDelivery.create({
-        data: {
-          firmId,
-          matterId: message.matterId ?? null,
-          messageId: message.id,
-          integrationConnectionId: connection?.id ?? null,
-          channel: "email",
-          status: "pending",
-          recipientContactId: participant.contactId ?? null,
-          recipientAddress: participant.displayAddress,
-          provider,
-          attemptCount: 0,
-          providerMetadata: { ...snapshots[index], preparationDigest }
-        }
-      }));
-    }
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.deliveries_prepared",
-      category: "integration",
-      ...workflowActor(context, userId),
-      matterId: message.matterId ?? null,
-      metadata: {
-        messageId: message.id,
-        deliveryCount: deliveries.length,
-        replacedPendingCount: replaced,
-        preparationDigest,
-        reasonDigest: sha256Digest(reason)
-      }
-    });
-    return { message, deliveries, replayed: false };
-  });
-}
-
-// features/keystone/webhooks/wire-contract.ts
-var import_node_http = require("node:http");
-function assertWebhookWireIdentity(eventId2, eventType) {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{7,299}$/.test(eventId2)) throw new Error("Webhook event ID must be an 8\u2013300 character ASCII identifier.");
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,299}$/.test(eventType)) throw new Error("Webhook event type must be an ASCII identifier.");
-}
+// features/keystone/webhooks/webhook-sender.ts
+var import_node_crypto12 = require("node:crypto");
+var import_node_https = require("node:https");
 
 // features/keystone/lib/secret-envelope.ts
 var import_node_crypto11 = require("node:crypto");
@@ -10440,8 +10830,333 @@ function encryptSecret(value, keyOverride) {
   const tag = cipher.getAuthTag();
   return `v1.${iv.toString("base64url")}.${encrypted.toString("base64url")}.${tag.toString("base64url")}`;
 }
+function decryptSecret(envelope2, keyOverride) {
+  const [version, encodedIv, encodedCiphertext, encodedTag, extra] = envelope2.split(".");
+  if (version !== "v1" || !encodedIv || !encodedCiphertext || !encodedTag || extra) {
+    throw new Error("Integration credential envelope is invalid.");
+  }
+  const key = envelopeKey(keyOverride);
+  const iv = Buffer.from(encodedIv, "base64url");
+  const ciphertext = Buffer.from(encodedCiphertext, "base64url");
+  const tag = Buffer.from(encodedTag, "base64url");
+  if (iv.length !== 12 || tag.length !== 16) throw new Error("Integration credential envelope is invalid.");
+  try {
+    const decipher = (0, import_node_crypto11.createDecipheriv)("aes-256-gcm", key, iv);
+    decipher.setAAD(Buffer.from("openfront-law-firm:integration:v1"));
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+  } catch {
+    throw new Error("Integration credential envelope authentication failed.");
+  }
+}
 function secretDigest(value, keyOverride) {
   return (0, import_node_crypto11.createHmac)("sha256", envelopeKey(keyOverride)).update(value).digest("hex");
+}
+
+// features/keystone/webhooks/destination.ts
+var import_node_dns = require("node:dns");
+var import_node_net = require("node:net");
+function parseAllowedWebhookHosts(raw = process.env.WEBHOOK_ALLOWED_HOSTS) {
+  return new Set(
+    (raw ?? "").split(",").map((entry) => entry.trim().toLowerCase()).filter((entry) => /^(\*\.)?[a-z0-9.-]+(:\d{1,5})?$/.test(entry))
+  );
+}
+function hostAllowed(url, allowed) {
+  const hostname = url.hostname.toLowerCase();
+  const withPort = url.port ? `${hostname}:${url.port}` : hostname;
+  if (allowed.has(withPort)) return true;
+  if (url.port) return false;
+  for (const entry of allowed) {
+    if (entry.startsWith("*.") && !entry.includes(":") && hostname.endsWith(entry.slice(1)) && hostname !== entry.slice(2)) {
+      return true;
+    }
+  }
+  return false;
+}
+function assertWebhookDestination(value, allowed = parseAllowedWebhookHosts()) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("destination_invalid");
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.hash) throw new Error("destination_invalid");
+  if (!allowed.size || !hostAllowed(url, allowed)) throw new Error("destination_not_allowlisted");
+  if ((0, import_node_net.isIP)(url.hostname.replace(/^\[|\]$/g, "")) && isPrivateAddress(url.hostname.replace(/^\[|\]$/g, ""))) {
+    throw new Error("destination_private_address");
+  }
+  return url;
+}
+function ipv4Octets(address) {
+  const parts = address.split(".").map(Number);
+  return parts.length === 4 && parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255) ? parts : null;
+}
+function ipv6Words(address) {
+  if ((0, import_node_net.isIP)(address) !== 6 || address.includes("%")) return null;
+  let hex = address.toLowerCase();
+  if (hex.includes(".")) {
+    const colon = hex.lastIndexOf(":");
+    const octets = ipv4Octets(hex.slice(colon + 1));
+    if (!octets) return null;
+    hex = hex.slice(0, colon + 1) + (octets[0] << 8 | octets[1]).toString(16) + ":" + (octets[2] << 8 | octets[3]).toString(16);
+  }
+  const halves = hex.split("::");
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const words = halves.length === 2 ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right] : left;
+  return words.length === 8 ? words.map((word) => Number.parseInt(word, 16)) : null;
+}
+function isPrivateAddress(address) {
+  const v4 = (0, import_node_net.isIP)(address) === 4 ? ipv4Octets(address) : null;
+  if (v4) {
+    const [a, b, c] = v4;
+    return a === 0 || a === 10 || a === 127 || a >= 224 || a === 100 && b >= 64 && b <= 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 192 && b === 0 || a === 192 && b === 88 && c === 99 || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113;
+  }
+  const words = ipv6Words(address);
+  if (!words) return true;
+  if (words.slice(0, 5).every((word) => word === 0) && words[5] === 65535) {
+    return isPrivateAddress(`${words[6] >> 8}.${words[6] & 255}.${words[7] >> 8}.${words[7] & 255}`);
+  }
+  if ((words[0] & 57344) !== 8192) return true;
+  return words[0] === 8194 || words[0] === 16383 || words[0] === 8193 && (words[1] <= 511 || words[1] === 3512);
+}
+function publicOnlyLookup(hostname, options, callback) {
+  const lookupOptions = { all: true, family: options?.family, hints: options?.hints };
+  (0, import_node_dns.lookup)(hostname, lookupOptions, (error, addresses) => {
+    if (error) return callback(error, "");
+    const list22 = addresses ?? [];
+    if (!list22.length || list22.some((entry) => isPrivateAddress(entry.address))) {
+      const denied2 = Object.assign(new Error("destination_private_address"), { code: "EDESTINATIONDENIED" });
+      return callback(denied2, "");
+    }
+    if (options?.all) return callback(null, list22);
+    return callback(null, list22[0].address, list22[0].family);
+  });
+}
+
+// features/keystone/webhooks/wire-contract.ts
+var import_node_http = require("node:http");
+function assertWebhookWireIdentity(eventId2, eventType) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{7,299}$/.test(eventId2)) throw new Error("Webhook event ID must be an 8\u2013300 character ASCII identifier.");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,299}$/.test(eventType)) throw new Error("Webhook event type must be an ASCII identifier.");
+}
+function assertWebhookWireHeaders(headers) {
+  for (const [name, value] of Object.entries(headers)) (0, import_node_http.validateHeaderValue)(name, value);
+}
+
+// features/keystone/webhooks/webhook-sender.ts
+var WEBHOOK_MAX_ATTEMPTS = 8;
+var WEBHOOK_TIMEOUT_MS = 1e4;
+var WEBHOOK_STALE_PROCESSING_MS = 2 * 6e4;
+var WEBHOOK_MAX_BODY_BYTES = 256 * 1024;
+var WEBHOOK_MAX_RESPONSE_BYTES = 16 * 1024;
+function webhookBody(delivery) {
+  return canonicalJson({
+    id: delivery.eventId,
+    type: delivery.eventType,
+    createdAt: new Date(delivery.createdAt).toISOString(),
+    data: delivery.payload ?? null
+  });
+}
+function bodyDigest(body) {
+  return (0, import_node_crypto12.createHash)("sha256").update(body).digest("hex");
+}
+function webhookSignature(secret, timestamp21, body) {
+  return (0, import_node_crypto12.createHmac)("sha256", secret).update(`${timestamp21}.${body}`).digest("hex");
+}
+function collectWebhookResponse(response, limit) {
+  return new Promise((resolve2) => {
+    const hash = (0, import_node_crypto12.createHash)("sha256");
+    let received = 0;
+    let settled = false;
+    const finish = (complete, errorCode) => {
+      if (settled) return;
+      settled = true;
+      resolve2({ status: response.statusCode ?? 0, bodyDigest: hash.digest("hex"), complete, errorCode });
+    };
+    response.on("data", (chunk) => {
+      if (settled) return;
+      const remaining = Math.max(0, limit - received);
+      hash.update(chunk.subarray(0, remaining));
+      received += chunk.length;
+      if (received > limit) {
+        finish(false, "response_byte_limit");
+        response.destroy();
+      }
+    });
+    response.on("end", () => finish(true));
+    response.on("aborted", () => finish(false, "response_aborted"));
+    response.on("error", () => finish(false, "response_error"));
+    response.on("close", () => finish(false, "response_premature_close"));
+  });
+}
+var httpsWebhookTransport = (request) => new Promise((resolve2, reject) => {
+  const outgoing = (0, import_node_https.request)(request.url, {
+    method: "POST",
+    headers: { ...request.headers, "content-length": String(Buffer.byteLength(request.body)) },
+    lookup: publicOnlyLookup,
+    timeout: request.timeoutMs
+  }, (response) => {
+    void collectWebhookResponse(response, request.maxResponseBytes).then(resolve2, reject);
+  });
+  const deadline = setTimeout(() => outgoing.destroy(Object.assign(new Error("timeout"), { code: "ETIMEDOUT" })), request.timeoutMs);
+  outgoing.on("timeout", () => outgoing.destroy(Object.assign(new Error("timeout"), { code: "ETIMEDOUT" })));
+  outgoing.on("error", (error) => {
+    clearTimeout(deadline);
+    reject(error);
+  });
+  outgoing.on("close", () => clearTimeout(deadline));
+  outgoing.end(request.body);
+});
+function failureCode(error) {
+  const code = error?.code;
+  const message = error?.message ?? "";
+  if (code === "ETIMEDOUT" || message === "timeout") return "timeout";
+  if (code === "EDESTINATIONDENIED" || message.startsWith("destination_")) return "destination_rejected";
+  return "network_error";
+}
+async function deliverWebhook(prismaInput, deliveryId, options = {}) {
+  const prisma = prismaWithoutGraphQLErrorConversion(prismaInput);
+  const clock = options.clock ?? (() => /* @__PURE__ */ new Date());
+  const delivery = await prisma.webhookDelivery.findUnique({
+    where: { id: deliveryId },
+    include: {
+      firm: { select: { status: true } },
+      connection: { select: { id: true, status: true, firmId: true } },
+      subscription: {
+        select: { id: true, status: true, connectionId: true, endpointUrl: true, eventTypes: true, firmId: true, signingSecretEncrypted: true, signingSecretDigest: true }
+      }
+    }
+  });
+  if (!delivery) return { status: "missing", outcome: "skipped", reason: "missing" };
+  const stale = delivery.status === "processing" && delivery.updatedAt.getTime() + WEBHOOK_STALE_PROCESSING_MS <= clock().getTime();
+  if (!["pending", "failed", "dead_letter"].includes(delivery.status) && !stale) {
+    return { status: delivery.status, outcome: "skipped", reason: "not_retryable" };
+  }
+  if (delivery.status === "dead_letter" && !options.force) return { status: delivery.status, outcome: "skipped", reason: "dead_letter" };
+  const settle = async (status, reason) => {
+    const updated = await prisma.webhookDelivery.updateMany({
+      where: { id: delivery.id, status: delivery.status, attemptCount: delivery.attemptCount },
+      data: { status, lastError: reason, ...status === "dead_letter" ? { completedAt: clock() } : {} }
+    });
+    if (updated.count && status === "dead_letter") {
+      await recordAuditEvent(prisma, {
+        firmId: delivery.firmId,
+        eventType: "webhook.delivery_dead_lettered",
+        category: "integration",
+        outcome: "failed",
+        actorType: "system",
+        matterId: delivery.matterId ?? null,
+        metadata: { deliveryId: delivery.id, reason }
+      });
+    }
+    return { status, outcome: status, reason };
+  };
+  const body = webhookBody(delivery);
+  const requestDigest = bodyDigest(body);
+  const { connection, subscription } = delivery;
+  try {
+    assertWebhookWireIdentity(delivery.eventId, delivery.eventType);
+  } catch {
+    return settle("dead_letter", "invalid_wire_identity");
+  }
+  if (connection?.status === "revoked" || connection?.firmId !== delivery.firmId) return settle("dead_letter", "connection_revoked");
+  if (!subscription || subscription.firmId !== delivery.firmId || subscription.status === "revoked") return settle("dead_letter", "subscription_revoked");
+  if (subscription.connectionId !== delivery.connectionId) return settle("dead_letter", "subscription_moved");
+  if (!Array.isArray(subscription.eventTypes) || !subscription.eventTypes.includes(delivery.eventType)) return settle("dead_letter", "event_type_unsubscribed");
+  if (delivery.destinationUrl !== subscription.endpointUrl) return settle("dead_letter", "destination_changed");
+  if (Buffer.byteLength(body) > WEBHOOK_MAX_BODY_BYTES) return settle("dead_letter", "payload_too_large");
+  if (delivery.matterId) {
+    const matter = await prisma.matter.findFirst({ where: { id: delivery.matterId, firmId: delivery.firmId }, select: { id: true } });
+    if (!matter) return settle("dead_letter", "matter_unavailable");
+  }
+  const priorAttempts = delivery.attemptCount ?? 0;
+  if (priorAttempts >= WEBHOOK_MAX_ATTEMPTS && !options.force) return settle("dead_letter", "retries_exhausted");
+  if (delivery.firm?.status !== "active") return settle("failed", "firm_inactive");
+  if (connection.status !== "active") return settle("failed", "connection_inactive");
+  if (subscription.status !== "active") return settle("failed", "subscription_paused");
+  let url;
+  try {
+    url = assertWebhookDestination(delivery.destinationUrl, options.allowedHosts ?? parseAllowedWebhookHosts());
+  } catch (error) {
+    const reason = error.message;
+    return settle(reason === "destination_not_allowlisted" ? "failed" : "dead_letter", reason);
+  }
+  let signingSecret;
+  try {
+    if (!subscription.signingSecretEncrypted) return settle("failed", "signing_secret_missing");
+    if (!/^[a-f0-9]{64}$/.test(subscription.signingSecretDigest ?? "")) return settle("failed", "signing_key_version_missing");
+    signingSecret = decryptSecret(subscription.signingSecretEncrypted, options.keyOverride);
+    if (secretDigest(signingSecret, options.keyOverride) !== subscription.signingSecretDigest) return settle("failed", "signing_key_version_mismatch");
+  } catch {
+    return settle("failed", "signing_secret_unavailable");
+  }
+  const attemptNumber = priorAttempts + 1;
+  const claimed = await prisma.webhookDelivery.updateMany({
+    where: { id: delivery.id, status: delivery.status, attemptCount: delivery.attemptCount },
+    data: { status: "processing", attemptCount: attemptNumber, lastError: "sending" }
+  });
+  if (!claimed.count) return { status: "processing", outcome: "skipped", reason: "claimed_elsewhere" };
+  const timestamp21 = Math.floor(clock().getTime() / 1e3);
+  const headers = {
+    "content-type": "application/json",
+    "user-agent": "openfront-law-firm-webhooks/1",
+    "x-openfront-event-id": delivery.eventId,
+    "x-openfront-event-type": delivery.eventType,
+    "x-openfront-delivery-id": delivery.id,
+    "x-openfront-attempt": String(attemptNumber),
+    "x-openfront-signature": `t=${timestamp21},v1=${webhookSignature(signingSecret, timestamp21, body)}`
+  };
+  let response;
+  let errorCode;
+  try {
+    assertWebhookWireHeaders(headers);
+    response = await (options.transport ?? httpsWebhookTransport)({
+      url,
+      headers,
+      body,
+      timeoutMs: WEBHOOK_TIMEOUT_MS,
+      maxResponseBytes: WEBHOOK_MAX_RESPONSE_BYTES
+    });
+  } catch (error) {
+    errorCode = failureCode(error);
+  }
+  const succeeded = Boolean(response && response.complete !== false && response.status >= 200 && response.status < 300);
+  const failure = succeeded ? null : response?.errorCode ?? errorCode ?? `http_${response?.status ?? 0}`;
+  const now = clock();
+  const finalStatus = succeeded ? "succeeded" : attemptNumber >= WEBHOOK_MAX_ATTEMPTS ? "dead_letter" : "failed";
+  await prisma.$transaction(async (tx) => {
+    await tx.webhookDeliveryAttempt.create({
+      data: {
+        firmId: delivery.firmId,
+        matterId: delivery.matterId ?? null,
+        deliveryId: delivery.id,
+        attemptNumber,
+        attemptedAt: now,
+        requestDigest,
+        responseStatus: response?.status ?? null,
+        responseDigest: response?.bodyDigest ?? "",
+        succeeded: succeeded ? "yes" : "no",
+        errorCode: failure ?? "",
+        errorMessage: ""
+      }
+    });
+    await tx.webhookDelivery.update({
+      where: { id: delivery.id },
+      data: { status: finalStatus, lastError: failure ?? "", ...finalStatus === "failed" ? {} : { completedAt: now } }
+    });
+    if (succeeded) await tx.webhookSubscription.update({ where: { id: subscription.id }, data: { lastDeliveredAt: now } });
+    await recordAuditEvent(tx, {
+      firmId: delivery.firmId,
+      eventType: succeeded ? "webhook.delivery_succeeded" : "webhook.delivery_failed",
+      category: "integration",
+      outcome: succeeded ? "succeeded" : "failed",
+      ...options.actor ?? { actorType: "system" },
+      matterId: delivery.matterId ?? null,
+      metadata: { deliveryId: delivery.id, attemptNumber, requestDigest, responseStatus: response?.status ?? null, errorCode: failure }
+    });
+  });
+  return { status: finalStatus, outcome: succeeded ? "succeeded" : finalStatus === "dead_letter" ? "dead_letter" : "failed", reason: failure ?? void 0 };
 }
 
 // features/keystone/mutations/providerWorkflows.ts
@@ -10564,7 +11279,7 @@ async function enqueueWebhookDelivery(_root, args, context) {
   if (!eventType) throw new Error("Webhook event type is required.");
   assertWebhookWireIdentity(deliveryEventId, eventType);
   const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
+  const created = await runSerializableTransaction(prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManageIntegrations");
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`webhook-delivery:${firmId}:${deliveryEventId}`}))`;
     const [connection, subscription] = await Promise.all([
@@ -10605,128 +11320,19 @@ async function enqueueWebhookDelivery(_root, args, context) {
     });
     return delivery;
   });
+  const sent = await deliverWebhook(prisma, created.id, { actor: workflowActor(context, userId) }).catch(() => null);
+  return { id: created.id, status: sent?.status ?? created.status };
 }
-async function queueCommunicationMessage(_root, args, context) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  const reason = boundedReason(args.reason, "Communication send reason", 5, 2e3);
+async function retryWebhookDelivery(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManageIntegrations");
   const prisma = context.prisma;
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`message:${firmId}:${args.messageId}`}))`;
-    const message = await tx.communicationMessage.findFirst({
-      where: { id: args.messageId, firmId },
-      include: { deliveries: true }
-    });
-    if (!message) throw new Error("Communication message was not found in the active firm.");
-    if (message.matterId) await assertMatterAccess(tx, firmId, message.matterId, userId);
-    for (const delivery of message.deliveries) {
-      await assertCurrentCommunicationRecipient(tx, message, delivery.providerMetadata?.participantId ?? "", delivery.recipientAddress);
-    }
-    if (message.status === "queued") return { message, replayed: true };
-    assertLifecycleTransition("communicationMessage", message.status, "queued");
-    if (!message.deliveries.length || message.deliveries.some((delivery) => delivery.status !== "pending")) {
-      throw new Error("Message queueing requires at least one pending controlled delivery.");
-    }
-    const queued = await tx.communicationMessage.update({
-      where: { id: message.id },
-      data: { status: "queued", queuedAt: /* @__PURE__ */ new Date() }
-    });
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.message_queued",
-      category: "integration",
-      actorUserId: userId,
-      matterId: message.matterId,
-      metadata: { messageId: message.id, deliveryCount: message.deliveries.length, reasonDigest: sha256Digest(reason), authenticationType: "human", intentVersion: 1, requestDigest: communicationQueueDigest(message, message.deliveries) }
-    });
-    return { message: queued, replayed: false };
-  });
-}
-async function transitionCommunicationDelivery(_root, args, context) {
-  requirePermission(context, "canManageCommunications", { humanOnly: true });
-  throw new Error("Communication delivery outcomes are unavailable until authenticated provider ingress is configured.");
-  const { session, firmId, userId } = requirePermission(context, "canManageCommunications");
-  const providerEventId = eventId(args.providerEventId);
-  const providerMessageId = optionalBoundedText(args.providerMessageId, "Provider message ID", 500);
-  const errorCode = optionalBoundedText(args.errorCode, "Provider error code", 200);
-  const errorMessage = optionalBoundedText(args.errorMessage, "Provider error message", 2e3);
-  const prisma = context.prisma;
-  const auditId = `communication:${providerEventId}`;
-  const requestDigest = sha256Digest({
-    deliveryId: args.deliveryId,
-    toStatus: args.toStatus,
-    providerMessageId: providerMessageId ?? null,
-    errorCode: errorCode ?? null,
-    errorMessage: errorMessage ?? null
-  });
-  return runSerializableTransaction(prisma, async (tx) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${auditId}))`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`communication-delivery:${firmId}:${args.deliveryId}`}))`;
-    const replay = await tx.auditEvent.findFirst({ where: { firmId, eventId: auditId } });
-    const delivery = await tx.communicationDelivery.findFirst({ where: { id: args.deliveryId, firmId } });
-    if (!delivery) throw new Error("Communication delivery was not found in the active firm.");
-    if (delivery.matterId) await assertMatterAccess(tx, firmId, delivery.matterId, userId);
-    if (replay) {
-      if (replay.metadata?.requestDigest !== requestDigest) {
-        throw new Error("Communication provider event ID was reused with a different payload.");
-      }
-      return { delivery, replayed: true };
-    }
-    assertLifecycleTransition("communicationDelivery", delivery.status, args.toStatus);
-    const now = /* @__PURE__ */ new Date();
-    const updated = await tx.communicationDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: args.toStatus,
-        providerMessageId: providerMessageId ?? "",
-        attemptCount: { increment: 1 },
-        lastAttemptAt: now,
-        deliveredAt: args.toStatus === "delivered" ? now : null,
-        errorCode: errorCode ?? "",
-        errorMessage: errorMessage ?? ""
-      }
-    });
-    const [message, deliveryStates] = await Promise.all([
-      tx.communicationMessage.findUnique({ where: { id: delivery.messageId } }),
-      tx.communicationDelivery.findMany({
-        where: { messageId: delivery.messageId },
-        select: { status: true }
-      })
-    ]);
-    const statuses = deliveryStates.map((item) => item.status);
-    const messageTarget = statuses.every((status) => status === "delivered") ? "delivered" : statuses.every((status) => (/* @__PURE__ */ new Set(["failed", "bounced"])).has(status)) ? "failed" : statuses.some((status) => (/* @__PURE__ */ new Set(["sent", "delivered"])).has(status)) ? "sent" : null;
-    if (message && messageTarget && message.status !== messageTarget) {
-      assertLifecycleTransition("communicationMessage", message.status, messageTarget);
-      await tx.communicationMessage.update({
-        where: { id: message.id },
-        data: {
-          status: messageTarget,
-          ...messageTarget === "sent" ? { sentAt: now } : {}
-        }
-      });
-    }
-    await tx.auditEvent.create({
-      data: {
-        firmId,
-        eventId: auditId,
-        eventType: `communication.delivery_${args.toStatus}`,
-        category: "integration",
-        outcome: (/* @__PURE__ */ new Set(["failed", "bounced"])).has(args.toStatus) ? "failed" : "succeeded",
-        ...workflowActor(context, userId),
-        matterId: delivery.matterId,
-        occurredAt: now,
-        metadata: {
-          deliveryId: delivery.id,
-          fromStatus: delivery.status,
-          providerMessageId,
-          credentialId: session.credentialId ?? null,
-          requestDigest
-        }
-      }
-    });
-    return { delivery: updated, replayed: false };
-  });
+  const delivery = await prisma.webhookDelivery.findFirst({ where: { id: args.deliveryId, firmId }, select: { id: true, matterId: true } });
+  if (!delivery) throw new Error("Webhook delivery was not found in the active firm.");
+  await assertCurrentCommandActor(prisma, context, "canManageIntegrations");
+  if (delivery.matterId) await assertMatterAccess(prisma, firmId, delivery.matterId, userId);
+  const result = await deliverWebhook(prisma, delivery.id, { force: true, actor: workflowActor(context, userId) });
+  if (result.outcome === "skipped") throw new Error(result.reason === "not_retryable" ? "This delivery is already sent or being sent." : "This delivery could not be retried.");
+  return { id: delivery.id, status: result.status };
 }
 async function addDocumentSigner(_root, args, context) {
   const { firmId, userId } = requirePermission(context, "canManageDocuments", { humanOnly: true });
@@ -11361,6 +11967,7 @@ function resultSummary(result) {
 async function recordAgentActionSucceeded(tx, action, summary, agentPrincipalId) {
   const now = /* @__PURE__ */ new Date();
   const resultDigest = sha256Digest(summary);
+  assertLifecycleTransition("agentAction", "executing", "succeeded");
   const updated = await tx.agentAction.updateMany({
     where: { id: action.id, status: "executing", startedAt: action.startedAt },
     data: { status: "succeeded", completedAt: now, resultDigest, resultEnvelope: summary }
@@ -11507,13 +12114,6 @@ async function dispatchAction(action, approvedContext) {
       confirmation: data.confirmation
     }, approvedContext);
   }
-  if (action.actionType === "communication.send") {
-    await assertActionMatterResource(approvedContext.prisma, action, "communicationMessage", data.messageId);
-    return queueCommunicationMessage(null, {
-      messageId: data.messageId,
-      reason: data.reason
-    }, approvedContext);
-  }
   if (action.actionType === "document.publish") {
     exactTarget(action, "documentId", data.documentId);
     return transitionDocument(null, {
@@ -11618,6 +12218,7 @@ async function executeAgentAction(_root, args, context) {
       approval
     });
     if (!authorization.allowed) throw new Error(authorization.reason ?? "Agent action is not authorized.");
+    if (!recovering) assertLifecycleTransition("agentAction", "approved", "executing");
     const claimed2 = await tx.agentAction.updateMany({
       where: recovering ? { id: action.id, status: "executing", startedAt: action.startedAt } : { id: action.id, status: "approved" },
       data: { status: "executing", startedAt: now }
@@ -11651,6 +12252,7 @@ async function executeAgentAction(_root, args, context) {
     const message = error instanceof Error ? error.message : "Controlled action execution failed.";
     await runSerializableTransaction(prisma, async (tx) => {
       const now = /* @__PURE__ */ new Date();
+      assertLifecycleTransition("agentAction", "executing", "failed");
       const failed = await tx.agentAction.updateMany({
         where: { id: claimed.action.id, status: "executing", startedAt: claimed.action.startedAt },
         data: {
@@ -11815,7 +12417,7 @@ async function updateAgentGrantAuthority(_root, args, context) {
 }
 
 // features/keystone/mutations/credentials.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 function requireHumanSession(context, permission) {
   const session = context.session;
   const firmId = activeFirmId(session);
@@ -11849,7 +12451,7 @@ async function audit(tx, data) {
   await tx.auditEvent.create({
     data: {
       firmId: data.firmId,
-      eventId: (0, import_node_crypto12.randomUUID)(),
+      eventId: (0, import_node_crypto13.randomUUID)(),
       eventType: data.eventType,
       category: "authentication",
       outcome: "succeeded",
@@ -11932,7 +12534,7 @@ async function issueOAuthClient(_root, args, context) {
   const scopes = normalizeMachineScopes(args.scopes);
   const description = args.description?.trim() || null;
   if (description && description.length > 2e3) throw new Error("OAuth client description is too long.");
-  const clientId = `olfc_${(0, import_node_crypto12.randomUUID)().replaceAll("-", "")}`;
+  const clientId = `olfc_${(0, import_node_crypto13.randomUUID)().replaceAll("-", "")}`;
   const secret = issueCredential("oauth_client");
   const prisma = context.prisma;
   return runSerializableTransaction(prisma, async (tx) => {
@@ -12061,6 +12663,7 @@ async function revokeAgentCredential(_root, args, context) {
     const credential = await tx.agentCredential.findFirst({ where: { id: args.id, firmId } });
     if (!credential) throw new Error("Agent credential was not found in the active firm.");
     if (credential.status === "revoked") return { credential, replayed: true };
+    assertLifecycleTransition("agentCredential", credential.status, "revoked");
     const revoked = await tx.agentCredential.update({
       where: { id: credential.id },
       data: { status: "revoked", revokedAt: /* @__PURE__ */ new Date(), revokedById: session.itemId }
@@ -12772,9 +13375,9 @@ async function updateFirmRoleAuthority(_root, args, context) {
 
 // features/keystone/mutations/onboarding.ts
 function bounded2(value, label, max) {
-  const text23 = value?.trim();
-  if (!text23 || text23.length > max) throw new Error(`${label} is required and must be ${max} characters or fewer.`);
-  return text23;
+  const text24 = value?.trim();
+  if (!text24 || text24.length > max) throw new Error(`${label} is required and must be ${max} characters or fewer.`);
+  return text24;
 }
 function optionalBounded(value, label, maximum) {
   const result = value?.trim() || null;
@@ -12818,6 +13421,20 @@ function currency(value) {
   const normalized = value?.trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(normalized)) throw new Error("Currency must be a three-letter code.");
   return normalized;
+}
+function defaultPaymentProviders(firmId) {
+  const functions = {
+    createPaymentFunction: "stripe",
+    capturePaymentFunction: "stripe",
+    refundPaymentFunction: "stripe",
+    getPaymentStatusFunction: "stripe",
+    generatePaymentLinkFunction: "stripe",
+    handleWebhookFunction: "stripe"
+  };
+  return [
+    { firmId, name: "Stripe (operating account)", code: "pp_stripe_operating", account: "operating", isInstalled: true, credentials: { secretKeyEnv: "STRIPE_SECRET_KEY" }, ...functions },
+    { firmId, name: "Stripe (trust / IOLTA account)", code: "pp_stripe_trust", account: "trust", isInstalled: true, credentials: { secretKeyEnv: "STRIPE_TRUST_SECRET_KEY" }, ...functions }
+  ];
 }
 async function completeFirmOnboarding(_root, args, context) {
   const session = context.session;
@@ -12964,7 +13581,8 @@ async function completeFirmOnboarding(_root, args, context) {
           description: "Firm-configured default practice area; review before operational use."
         }
       }),
-      tx.firm.update({ where: { id: firm.id }, data: { status: "active" } })
+      tx.firm.update({ where: { id: firm.id }, data: { status: "active" } }),
+      tx.paymentProvider.createMany({ data: defaultPaymentProviders(firm.id) })
     ]);
     await recordAuditEvent(tx, {
       firmId: firm.id,
@@ -13001,11 +13619,11 @@ async function completeFirmOnboarding(_root, args, context) {
 }
 
 // features/keystone/mutations/staffWorkflows.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 function requireString(value, label, maximum) {
-  const text23 = typeof value === "string" ? value.trim() : "";
-  if (!text23 || text23.length > maximum) throw new Error(`${label} is required and must be ${maximum} characters or fewer.`);
-  return text23;
+  const text24 = typeof value === "string" ? value.trim() : "";
+  if (!text24 || text24.length > maximum) throw new Error(`${label} is required and must be ${maximum} characters or fewer.`);
+  return text24;
 }
 function normalizeEmail(value) {
   const email = requireString(value, "Staff email", 320).toLowerCase();
@@ -13051,7 +13669,7 @@ async function inviteFirmMember(_root, args, context) {
     throw new Error("A user with this email already exists. Use account recovery or an administrator-assisted membership review.");
   }
   const created = await context.sudo().db.User.createOne({
-    data: { name, email, password: `Of!${(0, import_node_crypto13.randomBytes)(30).toString("base64url")}9a`, status: "invited" }
+    data: { name, email, password: `Of!${(0, import_node_crypto14.randomBytes)(30).toString("base64url")}9a`, status: "invited" }
   });
   const membership = await runSerializableTransaction(prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManagePeople");
@@ -13210,6 +13828,476 @@ async function changeFirmMemberAccess(_root, args, context) {
   });
 }
 
+// features/keystone/mutations/consultationPayments.ts
+var import_node_crypto17 = require("node:crypto");
+
+// features/keystone/mutations/portalPayments.ts
+var import_node_crypto16 = require("node:crypto");
+
+// features/keystone/lib/portal-auth.ts
+var import_node_crypto15 = require("node:crypto");
+var import_zod2 = require("zod");
+
+// features/keystone/lib/portal-read-error.ts
+var PortalReadError = class extends Error {
+  constructor(code) {
+    super(code === "invalid_session" ? "Portal session is invalid or expired." : code === "invalid_cursor" ? "Portal page is unavailable." : "Shared item is unavailable.");
+    this.code = code;
+    this.name = "PortalReadError";
+  }
+};
+
+// features/keystone/lib/portal-auth.ts
+async function authenticatePortalSession(rawToken, prisma, pepper) {
+  const client = prismaWithoutGraphQLErrorConversion(prisma);
+  const parsed = parseCredential(rawToken);
+  if (!parsed || parsed.kind !== "portal_session") return null;
+  const digest2 = credentialDigest("portal_session", rawToken, pepper);
+  const session = await client.portalSession.findUnique({
+    where: { tokenDigest: digest2 },
+    include: { portalAccount: { include: {
+      firm: { select: { id: true, status: true } },
+      contact: { select: { id: true, firmId: true, status: true } }
+    } } }
+  });
+  const now = /* @__PURE__ */ new Date();
+  if (!session || session.status !== "active" || session.expiresAt <= now || session.portalAccount?.id !== session.portalAccountId || session.portalAccount?.status !== "active" || session.portalAccount?.contact?.id !== session.portalAccount.contactId || session.portalAccount?.contact?.firmId !== session.firmId || !session.portalAccount?.contact?.status || session.portalAccount.contact.status === "archived" || session.portalAccount?.firmId !== session.firmId || session.portalAccount?.firm?.id !== session.firmId || session.portalAccount?.firm?.status !== "active") {
+    return null;
+  }
+  await client.portalSession.update({
+    where: { id: session.id },
+    data: { lastUsedAt: now }
+  });
+  return {
+    sessionId: session.id,
+    firmId: session.firmId,
+    portalAccountId: session.portalAccountId,
+    contactId: session.portalAccount.contactId
+  };
+}
+var PORTAL_INVOICE_LINE_LIMIT = 200;
+var PORTAL_THREAD_MESSAGE_LIMIT = 50;
+var portalCursor = import_zod2.z.object({ a: import_zod2.z.string(), g: import_zod2.z.string().datetime(), i: import_zod2.z.string().min(1).max(64) });
+async function recordPortalRead(client, identity, share) {
+  await client.auditEvent.create({
+    data: {
+      firmId: identity.firmId,
+      eventId: (0, import_node_crypto15.randomUUID)(),
+      eventType: "portal.resource_read",
+      category: "authorization",
+      outcome: "succeeded",
+      actorType: "portal_account",
+      matterId: share.matterId,
+      contactId: identity.contactId,
+      occurredAt: /* @__PURE__ */ new Date(),
+      metadata: {
+        portalAccountId: identity.portalAccountId,
+        portalShareId: share.id,
+        portalMatterAccessId: share.matterAccessId,
+        grantVersion: share.grantVersion,
+        policyRevision: share.policyRevision,
+        resourceType: share.resourceType
+      }
+    }
+  });
+}
+async function readPortalSharedResource(rawToken, shareId, prisma, pepper) {
+  return runSerializableTransaction(prisma, (tx) => readPortalSharedResourceInTransaction(rawToken, shareId, tx, pepper));
+}
+async function readPortalSharedResourceInTransaction(rawToken, shareId, prisma, pepper) {
+  const client = prismaWithoutGraphQLErrorConversion(prisma);
+  const identity = await authenticatePortalSession(rawToken, client, pepper);
+  if (!identity) throw new PortalReadError("invalid_session");
+  const now = /* @__PURE__ */ new Date();
+  const value = await client.portalShare.findFirst({
+    where: { ...portalShareCandidateWhere(identity, now), id: shareId },
+    select: portalShareHeaderSelect
+  });
+  const share = boundPortalShare(value, identity, now);
+  if (!share || share.id !== shareId || !await portalShareIsCurrent(client, share)) {
+    throw new PortalReadError("unavailable_resource");
+  }
+  const current = await client.portalShare.findFirst({
+    where: boundPortalShareWhere(share, identity, now),
+    select: { id: true }
+  });
+  if (!current || current.id !== share.id) throw new PortalReadError("unavailable_resource");
+  if (share.resourceType === "document") {
+    const resource3 = await client.document.findFirst({
+      where: {
+        id: share.documentId,
+        firmId: identity.firmId,
+        matterId: share.matterId,
+        status: "active",
+        confidentiality: "client_shareable"
+      },
+      select: { id: true, title: true, category: true, status: true, updatedAt: true }
+    });
+    if (!resource3 || resource3.id !== share.documentId) throw new Error("Shared document is unavailable.");
+    await recordPortalRead(client, identity, share);
+    return {
+      resourceType: share.resourceType,
+      document: resource3,
+      documentVersion: null,
+      invoice: null,
+      communicationThread: null
+    };
+  }
+  if (share.resourceType === "document_version") {
+    const resource3 = await client.documentVersion.findFirst({
+      where: {
+        id: share.documentVersionId,
+        firmId: identity.firmId,
+        document: {
+          id: share.documentVersion?.documentId,
+          firmId: identity.firmId,
+          matterId: share.matterAccess.matterId,
+          status: "active",
+          confidentiality: "client_shareable"
+        }
+      },
+      select: {
+        id: true,
+        versionNumber: true,
+        fileName: true,
+        mediaType: true,
+        byteSize: true,
+        checksumSha256: true,
+        createdAt: true
+      }
+    });
+    if (!resource3 || resource3.id !== share.documentVersionId) throw new Error("Shared document version is unavailable.");
+    await recordPortalRead(client, identity, share);
+    return {
+      resourceType: share.resourceType,
+      document: null,
+      documentVersion: resource3,
+      invoice: null,
+      communicationThread: null
+    };
+  }
+  if (share.resourceType === "invoice") {
+    const resource3 = await client.invoice.findFirst({
+      where: {
+        id: share.invoiceId,
+        firmId: identity.firmId,
+        matterId: share.matterId,
+        status: { in: ["issued", "partially_paid", "paid", "overdue"] }
+      },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+        currencyCode: true,
+        totalMinor: true,
+        paidMinor: true,
+        balanceDueMinor: true,
+        subtotalMinor: true,
+        discountMinor: true,
+        taxMinor: true,
+        issuedAt: true,
+        dueAt: true,
+        // Issued lines are immutable billing snapshots of the same invoice/matter.
+        lines: {
+          where: { firmId: identity.firmId, matterId: share.matterId },
+          orderBy: [{ serviceDate: "asc" }, { id: "asc" }],
+          take: PORTAL_INVOICE_LINE_LIMIT + 1,
+          select: { id: true, description: true, serviceDate: true, quantity: true, unitAmountMinor: true, lineTotalMinor: true, currencyCode: true }
+        }
+      }
+    });
+    if (!resource3 || resource3.id !== share.invoiceId) throw new Error("Shared invoice is unavailable.");
+    await recordPortalRead(client, identity, share);
+    const { lines, ...invoice } = resource3;
+    return {
+      resourceType: share.resourceType,
+      document: null,
+      documentVersion: null,
+      invoice: { ...invoice, lines: lines.slice(0, PORTAL_INVOICE_LINE_LIMIT), hasMoreLines: lines.length > PORTAL_INVOICE_LINE_LIMIT },
+      communicationThread: null
+    };
+  }
+  const resource2 = await client.communicationThread.findFirst({
+    where: {
+      id: share.communicationThreadId,
+      firmId: identity.firmId,
+      matterId: share.matterId,
+      status: "open"
+    },
+    select: { id: true, subject: true, primaryChannel: true, status: true, lastMessageAt: true }
+  });
+  if (!resource2 || resource2.id !== share.communicationThreadId) throw new Error("Shared communication thread is unavailable.");
+  const messages = await client.communicationMessage.findMany({
+    where: {
+      threadId: resource2.id,
+      firmId: identity.firmId,
+      matterId: share.matterId,
+      OR: [
+        { direction: "inbound", status: "received", senderContactId: identity.contactId }
+      ]
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    take: PORTAL_THREAD_MESSAGE_LIMIT + 1,
+    select: { id: true, direction: true, subject: true, body: true, sentAt: true, receivedAt: true, createdAt: true }
+  });
+  await recordPortalRead(client, identity, share);
+  return {
+    resourceType: share.resourceType,
+    document: null,
+    documentVersion: null,
+    invoice: null,
+    communicationThread: {
+      ...resource2,
+      messages: messages.slice(0, PORTAL_THREAD_MESSAGE_LIMIT).reverse(),
+      hasOlderMessages: messages.length > PORTAL_THREAD_MESSAGE_LIMIT
+    }
+  };
+}
+
+// features/keystone/mutations/portalPayments.ts
+function webBase() {
+  const value = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000";
+  return new URL(value).origin;
+}
+async function portalPaymentIdentity(token, context) {
+  if (!token) throw new Error("Portal session is required.");
+  const identity = await authenticatePortalSession(token, context.prisma);
+  if (!identity) throw new Error("Portal session is no longer active.");
+  return identity;
+}
+async function startPortalPayment(_root, args, context) {
+  if (!["invoice", "retainer"].includes(args.kind)) throw new Error("Unsupported payment resource.");
+  const identity = await portalPaymentIdentity(args.token, context);
+  const prisma = prismaWithoutGraphQLErrorConversion(context.prisma);
+  const setup = await runSerializableTransaction(prisma, async (tx) => {
+    const where = { firmId: identity.firmId, portalAccountId: identity.portalAccountId, status: "active", resourceType: args.kind === "invoice" ? "invoice" : "invoice", ...args.kind === "invoice" ? { invoiceId: args.id } : {} };
+    if (args.kind === "invoice") {
+      const rows = await tx.portalShare.findMany({ where, take: 20, select: portalShareHeaderSelect });
+      const share = rows.map((row) => boundPortalShare(row, identity)).find(Boolean);
+      if (!share || !await portalShareIsCurrent(tx, share)) throw new Error("Invoice is not shared with this portal account.");
+      const invoice = await tx.invoice.findFirst({ where: { id: args.id, firmId: identity.firmId, matterId: share.matterId, clientId: identity.contactId, status: { in: ["issued", "partially_paid", "overdue"] } }, select: { id: true, invoiceNumber: true, matterId: true, clientId: true, currencyCode: true, balanceDueMinor: true, client: { select: { primaryEmail: true } } } });
+      if (!invoice || invoice.balanceDueMinor <= 0) throw new Error("Invoice has no payable balance for this client.");
+      return { invoice, amount: invoice.balanceDueMinor, account: "operating", paymentType: "operating", matterId: invoice.matterId, payerId: invoice.clientId };
+    }
+    const retainer = await tx.retainerAgreement.findFirst({ where: { id: args.id, firmId: identity.firmId, clientId: identity.contactId, status: "active", matter: { is: { firmId: identity.firmId, clientId: identity.contactId, from_PortalMatterAccess_matter: { some: { portalAccountId: identity.portalAccountId, status: "active", canReadInvoices: true } } } } }, select: { id: true, agreementNumber: true, matterId: true, clientId: true, currencyCode: true, initialRetainerMinor: true, trustLedgerAccountId: true, trustLedgerAccount: { select: { trustAccountId: true } }, client: { select: { primaryEmail: true } } } });
+    if (!retainer?.trustLedgerAccountId || !retainer.initialRetainerMinor || retainer.initialRetainerMinor <= 0) throw new Error("An active retainer with a configured trust ledger and deposit amount is required.");
+    return { retainer, amount: retainer.initialRetainerMinor, account: "trust", paymentType: "trust_deposit", matterId: retainer.matterId, payerId: retainer.clientId };
+  });
+  const provider = await prisma.paymentProvider.findFirst({ where: { firmId: identity.firmId, code: setup.account === "trust" ? "pp_stripe_trust" : "pp_stripe_operating", isInstalled: true } });
+  if (!provider) throw new Error("The firm's selected payment account is not configured.");
+  const baseKey = `${args.kind}:${args.id}:${setup.amount}`;
+  const attempts = await prisma.payment.findMany({ where: { firmId: identity.firmId, OR: [{ idempotencyKey: baseKey }, { idempotencyKey: { startsWith: `${baseKey}:r` } }] }, orderBy: { createdAt: "desc" }, select: { id: true, idempotencyKey: true, status: true } });
+  const open = attempts.find((row) => ["pending", "authorized"].includes(row.status));
+  const key = open ? open.idempotencyKey : attempts.length ? `${baseKey}:r${attempts.length}` : baseKey;
+  let payment = open ? await prisma.payment.findFirst({ where: { id: open.id, firmId: identity.firmId } }) : null;
+  if (!payment) payment = await prisma.payment.create({ data: { firmId: identity.firmId, matterId: setup.matterId, ...args.kind === "invoice" ? { invoiceId: args.id } : { trustAccountId: setup.retainer.trustLedgerAccount?.trustAccountId }, payerId: setup.payerId, paymentNumber: `PAY-${(0, import_node_crypto16.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`, idempotencyKey: key, paymentType: setup.paymentType, status: "pending", amountMinor: setup.amount, refundedMinor: 0, currencyCode: args.kind === "invoice" ? setup.invoice.currencyCode : setup.retainer.currencyCode, providerCode: provider.code, paymentProviderId: provider.id } });
+  const resource2 = args.kind === "invoice" ? { id: args.id, number: setup.invoice.invoiceNumber, title: `Invoice ${setup.invoice.invoiceNumber}`, email: setup.invoice.client?.primaryEmail } : { id: args.id, number: setup.retainer.agreementNumber, title: `Retainer ${setup.retainer.agreementNumber}`, email: setup.retainer.client?.primaryEmail };
+  const result = await createPayment({ provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: identity.firmId, idempotencyKey: key, successUrl: `${webBase()}/portal/payments/return?payment=${payment.id}`, cancelUrl: `${webBase()}/portal/payments/return?payment=${payment.id}`, ...args.kind === "invoice" ? { invoice: resource2 } : { retainer: resource2 } });
+  if (!result?.checkoutUrl) throw new Error("Payment provider did not return a checkout URL.");
+  if (payment.providerPaymentId !== result.checkoutSessionId) payment = await prisma.payment.update({ where: { id: payment.id }, data: { providerPaymentId: result.checkoutSessionId } });
+  return { url: result.checkoutUrl, paymentId: payment.id };
+}
+async function reconcilePortalPayment(_root, args, context) {
+  const identity = await portalPaymentIdentity(args.token, context);
+  const prisma = prismaWithoutGraphQLErrorConversion(context.prisma);
+  const payment = await prisma.payment.findFirst({ where: { id: args.paymentId, firmId: identity.firmId, payerId: identity.contactId }, include: { paymentProvider: true, invoice: true } });
+  if (!payment) throw new Error("Payment is not available to this portal account.");
+  return reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, payment.payerId);
+}
+async function reconcilePaymentByProviderId(prisma, paymentId, firmId, payerId) {
+  const payment = await prisma.payment.findFirst({ where: { id: paymentId, firmId, ...payerId ? { payerId } : {} }, include: { paymentProvider: true, invoice: true } });
+  if (!payment || !payment.providerPaymentId || !payment.paymentProvider) throw new Error("Payment is not available for reconciliation.");
+  const status = await getPaymentStatus({ provider: payment.paymentProvider, paymentId: payment.providerPaymentId });
+  if (status.status !== "succeeded") return { status: payment.status, paymentId: payment.id };
+  if (status.amount !== payment.amountMinor || String(status.currency).toUpperCase() !== payment.currencyCode) throw new Error("Provider payment amount or currency mismatch.");
+  return runSerializableTransaction(prisma, async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-payment:${payment.firmId}:${payment.id}`}))`;
+    const current = await tx.payment.findFirst({ where: { id: payment.id, firmId: payment.firmId, ...payerId ? { payerId } : {} } });
+    if (!current) throw new Error("Payment is no longer available.");
+    if (["captured", "settled"].includes(current.status)) return { status: current.status, paymentId: current.id, replayed: true };
+    assertLifecycleTransition("providerPayment", current.status, "captured");
+    await tx.payment.update({ where: { id: current.id }, data: { status: "captured", capturedAt: /* @__PURE__ */ new Date(), failedAt: null, failureReason: "", providerPaymentId: payment.providerPaymentId } });
+    if (current.paymentType === "operating" && /^consultation:[^:]+$/.test(current.idempotencyKey ?? "")) return { status: "captured", paymentId: current.id, replayed: false };
+    if (current.paymentType === "operating") {
+      if (!current.invoiceId) throw new Error("Operating payment has no invoice.");
+      const invoice = await tx.invoice.findFirst({ where: { id: current.invoiceId, firmId: current.firmId } });
+      if (!invoice) throw new Error("Payment invoice was not found.");
+      if (!["issued", "partially_paid", "overdue"].includes(invoice.status) || invoice.balanceDueMinor <= 0) {
+        await recordAuditEvent(tx, { firmId: current.firmId, eventType: "payment.captured_unallocated", category: "financial", actorUserId: null, actorType: "system", matterId: invoice.matterId, invoiceId: invoice.id, paymentId: current.id, metadata: { invoiceStatus: invoice.status, amountMinor: current.amountMinor } });
+        return { status: "captured", paymentId: current.id, replayed: false, unallocated: true };
+      }
+      await applyInvoiceAllocation(tx, { firmId: current.firmId, paymentId: current.id, invoiceId: invoice.id, amountMinor: Math.min(current.amountMinor, invoice.balanceDueMinor), idempotencyKey: `provider-settlement:${current.id}`, actorUserId: null, note: "Online payment settlement" });
+    }
+    if (current.paymentType === "trust_deposit") {
+      const retainerId = /^retainer:([^:]+):/.exec(current.idempotencyKey ?? "")?.[1];
+      const retainer = retainerId ? await tx.retainerAgreement.findFirst({ where: { id: retainerId, firmId: current.firmId, clientId: current.payerId } }) : null;
+      if (!retainer?.trustLedgerAccountId) throw new Error("Trust deposit retainer ledger was not found.");
+      const ledger = await tx.trustLedgerAccount.findFirst({ where: { id: retainer.trustLedgerAccountId, firmId: current.firmId, status: "active" }, include: { trustAccount: true } });
+      if (!ledger || !ledger.trustAccount) throw new Error("Active trust ledger is required for the deposit.");
+      if (current.trustAccountId !== ledger.trustAccountId) throw new Error("Payment trust account does not match the trust ledger.");
+      await applyTrustPosting(tx, current.firmId, null, {
+        idempotencyKey: `online-trust:${current.id}`,
+        trustAccountId: ledger.trustAccountId,
+        transactionType: "deposit",
+        currencyCode: current.currencyCode,
+        occurredAt: (/* @__PURE__ */ new Date()).toISOString(),
+        description: `Online retainer deposit ${current.paymentNumber}`,
+        sourcePaymentId: current.id,
+        entries: [
+          { accountingBucket: "bank_control", direction: "debit", amountMinor: current.amountMinor, currencyCode: current.currencyCode, memo: "Online card deposit" },
+          { ledgerAccountId: ledger.id, accountingBucket: "client_liability", direction: "credit", amountMinor: current.amountMinor, currencyCode: current.currencyCode, memo: "Online card deposit" }
+        ]
+      });
+    }
+    return { status: "captured", paymentId: current.id, replayed: false };
+  });
+}
+
+// features/keystone/mutations/consultationPayments.ts
+var CONSULTATION_PAYMENT_WINDOW_MS = 35 * 6e4;
+var consultationPaymentKey = (consultationId) => `consultation:${consultationId}`;
+var consultationIdFromPaymentKey = (key) => /^consultation:([^:]+)$/.exec(key ?? "")?.[1] ?? null;
+var OPERATING_PROVIDER = "pp_stripe_operating";
+function consultationPaymentState(row, payment) {
+  if (row.feeMinor <= 0) return "none";
+  if (payment && ["captured", "settled"].includes(payment.status)) {
+    return (payment.refundedMinor ?? 0) >= payment.amountMinor ? "refunded" : "paid";
+  }
+  return row.status === "requested" ? "due" : "expired";
+}
+function unpaidRequestExpired(row, paid, now = Date.now()) {
+  return row.feeMinor > 0 && row.status === "requested" && !paid && now - row.createdAt.getTime() > CONSULTATION_PAYMENT_WINDOW_MS;
+}
+async function releaseUnpaidConsultations(tx, firmId) {
+  const cutoff = new Date(Date.now() - CONSULTATION_PAYMENT_WINDOW_MS);
+  const stale = await tx.consultation.findMany({ where: { firmId, status: "requested", feeMinor: { gt: 0 }, createdAt: { lt: cutoff } }, select: { id: true, intakeId: true, feeMinor: true, status: true, createdAt: true }, take: 50 });
+  for (const row of stale) {
+    const payment = await tx.payment.findFirst({ where: { firmId, idempotencyKey: consultationPaymentKey(row.id) }, select: { status: true } });
+    if (!unpaidRequestExpired(row, Boolean(payment && ["captured", "settled"].includes(payment.status)))) continue;
+    await tx.consultation.update({ where: { id: row.id }, data: { status: "cancelled", cancellationReason: "Consultation fee was not paid; the time was released." } });
+    if (payment) await tx.payment.updateMany({ where: { firmId, idempotencyKey: consultationPaymentKey(row.id), status: "pending" }, data: { status: "cancelled", failedAt: /* @__PURE__ */ new Date(), failureReason: "Checkout window ended" } });
+    await recordAuditEvent(tx, { firmId, eventType: "consultation.payment_expired", category: "financial", intakeId: row.intakeId, metadata: { consultationId: row.id } });
+  }
+}
+function webBase2() {
+  return new URL(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000").origin;
+}
+async function ownedConsultation(prisma, context, consultationId) {
+  const session = context.session;
+  if (!isHumanIdentitySession(session) || session.listKey !== "User") throw new Error("Sign in to manage your consultation.");
+  const row = await prisma.consultation.findFirst({ where: { id: String(consultationId), accountId: session.itemId }, include: { participants: { select: { id: true, primaryEmail: true }, take: 1 }, account: { select: { email: true } } } });
+  if (!row) throw new Error("This consultation is unavailable.");
+  return row;
+}
+async function consultationPaymentFor(prisma, consultation) {
+  return prisma.payment.findFirst({ where: { firmId: consultation.firmId, idempotencyKey: consultationPaymentKey(consultation.id) } });
+}
+async function startConsultationPayment(_root, args, context) {
+  const prisma = prismaWithoutGraphQLErrorConversion(context.prisma);
+  const consultation = await ownedConsultation(prisma, context, args.consultationId);
+  if (consultation.feeMinor <= 0) throw new Error("This consultation has no fee.");
+  if (consultation.status !== "requested") throw new Error("This consultation can no longer be paid online.");
+  if (Date.now() - consultation.createdAt.getTime() > CONSULTATION_PAYMENT_WINDOW_MS - 5 * 6e4) throw new Error("The time held for payment has ended. Request a new time.");
+  const payer = consultation.participants[0];
+  if (!payer) throw new Error("This consultation is unavailable.");
+  const provider = await prisma.paymentProvider.findFirst({ where: { firmId: consultation.firmId, code: OPERATING_PROVIDER, isInstalled: true } });
+  if (!provider) throw new Error("Online payment is not configured for this firm.");
+  const key = consultationPaymentKey(consultation.id);
+  let payment = await prisma.payment.findFirst({ where: { firmId: consultation.firmId, idempotencyKey: key } });
+  if (payment && ["captured", "settled"].includes(payment.status)) return { url: null, paymentId: payment.id, status: "paid" };
+  if (!payment) {
+    payment = await prisma.payment.create({ data: {
+      firmId: consultation.firmId,
+      payerId: payer.id,
+      paymentNumber: `PAY-${(0, import_node_crypto17.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+      idempotencyKey: key,
+      paymentType: "operating",
+      status: "pending",
+      amountMinor: consultation.feeMinor,
+      refundedMinor: 0,
+      currencyCode: consultation.currencyCode,
+      providerCode: provider.code,
+      paymentProviderId: provider.id
+    } });
+  }
+  const attempt = `${key}:${Math.floor(Date.now() / 6e4)}`;
+  const page = `${webBase2()}/account/appointments/${encodeURIComponent(consultation.id)}`;
+  const result = await createPayment({
+    provider,
+    amount: payment.amountMinor,
+    currency: payment.currencyCode,
+    paymentId: payment.id,
+    firmId: consultation.firmId,
+    idempotencyKey: attempt,
+    successUrl: `${page}?paid=1`,
+    cancelUrl: page,
+    consultation: { id: consultation.id, number: consultation.id, title: `${consultation.serviceTitle} consultation fee`, email: consultation.account?.email || payer.primaryEmail || void 0 }
+  });
+  if (!result?.checkoutUrl) throw new Error("Payment provider did not return a checkout URL.");
+  await prisma.payment.update({ where: { id: payment.id }, data: { providerPaymentId: result.checkoutSessionId, status: "pending" } });
+  return { url: result.checkoutUrl, paymentId: payment.id, status: "due" };
+}
+async function afterConsultationPaymentCaptured(prisma, paymentId) {
+  const payment = await prisma.payment.findFirst({ where: { id: paymentId } });
+  const consultationId = consultationIdFromPaymentKey(payment?.idempotencyKey);
+  if (!payment || !consultationId) return;
+  const consultation = await prisma.consultation.findFirst({ where: { id: consultationId, firmId: payment.firmId } });
+  if (!consultation) return;
+  await recordAuditEvent(prisma, { firmId: payment.firmId, eventType: "consultation.fee_paid", category: "financial", intakeId: consultation.intakeId, paymentId: payment.id, metadata: { consultationId, amountMinor: payment.amountMinor } }).catch(() => void 0);
+  if (consultation.status === "cancelled") await refundConsultationFee(prisma, { firmId: payment.firmId, consultationId, actorUserId: consultation.accountId, explanation: "Consultation was released before its payment completed." });
+}
+async function reconcileConsultationPayment(_root, args, context) {
+  const prisma = prismaWithoutGraphQLErrorConversion(context.prisma);
+  const consultation = await ownedConsultation(prisma, context, args.consultationId);
+  const payment = await consultationPaymentFor(prisma, consultation);
+  if (!payment?.providerPaymentId) return { status: consultationPaymentState(consultation, payment) };
+  if (!["captured", "settled"].includes(payment.status)) {
+    const result = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, payment.payerId);
+    if (result.status === "captured" && !result.replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
+  }
+  return { status: consultationPaymentState(consultation, await consultationPaymentFor(prisma, consultation)) };
+}
+async function refundConsultationFee(prisma, input) {
+  const key = `${consultationPaymentKey(input.consultationId)}:refund`;
+  const prior = await prisma.refund.findFirst({ where: { firmId: input.firmId, idempotencyKey: key } });
+  if (prior) return prior;
+  const payment = await prisma.payment.findFirst({ where: { firmId: input.firmId, idempotencyKey: consultationPaymentKey(input.consultationId) }, include: { paymentProvider: true } });
+  if (!payment || !["captured", "settled"].includes(payment.status) || !payment.paymentProvider || !payment.providerPaymentId) return null;
+  const amountMinor = payment.amountMinor - (payment.refundedMinor ?? 0);
+  if (amountMinor <= 0) return null;
+  const requester = input.actorUserId ?? (await prisma.consultation.findFirst({ where: { id: input.consultationId }, select: { hostId: true, accountId: true } }))?.accountId;
+  if (!requester) return null;
+  const status = await getPaymentStatus({ provider: payment.paymentProvider, paymentId: payment.providerPaymentId });
+  if (!status?.paymentIntentId) throw new Error("The card payment has no settled charge to refund.");
+  const providerRefund = await refundPayment({ provider: payment.paymentProvider, paymentId: status.paymentIntentId, amount: amountMinor, idempotencyKey: `law-consultation-refund:${input.firmId}:${input.consultationId}` });
+  const providerRefundId = String(providerRefund?.data?.id ?? "");
+  if (!["succeeded", "pending"].includes(providerRefund?.status) || !providerRefundId) throw new Error("The card refund was not accepted; check the provider.");
+  return runSerializableTransaction(prisma, async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`refund-payment:${input.firmId}:${payment.id}`}))`;
+    const again = await tx.refund.findFirst({ where: { firmId: input.firmId, idempotencyKey: key } });
+    if (again) return again;
+    const now = /* @__PURE__ */ new Date();
+    const refund = await tx.refund.create({ data: {
+      firmId: input.firmId,
+      paymentId: payment.id,
+      refundNumber: `REF-${(0, import_node_crypto17.randomUUID)().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
+      idempotencyKey: key,
+      status: "succeeded",
+      reason: "client_request",
+      amountMinor,
+      currencyCode: payment.currencyCode,
+      explanation: input.explanation.slice(0, 4e3),
+      requestedById: requester,
+      requestedAt: now,
+      processedAt: now,
+      providerRefundId
+    } });
+    await tx.payment.update({ where: { id: payment.id }, data: { refundedMinor: { increment: amountMinor } } });
+    await recordAuditEvent(tx, { firmId: input.firmId, eventType: "refund.succeeded", category: "financial", actorUserId: input.actorUserId, paymentId: payment.id, metadata: { refundId: refund.id, providerRefundId, amountMinor, source: "consultation_cancelled", consultationId: input.consultationId } });
+    return refund;
+  });
+}
+
 // features/keystone/mutations/consultationLifecycle.ts
 var consultationOutcomes = /* @__PURE__ */ new Set(["pending", "recommend_engagement", "decline", "follow_up"]);
 var reservedStatuses = ["requested", "scheduled"];
@@ -13243,6 +14331,10 @@ async function scheduleConsultation(_root, args, context) {
     const consultation = await tx.consultation.findFirst({ where: { id: reference.id, firmId } });
     if (!consultation || consultation.hostId !== reference.hostId) throw new Error("Consultation changed concurrently; reload before retrying.");
     if (consultation.status !== "scheduled") assertLifecycleTransition("consultation", consultation.status, "scheduled");
+    if (consultation.status === "requested" && consultation.feeMinor > 0) {
+      const fee = await tx.payment.findFirst({ where: { firmId, idempotencyKey: consultationPaymentKey(consultation.id) }, select: { status: true } });
+      if (!fee || !["captured", "settled"].includes(fee.status)) throw new Error("The consultation fee has not been paid yet; the client confirms the time by paying.");
+    }
     const host = await tx.firmMembership.findFirst({
       where: { firmId, userId: args.hostId, status: "active", role: { status: "active", canManageIntake: true }, user: { status: "active" } },
       select: { userId: true }
@@ -13289,7 +14381,7 @@ async function transitionConsultation(_root, args, context) {
   if (outcome && !consultationOutcomes.has(outcome)) throw new Error("Unsupported consultation outcome.");
   if (outcome && args.toStatus !== "completed") throw new Error("Only a completed consultation records an outcome.");
   const reason = args.toStatus === "cancelled" ? boundedReason(args.reason, "Cancellation reason", 3, 2e3) : optionalBoundedText(args.reason, "Reason", 2e3);
-  return runSerializableTransaction(context.prisma, async (tx) => {
+  const result = await runSerializableTransaction(context.prisma, async (tx) => {
     await assertCurrentCommandActor(tx, context, "canManageIntake");
     const reference = await tx.consultation.findFirst({ where: { id: args.consultationId, firmId }, select: { id: true, hostId: true } });
     if (!reference) throw new Error("Consultation was not found in the active firm.");
@@ -13317,14 +14409,21 @@ async function transitionConsultation(_root, args, context) {
       intakeId: consultation.intakeId,
       metadata: { consultationId: consultation.id, fromStatus: consultation.status, outcome, ...reason ? { reasonDigest: sha256Digest(reason) } : {} }
     });
+    if (args.toStatus === "completed") {
+      await advanceIntakeAfterConsultation(tx, context, { firmId, userId, intakeId: consultation.intakeId, consultationId: consultation.id, outcome });
+    }
     return projection(updated);
   });
+  if (args.toStatus === "cancelled") {
+    await refundConsultationFee(prismaWithoutGraphQLErrorConversion(context.prisma), { firmId, consultationId: result.id, actorUserId: userId, explanation: `Consultation cancelled by the firm.${reason ? ` ${reason}` : ""}` });
+  }
+  return result;
 }
 async function cancelOwnConsultation(_root, args, context) {
   const session = context.session;
   if (!isInteractiveHumanSession(session)) throw new Error("Sign in to manage your consultation.");
   const reason = optionalBoundedText(args.reason, "Cancellation reason", 1e3);
-  return runSerializableTransaction(context.prisma, async (tx) => {
+  const result = await runSerializableTransaction(context.prisma, async (tx) => {
     const account2 = await tx.user.findFirst({ where: { id: session.itemId, status: "active" }, select: { id: true } });
     const reference = account2 ? await tx.consultation.findFirst({ where: { id: args.consultationId, accountId: account2.id }, select: { id: true, firmId: true, hostId: true } }) : null;
     if (!reference) throw new Error("This consultation is unavailable.");
@@ -13346,8 +14445,10 @@ async function cancelOwnConsultation(_root, args, context) {
       intakeId: consultation.intakeId,
       metadata: { consultationId: consultation.id, fromStatus: consultation.status }
     });
-    return projection(updated);
+    return { ...projection(updated), firmId: consultation.firmId };
   });
+  await refundConsultationFee(prismaWithoutGraphQLErrorConversion(context.prisma), { firmId: result.firmId, consultationId: result.id, actorUserId: session.itemId, explanation: `Consultation cancelled by the client before it started.${reason ? ` ${reason}` : ""}` });
+  return projection(result);
 }
 
 // features/keystone/mutations/retainerWorkflows.ts
@@ -13625,7 +14726,7 @@ async function verifyDocketEntry(_root, args, context) {
 }
 
 // features/keystone/mutations/partyWorkflows.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto18 = require("node:crypto");
 var intakeRoles = /* @__PURE__ */ new Set(["prospective_client", "adverse_party", "related_party", "witness", "referrer", "other"]);
 var matterRoles = /* @__PURE__ */ new Set(["client", "claimant", "respondent", "opposing_party", "witness", "expert", "counsel", "adjudicator", "other"]);
 var matterSides = /* @__PURE__ */ new Set(["our_client", "adverse", "neutral", "unknown"]);
@@ -13649,7 +14750,7 @@ async function requireConflictReReview(tx, input) {
       firmId: input.firmId,
       intakeId: input.intakeId ?? null,
       matterId: input.matterId ?? null,
-      checkNumber: `PARTY-${(0, import_node_crypto14.randomUUID)()}`,
+      checkNumber: `PARTY-${(0, import_node_crypto18.randomUUID)()}`,
       status: "requested",
       requestedById: input.userId,
       searchScope: "contacts_and_matters",
@@ -13861,231 +14962,6 @@ async function changeMatterParty(_root, args, context) {
     });
     return { ...updated, conflictCheckId };
   });
-}
-
-// features/keystone/lib/portal-auth.ts
-var import_node_crypto15 = require("node:crypto");
-var import_zod2 = require("zod");
-
-// features/keystone/lib/portal-read-error.ts
-var PortalReadError = class extends Error {
-  constructor(code) {
-    super(code === "invalid_session" ? "Portal session is invalid or expired." : code === "invalid_cursor" ? "Portal page is unavailable." : "Shared item is unavailable.");
-    this.code = code;
-    this.name = "PortalReadError";
-  }
-};
-
-// features/keystone/lib/portal-auth.ts
-async function authenticatePortalSession(rawToken, prisma, pepper) {
-  const client = prismaWithoutGraphQLErrorConversion(prisma);
-  const parsed = parseCredential(rawToken);
-  if (!parsed || parsed.kind !== "portal_session") return null;
-  const digest2 = credentialDigest("portal_session", rawToken, pepper);
-  const session = await client.portalSession.findUnique({
-    where: { tokenDigest: digest2 },
-    include: { portalAccount: { include: {
-      firm: { select: { id: true, status: true } },
-      contact: { select: { id: true, firmId: true, status: true } }
-    } } }
-  });
-  const now = /* @__PURE__ */ new Date();
-  if (!session || session.status !== "active" || session.expiresAt <= now || session.portalAccount?.id !== session.portalAccountId || session.portalAccount?.status !== "active" || session.portalAccount?.contact?.id !== session.portalAccount.contactId || session.portalAccount?.contact?.firmId !== session.firmId || !session.portalAccount?.contact?.status || session.portalAccount.contact.status === "archived" || session.portalAccount?.firmId !== session.firmId || session.portalAccount?.firm?.id !== session.firmId || session.portalAccount?.firm?.status !== "active") {
-    return null;
-  }
-  await client.portalSession.update({
-    where: { id: session.id },
-    data: { lastUsedAt: now }
-  });
-  return {
-    sessionId: session.id,
-    firmId: session.firmId,
-    portalAccountId: session.portalAccountId,
-    contactId: session.portalAccount.contactId
-  };
-}
-var PORTAL_INVOICE_LINE_LIMIT = 200;
-var PORTAL_THREAD_MESSAGE_LIMIT = 50;
-var portalCursor = import_zod2.z.object({ a: import_zod2.z.string(), g: import_zod2.z.string().datetime(), i: import_zod2.z.string().min(1).max(64) });
-async function recordPortalRead(client, identity, share) {
-  await client.auditEvent.create({
-    data: {
-      firmId: identity.firmId,
-      eventId: (0, import_node_crypto15.randomUUID)(),
-      eventType: "portal.resource_read",
-      category: "authorization",
-      outcome: "succeeded",
-      actorType: "portal_account",
-      matterId: share.matterId,
-      contactId: identity.contactId,
-      occurredAt: /* @__PURE__ */ new Date(),
-      metadata: {
-        portalAccountId: identity.portalAccountId,
-        portalShareId: share.id,
-        portalMatterAccessId: share.matterAccessId,
-        grantVersion: share.grantVersion,
-        policyRevision: share.policyRevision,
-        resourceType: share.resourceType
-      }
-    }
-  });
-}
-async function readPortalSharedResource(rawToken, shareId, prisma, pepper) {
-  return runSerializableTransaction(prisma, (tx) => readPortalSharedResourceInTransaction(rawToken, shareId, tx, pepper));
-}
-async function readPortalSharedResourceInTransaction(rawToken, shareId, prisma, pepper) {
-  const client = prismaWithoutGraphQLErrorConversion(prisma);
-  const identity = await authenticatePortalSession(rawToken, client, pepper);
-  if (!identity) throw new PortalReadError("invalid_session");
-  const now = /* @__PURE__ */ new Date();
-  const value = await client.portalShare.findFirst({
-    where: { ...portalShareCandidateWhere(identity, now), id: shareId },
-    select: portalShareHeaderSelect
-  });
-  const share = boundPortalShare(value, identity, now);
-  if (!share || share.id !== shareId || !await portalShareIsCurrent(client, share)) {
-    throw new PortalReadError("unavailable_resource");
-  }
-  const current = await client.portalShare.findFirst({
-    where: boundPortalShareWhere(share, identity, now),
-    select: { id: true }
-  });
-  if (!current || current.id !== share.id) throw new PortalReadError("unavailable_resource");
-  if (share.resourceType === "document") {
-    const resource3 = await client.document.findFirst({
-      where: {
-        id: share.documentId,
-        firmId: identity.firmId,
-        matterId: share.matterId,
-        status: "active",
-        confidentiality: "client_shareable"
-      },
-      select: { id: true, title: true, category: true, status: true, updatedAt: true }
-    });
-    if (!resource3 || resource3.id !== share.documentId) throw new Error("Shared document is unavailable.");
-    await recordPortalRead(client, identity, share);
-    return {
-      resourceType: share.resourceType,
-      document: resource3,
-      documentVersion: null,
-      invoice: null,
-      communicationThread: null
-    };
-  }
-  if (share.resourceType === "document_version") {
-    const resource3 = await client.documentVersion.findFirst({
-      where: {
-        id: share.documentVersionId,
-        firmId: identity.firmId,
-        document: {
-          id: share.documentVersion?.documentId,
-          firmId: identity.firmId,
-          matterId: share.matterAccess.matterId,
-          status: "active",
-          confidentiality: "client_shareable"
-        }
-      },
-      select: {
-        id: true,
-        versionNumber: true,
-        fileName: true,
-        mediaType: true,
-        byteSize: true,
-        checksumSha256: true,
-        createdAt: true
-      }
-    });
-    if (!resource3 || resource3.id !== share.documentVersionId) throw new Error("Shared document version is unavailable.");
-    await recordPortalRead(client, identity, share);
-    return {
-      resourceType: share.resourceType,
-      document: null,
-      documentVersion: resource3,
-      invoice: null,
-      communicationThread: null
-    };
-  }
-  if (share.resourceType === "invoice") {
-    const resource3 = await client.invoice.findFirst({
-      where: {
-        id: share.invoiceId,
-        firmId: identity.firmId,
-        matterId: share.matterId,
-        status: { in: ["issued", "partially_paid", "paid", "overdue"] }
-      },
-      select: {
-        id: true,
-        invoiceNumber: true,
-        status: true,
-        currencyCode: true,
-        totalMinor: true,
-        paidMinor: true,
-        balanceDueMinor: true,
-        subtotalMinor: true,
-        discountMinor: true,
-        taxMinor: true,
-        issuedAt: true,
-        dueAt: true,
-        // Issued lines are immutable billing snapshots of the same invoice/matter.
-        lines: {
-          where: { firmId: identity.firmId, matterId: share.matterId },
-          orderBy: [{ serviceDate: "asc" }, { id: "asc" }],
-          take: PORTAL_INVOICE_LINE_LIMIT + 1,
-          select: { id: true, description: true, serviceDate: true, quantity: true, unitAmountMinor: true, lineTotalMinor: true, currencyCode: true }
-        }
-      }
-    });
-    if (!resource3 || resource3.id !== share.invoiceId) throw new Error("Shared invoice is unavailable.");
-    await recordPortalRead(client, identity, share);
-    const { lines, ...invoice } = resource3;
-    return {
-      resourceType: share.resourceType,
-      document: null,
-      documentVersion: null,
-      invoice: { ...invoice, lines: lines.slice(0, PORTAL_INVOICE_LINE_LIMIT), hasMoreLines: lines.length > PORTAL_INVOICE_LINE_LIMIT },
-      communicationThread: null
-    };
-  }
-  const resource2 = await client.communicationThread.findFirst({
-    where: {
-      id: share.communicationThreadId,
-      firmId: identity.firmId,
-      matterId: share.matterId,
-      status: "open"
-    },
-    select: { id: true, subject: true, primaryChannel: true, status: true, lastMessageAt: true }
-  });
-  if (!resource2 || resource2.id !== share.communicationThreadId) throw new Error("Shared communication thread is unavailable.");
-  const messages = await client.communicationMessage.findMany({
-    where: {
-      threadId: resource2.id,
-      firmId: identity.firmId,
-      matterId: share.matterId,
-      OR: [
-        { direction: "inbound", status: "received", senderContactId: identity.contactId },
-        {
-          direction: "outbound",
-          status: { in: ["sent", "delivered"] },
-          deliveries: { some: { recipientContactId: identity.contactId, status: { in: ["sent", "delivered"] } } }
-        }
-      ]
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-    take: PORTAL_THREAD_MESSAGE_LIMIT + 1,
-    select: { id: true, direction: true, subject: true, body: true, sentAt: true, receivedAt: true, createdAt: true }
-  });
-  await recordPortalRead(client, identity, share);
-  return {
-    resourceType: share.resourceType,
-    document: null,
-    documentVersion: null,
-    invoice: null,
-    communicationThread: {
-      ...resource2,
-      messages: messages.slice(0, PORTAL_THREAD_MESSAGE_LIMIT).reverse(),
-      hasOlderMessages: messages.length > PORTAL_THREAD_MESSAGE_LIMIT
-    }
-  };
 }
 
 // features/keystone/mutations/portalPolicyWorkflows.ts
@@ -15254,22 +16130,43 @@ function formatInstant(value, timeZone, { includeTime = true, missing = "Not rec
 }
 
 // features/shared/dispatch-outcome.ts
-function communicationDispatchState(status, errorCode) {
-  if (errorCode === "smtp_outcome_unknown") return { status: "unknown", guidance: "Unknown \u2014 do not resend until reconciled." };
-  if (errorCode === "smtp_not_dispatched") return { status: "not_dispatched", guidance: "Not dispatched. Review the original intent and authority; no automatic retry." };
-  if (errorCode === "smtp_send_admitted") return { status: "in_flight", guidance: "Admitted; acceptance is not yet confirmed. Do not resend." };
-  if (status === "sent") return { status: "relay_accepted", guidance: "Accepted by the relay; final delivery is not confirmed." };
-  return { status, guidance: status === "pending" ? "Queued; no final delivery outcome." : "" };
-}
 function webhookDispatchState(status, lastError) {
-  if (lastError?.startsWith("outcome_unknown:")) return { status: "unknown", guidance: "Unknown \u2014 do not resend until reconciled." };
-  if (lastError?.startsWith("not_dispatched:")) return { status: "not_dispatched", guidance: "Not dispatched. Review the original intent and authority before any new admission." };
-  if (lastError === "admitted:awaiting_observation") return { status: "in_flight", guidance: "Admitted; remote outcome is not confirmed. Do not resend." };
-  if (lastError === "claimed:not_admitted") return { status: "claimed", guidance: "Claimed, but not admitted for transport." };
+  if (status === "processing") return { status: "in_flight", guidance: "Sending, or interrupted before the result was recorded. Retry if it stays here." };
+  if (status === "dead_letter") return { status, guidance: "Retries used up. Staff can retry once more." };
+  if (status === "failed") return { status, guidance: lastError ? `Last attempt failed (${lastError.replace(/[^a-z0-9_:]/gi, "").slice(0, 60)}). Staff can retry.` : "Last attempt failed. Staff can retry." };
   return { status, guidance: "" };
 }
 
 // features/keystone/mutations/practiceWorkspace.ts
+var trustAccountTypeLabels = {
+  trust: "Trust",
+  pooled_trust: "IOLTA / pooled trust",
+  dedicated_client: "Dedicated client trust",
+  other: "Other safeguarded funds"
+};
+var eventVerbs = { create: "created", update: "updated", delete: "deleted" };
+function readableEvent(key) {
+  const words = String(key ?? "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/[._\s]+/).filter(Boolean).map((word) => eventVerbs[word.toLowerCase()] ?? word.toLowerCase());
+  const text24 = words.join(" ");
+  return text24 ? text24.charAt(0).toUpperCase() + text24.slice(1) : "Activity";
+}
+function grantAccessLabel(record) {
+  const sees = [
+    record.canReadDocuments ? "documents" : null,
+    record.canReadInvoices ? "invoices" : null,
+    record.canReadMessages ? "messages" : null
+  ].filter(Boolean);
+  const upload = record.canUploadDocuments ? "can upload" : null;
+  return [sees.length ? `Sees ${sees.join(", ")}` : "Sees nothing yet", upload].filter(Boolean).join(" \xB7 ");
+}
+function ledgerMoney(amountMinor, currencyCode) {
+  try {
+    const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode || "USD" });
+    return formatter.format(Number(amountMinor ?? 0) / 10 ** (formatter.resolvedOptions().maximumFractionDigits ?? 2));
+  } catch {
+    return `${Number(amountMinor ?? 0)} ${currencyCode}`;
+  }
+}
 var CATEGORIES = /* @__PURE__ */ new Set([
   "intake",
   "matters",
@@ -15459,14 +16356,14 @@ var practiceWorkspaceSources = {
     {
       key: "drafts",
       title: "Drafts ready for review",
-      description: "Outbound drafts that can be queued only after recipients and controlled deliveries exist.",
+      description: "Outbound drafts awaiting review.",
       model: "CommunicationMessage",
       permissions: ["canReadCommunications", "canManageCommunications"],
       where: { status: { equals: "draft" } },
       orderBy: { updatedAt: "desc" },
-      query: "id subject direction channel status updatedAt matter { matterNumber } thread { subject } deliveriesCount",
+      query: "id subject direction channel status updatedAt matter { matterNumber } thread { subject }",
       kind: "Message",
-      map: (record) => ({ id: record.id, title: record.subject || record.thread?.subject || "Untitled draft", subtitle: `${matterLabel(record)} \xB7 ${record.channel} \xB7 ${record.deliveriesCount ?? 0} controlled deliveries`, status: record.status, at: iso2(record.updatedAt) })
+      map: (record) => ({ id: record.id, title: record.subject || record.thread?.subject || "Untitled draft", subtitle: `${matterLabel(record)} \xB7 ${record.channel} \xB7 recorded draft`, status: record.status, at: iso2(record.updatedAt) })
     },
     {
       key: "threads",
@@ -15479,18 +16376,6 @@ var practiceWorkspaceSources = {
       query: "id subject status primaryChannel lastMessageAt matter { matterNumber } intake { intakeNumber } messagesCount",
       kind: "Thread",
       map: (record) => ({ id: record.id, title: record.subject, subtitle: `${record.matter?.matterNumber ?? record.intake?.intakeNumber ?? "Firm-level"} \xB7 ${record.primaryChannel} \xB7 ${record.messagesCount ?? 0} messages`, status: record.status, at: iso2(record.lastMessageAt) })
-    },
-    {
-      key: "delivery",
-      title: "Delivery follow-up",
-      description: "Failed, bounced, and pending provider handoffs requiring operator attention.",
-      model: "CommunicationDelivery",
-      permissions: ["canReadCommunications"],
-      where: { status: { in: ["pending", "failed", "bounced"] } },
-      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-      query: "id status channel errorCode attemptCount lastAttemptAt message { subject }",
-      kind: "Delivery",
-      map: (record) => ({ id: record.id, title: record.message?.subject ? `Delivery \xB7 ${record.message.subject}` : "Message delivery", subtitle: `${record.channel} \xB7 ${record.attemptCount ?? 0} attempts \xB7 ${communicationDispatchState(record.status, record.errorCode).guidance}`, status: communicationDispatchState(record.status, record.errorCode).status, at: iso2(record.lastAttemptAt) })
     }
   ],
   "time-expenses": [
@@ -15540,9 +16425,9 @@ var practiceWorkspaceSources = {
       permissions: ["canReadPayments", "canManagePayments", "canReadBilling"],
       where: { status: { in: ["pending", "authorized", "captured"] } },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      query: "id paymentNumber status createdAt",
+      query: "id paymentNumber status createdAt amountMinor currencyCode payer { displayName }",
       kind: "Payment",
-      map: (record) => ({ id: record.id, title: record.paymentNumber, subtitle: "Payment awaiting capture, settlement or allocation", status: record.status, at: iso2(record.createdAt) })
+      map: (record) => ({ id: record.id, title: record.paymentNumber, subtitle: `${ledgerMoney(record.amountMinor, record.currencyCode)} \xB7 ${record.payer?.displayName ?? "Payer unavailable"}`, status: record.status, at: iso2(record.createdAt) })
     }
   ],
   accounting: [
@@ -15555,7 +16440,7 @@ var practiceWorkspaceSources = {
       orderBy: { updatedAt: "desc" },
       query: "id name accountType status currencyCode bankAccountLastFour updatedAt ledgerAccountsCount reconciliationsCount",
       kind: "Trust account",
-      map: (record) => ({ id: record.id, title: record.name, subtitle: `${record.accountType} \xB7 ${record.currencyCode} \xB7 \u2022\u2022\u2022\u2022${record.bankAccountLastFour || "----"}`, status: record.status, at: iso2(record.updatedAt) })
+      map: (record) => ({ id: record.id, title: record.name, subtitle: `${trustAccountTypeLabels[record.accountType] ?? "Trust"} \xB7 ${record.currencyCode} \xB7 \u2022\u2022\u2022\u2022${record.bankAccountLastFour || "----"}`, status: record.status, at: iso2(record.updatedAt) })
     },
     {
       key: "ledgers",
@@ -15565,9 +16450,9 @@ var practiceWorkspaceSources = {
       permissions: ["canReadTrust", "canManageTrust"],
       where: { status: { in: ["active", "frozen"] } },
       orderBy: { updatedAt: "desc" },
-      query: "id ledgerNumber status currencyCode updatedAt trustAccount { id name } client { displayName } matter { matterNumber }",
+      query: "id ledgerNumber status currencyCode balanceMinor updatedAt trustAccount { id name } client { displayName } matter { matterNumber }",
       kind: "Client ledger",
-      map: (record) => ({ id: record.id, title: `${record.ledgerNumber} \xB7 ${record.client?.displayName ?? "Client"}`, subtitle: `${record.trustAccount?.name ?? "Trust account"} \xB7 ${record.currencyCode} \xB7 ${record.matter?.matterNumber ?? "client-level"}`, status: record.status, at: iso2(record.updatedAt) })
+      map: (record) => ({ id: record.id, title: `${record.ledgerNumber} \xB7 ${record.client?.displayName ?? "Client"}`, subtitle: `Balance ${ledgerMoney(record.balanceMinor, record.currencyCode)} \xB7 ${record.trustAccount?.name ?? "Trust account"} \xB7 ${record.matter?.matterNumber ?? "Client-level"}`, status: record.status, at: iso2(record.updatedAt) })
     },
     {
       key: "reconciliation",
@@ -15605,7 +16490,7 @@ var practiceWorkspaceSources = {
       orderBy: { updatedAt: "desc" },
       query: "id status expiresAt updatedAt portalAccount { email contact { displayName } } matter { matterNumber title } canReadDocuments canUploadDocuments canReadInvoices canReadMessages",
       kind: "Matter grant",
-      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} \xB7 exact capabilities`, status: record.status, at: iso2(record.expiresAt ?? record.updatedAt) })
+      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} \xB7 ${grantAccessLabel(record)}`, status: record.status, at: iso2(record.expiresAt ?? record.updatedAt) })
     },
     {
       key: "shares",
@@ -15615,9 +16500,9 @@ var practiceWorkspaceSources = {
       permissions: ["canReadPortal", "canManagePortal"],
       where: { status: { equals: "active" } },
       orderBy: { grantedAt: "desc" },
-      query: "id status resourceType grantedAt expiresAt portalAccount { email contact { displayName } } matter { matterNumber title }",
+      query: "id status resourceType grantedAt expiresAt createdAt portalAccount { email contact { displayName } } matter { matterNumber title }",
       kind: "Portal share",
-      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} \xB7 ${record.resourceType.replaceAll("_", " ")}`, status: record.status, at: iso2(record.expiresAt ?? record.grantedAt) })
+      map: (record) => ({ id: record.id, title: record.portalAccount?.contact?.displayName ?? record.portalAccount?.email ?? "Portal account", subtitle: `${matterLabel(record)} \xB7 ${{ document: "Document", invoice: "Invoice", communication_thread: "Conversation" }[record.resourceType] ?? "Shared item"}`, status: record.status, at: iso2(record.expiresAt ?? record.grantedAt ?? record.createdAt) })
     },
     {
       key: "eligible-contacts",
@@ -15739,7 +16624,7 @@ var practiceWorkspaceSources = {
       orderBy: { occurredAt: "desc" },
       query: "id eventType category outcome occurredAt matter { matterNumber } actorUser { name }",
       kind: "Audit evidence",
-      map: (record) => ({ id: record.id, title: record.eventType, subtitle: `${record.category} \xB7 ${record.matter?.matterNumber ?? "Firm-level"} \xB7 ${record.actorUser?.name ?? "system"}`, status: record.outcome, at: iso2(record.occurredAt) })
+      map: (record) => ({ id: record.id, title: readableEvent(record.eventType), subtitle: `${readableEvent(record.category)} \xB7 ${record.matter?.matterNumber ?? "Firm-level"} \xB7 ${record.actorUser?.name ?? "System"}`, status: record.outcome, at: iso2(record.occurredAt) })
     }
   ],
   integrations: [
@@ -15757,7 +16642,7 @@ var practiceWorkspaceSources = {
     {
       key: "webhooks",
       title: "Webhook deliveries",
-      description: "Queued, sent, unresolved and rejected deliveries. A delivery with an unknown outcome must be checked, not resent.",
+      description: "Webhooks go out on the request that causes them. A failed or interrupted delivery can be retried by staff.",
       model: "WebhookDelivery",
       permissions: ["canReadIntegrations", "canManageIntegrations"],
       where: { status: { in: ["pending", "processing", "failed", "dead_letter"] } },
@@ -15796,17 +16681,20 @@ function mapWorkspaceRecord(category, source, record, ordinal, canAct) {
 }
 var actionPermissions = {
   Intake: "canManageIntake",
+  // Confirm / reschedule / cancel / record outcome run through the intake-managed
+  // consultation commands; without this entry booked requests could never leave "requested".
+  Consultation: "canManageIntake",
   "Conflict check": "canResolveConflicts",
   Matter: "canManageMatters",
   Deadline: "canManageCalendar",
   Task: "canManageTasks",
-  Message: "canManageCommunications",
   Document: "canManageDocuments",
   "Time entry": "canManageBilling",
   Expense: "canManageBilling",
   Invoice: "canManageBilling",
   "Legal hold": "canManageRetention",
   Connection: "canManageIntegrations",
+  "Webhook delivery": "canManageIntegrations",
   "Trust account": "canManageTrust",
   "Client ledger": "canManageTrust",
   Reconciliation: "canManageTrust"
@@ -16696,6 +17584,217 @@ async function prepareSignatureRequest(_root, args, context) {
   });
 }
 
+// features/keystone/mutations/communicationWorkflows.ts
+var participantRoles = /* @__PURE__ */ new Set(["staff", "client", "external_counsel", "third_party"]);
+var singleEmailAddress = /^[^\s@<>,;()"]+@[^\s@<>,;()"]+\.[^\s@<>,;()"]+$/;
+function isSingleEmailAddress(value) {
+  return Boolean(value && value.length <= 254 && singleEmailAddress.test(value));
+}
+async function lockThread(tx, firmId, threadId) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`communication-thread:${firmId}:${threadId}`}))`;
+}
+async function resolveParticipantIdentity(tx, firmId, thread, args) {
+  const identities = [args.userId, args.contactId, args.portalAccountId].filter(Boolean);
+  if (identities.length !== 1) throw new Error("Choose exactly one staff member, contact or portal account.");
+  if (args.contactMethodId && !args.contactId) throw new Error("A contact method can be chosen only for a contact participant.");
+  if (args.userId) {
+    if (args.participantRole !== "staff") throw new Error("Firm users can join a thread only as staff.");
+    const membership = await tx.firmMembership.findFirst({
+      where: { firmId, userId: args.userId, status: "active", user: { status: "active" }, role: { firmId, status: "active", canReadCommunications: true, ...thread.matterId ? { canReadMatters: true } : {} } },
+      select: { user: { select: { email: true } } }
+    });
+    if (!membership) throw new Error("Staff participant must be an active member of the active firm.");
+    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, args.userId);
+    return { userId: args.userId, displayAddress: membership.user?.email ?? "" };
+  }
+  if (args.participantRole === "staff") throw new Error("Staff participants must be firm users.");
+  if (args.portalAccountId) {
+    if (args.participantRole !== "client") throw new Error("Portal accounts can join a thread only as clients.");
+    const account2 = await tx.portalAccount.findFirst({
+      where: { id: args.portalAccountId, firmId, status: "active" },
+      select: { id: true, email: true, contactId: true, contact: { select: { firmId: true, status: true } } }
+    });
+    if (!account2 || account2.contact?.firmId !== firmId || account2.contact.status === "archived" || !thread.matterId) throw new Error("Portal participant must be a current account/contact on this matter.");
+    const identity = { firmId, portalAccountId: account2.id, contactId: account2.contactId };
+    let after;
+    let admitted = false;
+    for (let page = 0; page < 32 && !admitted; page++) {
+      const shares = await tx.portalShare.findMany({
+        where: { ...portalShareCandidateWhere(identity, /* @__PURE__ */ new Date()), matterId: thread.matterId, resourceType: "communication_thread", communicationThreadId: thread.id, ...after ? { id: { gt: after } } : {} },
+        select: portalShareHeaderSelect,
+        orderBy: { id: "asc" },
+        take: 32
+      });
+      for (const candidate of shares) {
+        const share = boundPortalShare(candidate, identity);
+        if (share && await portalShareIsCurrent(tx, share)) {
+          admitted = true;
+          break;
+        }
+      }
+      if (shares.length < 32) break;
+      after = shares[shares.length - 1].id;
+    }
+    if (!admitted) throw new Error("Portal recipient needs a current message-capable share of this exact thread.");
+    return { portalAccountId: account2.id, contactId: account2.contactId ?? null, displayAddress: account2.email ?? "" };
+  }
+  const contact = await tx.contact.findFirst({
+    where: { id: args.contactId, firmId, status: { not: "archived" } },
+    select: { id: true, primaryEmail: true }
+  });
+  if (!contact) throw new Error("Contact participant must be an active contact in the active firm.");
+  if (args.contactMethodId) {
+    const method2 = await tx.contactMethod.findFirst({
+      where: { id: args.contactMethodId, firmId, contactId: contact.id, methodType: "email", canContact: true },
+      select: { value: true }
+    });
+    if (!method2) throw new Error("Contact method must be a contactable email address of this contact.");
+    return { contactId: contact.id, displayAddress: method2.value };
+  }
+  const method = await tx.contactMethod.findFirst({
+    where: { firmId, contactId: contact.id, methodType: "email", value: args.address ?? contact.primaryEmail, canContact: true },
+    select: { value: true }
+  });
+  if (!method) throw new Error("Choose a currently contactable email method before preparing this recipient.");
+  return { contactId: contact.id, displayAddress: method.value };
+}
+async function assertCurrentCommunicationRecipient(tx, message, participantId, expectedAddress) {
+  await tx.$executeRaw`SELECT id FROM "Firm" WHERE id = ${message.firmId} FOR SHARE`;
+  await tx.$executeRaw`SELECT id FROM "CommunicationThread" WHERE id = ${message.threadId} AND firm = ${message.firmId} FOR SHARE`;
+  await tx.$executeRaw`SELECT id FROM "CommunicationParticipant" WHERE id = ${participantId} AND firm = ${message.firmId} FOR SHARE`;
+  if (message.matterId) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`matter-team:${message.firmId}:${message.matterId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ethical-wall-matter:${message.firmId}:${message.matterId}`}))`;
+    await tx.$executeRaw`SELECT id FROM "Matter" WHERE id = ${message.matterId} AND firm = ${message.firmId} FOR SHARE`;
+  }
+  const thread = await tx.communicationThread.findFirst({
+    where: { id: message.threadId, firmId: message.firmId, matterId: message.matterId, status: "open", firm: { status: "active" } },
+    select: { id: true, matterId: true }
+  });
+  const participant = await tx.communicationParticipant.findFirst({
+    where: { id: participantId, firmId: message.firmId, threadId: message.threadId, matterId: message.matterId, status: "active" }
+  });
+  if (!thread || !participant) throw new Error("Recipient or thread is no longer available.");
+  if (participant.userId) {
+    await tx.$executeRaw`SELECT u.id FROM "User" u JOIN "FirmMembership" m ON m."user" = u.id JOIN "Role" r ON r.id = m.role AND r.firm = m.firm WHERE u.id = ${participant.userId} AND m.firm = ${message.firmId} FOR SHARE OF u,m,r`;
+  }
+  if (participant.portalAccountId) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-policy:${message.firmId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-account:${message.firmId}:${participant.portalAccountId}`}))`;
+    await tx.$executeRaw`SELECT id FROM "PortalAccount" WHERE id = ${participant.portalAccountId} AND firm = ${message.firmId} FOR SHARE`;
+  }
+  if (participant.contactId) {
+    await tx.$executeRaw`SELECT id FROM "Contact" WHERE id = ${participant.contactId} AND firm = ${message.firmId} FOR SHARE`;
+    await tx.$executeRaw`SELECT id FROM "ContactMethod" WHERE contact = ${participant.contactId} AND firm = ${message.firmId} ORDER BY id FOR SHARE`;
+  }
+  const current = await resolveParticipantIdentity(tx, message.firmId, thread, {
+    participantRole: participant.participantRole,
+    userId: participant.userId,
+    portalAccountId: participant.portalAccountId,
+    contactId: participant.portalAccountId ? void 0 : participant.contactId,
+    address: expectedAddress ?? participant.displayAddress
+  });
+  const address = expectedAddress ?? participant.displayAddress;
+  if (!isSingleEmailAddress(current.displayAddress) || current.displayAddress !== address) throw new Error("Recipient address or contactability changed; prepare a new reviewed envelope.");
+  return participant;
+}
+async function addCommunicationParticipant(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
+  if (!participantRoles.has(args.participantRole)) throw new Error("Participant role is not available through this command.");
+  const prisma = context.prisma;
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManageCommunications");
+    await lockThread(tx, firmId, args.threadId);
+    const thread = await tx.communicationThread.findFirst({
+      where: { id: args.threadId, firmId },
+      select: { id: true, status: true, matterId: true }
+    });
+    if (!thread) throw new Error("Communication thread was not found in the active firm.");
+    if (thread.matterId) await assertMatterAccess(tx, firmId, thread.matterId, userId);
+    if (thread.status !== "open") throw new Error("Participants can be added only to open threads.");
+    const identity = await resolveParticipantIdentity(tx, firmId, thread, args);
+    const existing = await tx.communicationParticipant.findFirst({
+      where: {
+        firmId,
+        threadId: thread.id,
+        status: "active",
+        userId: identity.userId ?? null,
+        contactId: identity.contactId ?? null,
+        portalAccountId: identity.portalAccountId ?? null
+      }
+    });
+    if (existing) {
+      if (existing.participantRole !== args.participantRole) {
+        throw new Error("This identity already participates in the thread with a different role.");
+      }
+      await assertCurrentCommunicationRecipient(tx, { firmId, threadId: thread.id, matterId: thread.matterId }, existing.id, existing.displayAddress);
+      return { participant: existing, replayed: true };
+    }
+    const participant = await tx.communicationParticipant.create({
+      data: {
+        firmId,
+        matterId: thread.matterId ?? null,
+        threadId: thread.id,
+        userId: identity.userId ?? null,
+        contactId: identity.contactId ?? null,
+        portalAccountId: identity.portalAccountId ?? null,
+        participantRole: args.participantRole,
+        status: "active",
+        displayAddress: identity.displayAddress,
+        addedAt: /* @__PURE__ */ new Date()
+      }
+    });
+    await assertCurrentCommunicationRecipient(tx, { firmId, threadId: thread.id, matterId: thread.matterId }, participant.id, participant.displayAddress);
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "communication.participant_added",
+      category: "legal_workflow",
+      ...workflowActor(context, userId),
+      matterId: thread.matterId ?? null,
+      contactId: identity.contactId ?? null,
+      metadata: {
+        threadId: thread.id,
+        participantId: participant.id,
+        participantRole: args.participantRole,
+        identityDigest: sha256Digest({ ...identity, participantRole: args.participantRole })
+      }
+    });
+    return { participant, replayed: false };
+  });
+}
+async function removeCommunicationParticipant(_root, args, context) {
+  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
+  const reason = boundedReason(args.reason, "Participant removal reason", 5, 2e3);
+  const prisma = context.prisma;
+  return runSerializableTransaction(prisma, async (tx) => {
+    await assertCurrentCommandActor(tx, context, "canManageCommunications");
+    const identity = await tx.communicationParticipant.findFirst({
+      where: { id: args.participantId, firmId },
+      select: { threadId: true }
+    });
+    if (!identity) throw new Error("Communication participant was not found in the active firm.");
+    await lockThread(tx, firmId, identity.threadId);
+    const participant = await tx.communicationParticipant.findFirst({ where: { id: args.participantId, firmId } });
+    if (!participant) throw new Error("Communication participant was not found in the active firm.");
+    if (participant.matterId) await assertMatterAccess(tx, firmId, participant.matterId, userId);
+    if (participant.status === "removed") return { participant, replayed: true };
+    const removed = await tx.communicationParticipant.update({
+      where: { id: participant.id },
+      data: { status: "removed", removedAt: /* @__PURE__ */ new Date() }
+    });
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "communication.participant_removed",
+      category: "legal_workflow",
+      ...workflowActor(context, userId),
+      matterId: participant.matterId ?? null,
+      contactId: participant.contactId ?? null,
+      metadata: { threadId: participant.threadId, participantId: participant.id, reasonDigest: sha256Digest(reason) }
+    });
+    return { participant: removed, replayed: false };
+  });
+}
+
 // features/keystone/mutations/redirectToInit.ts
 async function redirectToInit(root, args, context) {
   const userCount = await context.sudo().query.User.count({});
@@ -16707,7 +17806,7 @@ async function redirectToInit(root, args, context) {
 var redirectToInit_default = redirectToInit;
 
 // features/keystone/mutations/customerConsultations.ts
-var import_node_crypto16 = require("node:crypto");
+var import_node_crypto19 = require("node:crypto");
 
 // features/storefront/lib/first-contact.ts
 var FIXTURE_FIRST_CONTACT_NOTICE = "Fictional local appointment. No legal advice or attorney-client relationship. Share only what is reasonably necessary to assess fit. Do not send documents, account numbers, medical records, or unnecessary confidential details.";
@@ -16762,8 +17861,14 @@ async function account(tx, context) {
   if (!user || user.status !== "active") throw new Error("Sign in to your account.");
   return user;
 }
-function dto(row) {
-  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || "UTC" };
+function dto(row, payment = null) {
+  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || "UTC", paymentState: consultationPaymentState(row, payment) };
+}
+async function withPayments(tx, rows) {
+  const paid = rows.filter((row) => row.feeMinor > 0);
+  const payments = paid.length ? await tx.payment.findMany({ where: { firmId: paid[0].firmId, idempotencyKey: { in: paid.map((row) => consultationPaymentKey(row.id)) } }, select: { idempotencyKey: true, status: true, amountMinor: true, refundedMinor: true } }) : [];
+  const byKey = new Map(payments.map((payment) => [payment.idempotencyKey, payment]));
+  return rows.map((row) => dto(row, byKey.get(consultationPaymentKey(row.id)) ?? null));
 }
 var serviceSelect = { id: true, code: true, publicSlug: true, name: true, description: true, consultationFeeMinor: true, consultationMinutes: true };
 function serviceDto(service, firm) {
@@ -16788,19 +17893,25 @@ async function consultationCatalogPage(_root, args, context) {
     const admitted = await publicFirm(tx, "booking");
     if (!admitted) return { services: [], nextCursor: null };
     const { firm } = admitted;
-    const after = decodeCursor(args.cursor, ["s", "i"]);
+    const after = decodeCursor(args.cursor, ["o", "s", "i"]);
+    const order = after ? Number(after.o) : null;
+    if (after && !Number.isInteger(order)) throw new Error("This page is unavailable. Start again from the first page.");
     const rows = await tx.practiceArea.findMany({
       where: { AND: [
         { firmId: firm.id, status: "active", isPublic: true, publicSlug: { not: null } },
-        after ? { OR: [{ publicSlug: { gt: after.s } }, { publicSlug: after.s, id: { gt: after.i } }] } : {}
+        after ? { OR: [
+          { sortOrder: { gt: order } },
+          { sortOrder: order, publicSlug: { gt: after.s } },
+          { sortOrder: order, publicSlug: after.s, id: { gt: after.i } }
+        ] } : {}
       ] },
-      orderBy: [{ publicSlug: "asc" }, { id: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { publicSlug: "asc" }, { id: "asc" }],
       take: CATALOG_PAGE_SIZE + 1,
-      select: serviceSelect
+      select: { ...serviceSelect, sortOrder: true }
     });
     const page = rows.slice(0, CATALOG_PAGE_SIZE);
     const last = page.at(-1);
-    return { services: page.map((service) => serviceDto(service, firm)), nextCursor: rows.length > CATALOG_PAGE_SIZE && last ? encodeCursor({ s: last.publicSlug, i: last.id }) : null };
+    return { services: page.map((service) => serviceDto(service, firm)), nextCursor: rows.length > CATALOG_PAGE_SIZE && last ? encodeCursor({ o: String(last.sortOrder), s: last.publicSlug, i: last.id }) : null };
   });
 }
 async function consultationCatalog(root, _args, context) {
@@ -16886,6 +17997,36 @@ function requireConfiguredConsultationCalendar(admitted) {
 function busyWhere(firmId, hostId, start, end) {
   return { firmId, hostId, status: { in: ["requested", "scheduled"] }, startsAt: { lt: end }, endsAt: { gt: start } };
 }
+async function hostBusyIntervals(tx, firm, hosts, now) {
+  const busy = /* @__PURE__ */ new Map();
+  for (const host of hosts) {
+    const intervals = [];
+    let after;
+    let complete = false;
+    for (let page = 0; page < 64; page++) {
+      const rows = await tx.consultation.findMany({ where: { ...busyWhere(firm.id, host.userId, new Date(now), new Date(now + BOOKING_HORIZON_MS + 864e5)), ...after ? { id: { gt: after } } : {} }, select: { id: true, startsAt: true, endsAt: true }, orderBy: { id: "asc" }, take: 256 });
+      intervals.push(...rows.map((row) => ({ start: row.startsAt.getTime(), end: row.endsAt.getTime() })));
+      if (rows.length < 256) {
+        complete = true;
+        break;
+      }
+      after = rows[rows.length - 1].id;
+    }
+    if (!complete) throw new Error("Consultation capacity could not be fully checked. Contact the firm.");
+    busy.set(host.userId, intervals);
+  }
+  return busy;
+}
+function openSlots(hosts, busy, minutes, now, horizonMs) {
+  const slots = [];
+  const first = Math.ceil((now + BOOKING_LEAD_MS) / CANDIDATE_STEP_MS) * CANDIDATE_STEP_MS;
+  for (let at = first; at <= now + horizonMs && slots.length < MAX_OFFERED_SLOTS; at += CANDIDATE_STEP_MS) {
+    const start = new Date(at), end = new Date(at + minutes * 6e4);
+    const open = hosts.some((host) => insideConsultationHours(start, end, host.timezone) && !(busy.get(host.userId) ?? []).some((interval) => interval.start < end.getTime() && interval.end > start.getTime()));
+    if (open) slots.push({ startsAt: start.toISOString(), endsAt: end.toISOString() });
+  }
+  return slots;
+}
 async function consultationAvailability(_root, args, context) {
   return runSerializableTransaction(context.prisma, async (tx) => {
     await account(tx, context);
@@ -16893,36 +18034,47 @@ async function consultationAvailability(_root, args, context) {
     if (!admitted) throw new Error("Consultation booking is unavailable.");
     const { firm } = admitted;
     requireConfiguredConsultationCalendar(admitted);
+    await releaseUnpaidConsultations(tx, firm.id);
     const service = await tx.practiceArea.findFirst({ where: { id: args.serviceId, firmId: firm.id, status: "active", isPublic: true } });
     if (!service) throw new Error("Service is unavailable.");
     const timezone2 = validTimezone(firm.defaultTimezone);
     const now = Date.now();
     const hosts = await eligibleHosts(tx, firm);
-    const busy = /* @__PURE__ */ new Map();
-    for (const host of hosts) {
-      const intervals = [];
-      let after;
-      let complete = false;
-      for (let page = 0; page < 64; page++) {
-        const rows = await tx.consultation.findMany({ where: { ...busyWhere(firm.id, host.userId, new Date(now), new Date(now + BOOKING_HORIZON_MS + 864e5)), ...after ? { id: { gt: after } } : {} }, select: { id: true, startsAt: true, endsAt: true }, orderBy: { id: "asc" }, take: 256 });
-        intervals.push(...rows.map((row) => ({ start: row.startsAt.getTime(), end: row.endsAt.getTime() })));
-        if (rows.length < 256) {
-          complete = true;
-          break;
-        }
-        after = rows[rows.length - 1].id;
-      }
-      if (!complete) throw new Error("Consultation capacity could not be fully checked. Contact the firm.");
-      busy.set(host.userId, intervals);
+    const busy = await hostBusyIntervals(tx, firm, hosts, now);
+    return { timezone: timezone2, slots: openSlots(hosts, busy, service.consultationMinutes, now, BOOKING_HORIZON_MS) };
+  });
+}
+var OPEN_TIMES_HORIZON_MS = 7 * 864e5;
+var OPEN_TIMES_PER_SERVICE = 60;
+async function consultationOpenTimes(_root, args, context) {
+  return runSerializableTransaction(context.prisma, async (tx) => {
+    const admitted = await publicFirm(tx, "booking");
+    if (!admitted) return { timezone: "UTC", services: [] };
+    const { firm } = admitted;
+    try {
+      requireConfiguredConsultationCalendar(admitted);
+    } catch {
+      return { timezone: validTimezone(firm.defaultTimezone), services: [] };
     }
-    const slots = [];
-    const first = Math.ceil((now + BOOKING_LEAD_MS) / CANDIDATE_STEP_MS) * CANDIDATE_STEP_MS;
-    for (let at = first; at <= now + BOOKING_HORIZON_MS && slots.length < MAX_OFFERED_SLOTS; at += CANDIDATE_STEP_MS) {
-      const start = new Date(at), end = new Date(at + service.consultationMinutes * 6e4);
-      const open = hosts.some((host) => insideConsultationHours(start, end, host.timezone) && !(busy.get(host.userId) ?? []).some((interval) => interval.start < end.getTime() && interval.end > start.getTime()));
-      if (open) slots.push({ startsAt: start.toISOString(), endsAt: end.toISOString() });
-    }
-    return { timezone: timezone2, slots };
+    const services = await tx.practiceArea.findMany({
+      where: { firmId: firm.id, status: "active", isPublic: true, publicSlug: { not: null }, ...args.serviceId ? { id: String(args.serviceId) } : {} },
+      orderBy: [{ sortOrder: "asc" }, { publicSlug: "asc" }, { id: "asc" }],
+      take: CATALOG_PAGE_SIZE,
+      select: { id: true, consultationMinutes: true }
+    });
+    const timezone2 = validTimezone(firm.defaultTimezone);
+    if (!services.length) return { timezone: timezone2, services: [] };
+    const now = Date.now();
+    const hosts = await eligibleHosts(tx, firm);
+    const busy = await hostBusyIntervals(tx, firm, hosts, now);
+    const byLength = /* @__PURE__ */ new Map();
+    return {
+      timezone: timezone2,
+      services: services.map((service) => {
+        if (!byLength.has(service.consultationMinutes)) byLength.set(service.consultationMinutes, openSlots(hosts, busy, service.consultationMinutes, now, OPEN_TIMES_HORIZON_MS).slice(0, OPEN_TIMES_PER_SERVICE));
+        return { serviceId: service.id, slots: byLength.get(service.consultationMinutes) };
+      })
+    };
   });
 }
 function currentAcknowledgment({ mode, policy }) {
@@ -16956,7 +18108,7 @@ async function bookClientConsultation(_root, args, context) {
     const prior = await tx.consultation.findUnique({ where: { firmId_requestKey: { firmId: firm.id, requestKey: args.requestKey } } });
     if (prior) {
       if (prior.accountId !== user.id || prior.requestDigest !== fingerprint) throw new Error("Request reference is unavailable for this account or has changed.");
-      return dto(prior);
+      return (await withPayments(tx, [prior]))[0];
     }
     const admitted = await publicFirm(tx, "booking");
     if (!admitted || admitted.firm.id !== firm.id) throw new Error("Consultation booking is unavailable.");
@@ -16968,6 +18120,7 @@ async function bookClientConsultation(_root, args, context) {
     if (!service) throw new Error("Service is unavailable.");
     const end = new Date(start.getTime() + service.consultationMinutes * 6e4);
     if (!withinHorizon(start, Date.now())) throw new Error("Select an available time within the next fourteen days.");
+    await releaseUnpaidConsultations(tx, firm.id);
     const hosts = await eligibleHosts(tx, firm);
     if (!hosts.length) throw new Error("No consultation host is available.");
     let receiver = null;
@@ -16984,7 +18137,7 @@ async function bookClientConsultation(_root, args, context) {
     }
     if (!insideHours) throw new Error("Select an available time.");
     if (!receiver) throw new Error("This time is no longer available. Choose another time.");
-    const suffix = (0, import_node_crypto16.randomUUID)().slice(0, 8).toUpperCase();
+    const suffix = (0, import_node_crypto19.randomUUID)().slice(0, 8).toUpperCase();
     const contact = await tx.contact.create({ data: { firmId: firm.id, firstName: user.name, lastName: "", contactType: "person", status: "prospective_client", primaryEmail: user.email, conflictSearchAliases: [] } });
     const intake = await tx.intake.create({ data: { firmId: firm.id, intakeNumber: `INT-${suffix}`, title: `${service.name} consultation`, status: "new", source: "website", primaryContactId: contact.id, openedById: receiver.userId, assignedToId: receiver.userId, officeId: receiver.officeId, summary, adversePartySummary: firstContact.opposingParties } });
     await tx.intakeParticipant.create({ data: { firmId: firm.id, intakeId: intake.id, contactId: contact.id, participantRole: "prospective_client", status: "active" } });
@@ -17030,7 +18183,7 @@ async function customerConsultationPage(_root, args, context) {
     });
     const page = rows.slice(0, HISTORY_PAGE_SIZE);
     const last = page.at(-1);
-    return { appointments: page.map(dto), nextCursor: rows.length > HISTORY_PAGE_SIZE && last ? encodeCursor({ a: user.id, c: last.createdAt.toISOString(), i: last.id }) : null };
+    return { appointments: await withPayments(tx, page), nextCursor: rows.length > HISTORY_PAGE_SIZE && last ? encodeCursor({ a: user.id, c: last.createdAt.toISOString(), i: last.id }) : null };
   });
 }
 async function customerConsultations(root, _args, context) {
@@ -17042,16 +18195,16 @@ async function customerConsultation(_root, args, context) {
     const firm = await servicingFirm(tx);
     if (!firm) throw new Error("Appointment history is temporarily unavailable.");
     const row = await tx.consultation.findFirst({ where: { id: args.id, accountId: user.id, firmId: firm.id } });
-    return row ? dto(row) : null;
+    return row ? (await withPayments(tx, [row]))[0] : null;
   });
 }
 
 // features/keystone/mutations/index.ts
-var graphql4 = String.raw;
+var graphql5 = String.raw;
 function extendGraphqlSchema(baseSchema) {
   return (0, import_schema.mergeSchemas)({
     schemas: [baseSchema],
-    typeDefs: graphql4`
+    typeDefs: graphql5`
       input TrustLedgerPostingEntryInput {
         ledgerAccountId: ID
         accountingBucket: String!
@@ -17337,6 +18490,8 @@ function extendGraphqlSchema(baseSchema) {
         replayed: Boolean!
       }
 
+      type PortalPaymentStartResult { url: String! paymentId: ID! }
+      type PortalPaymentReconcileResult { status: String! paymentId: ID! replayed: Boolean }
       type PaymentTransitionResult {
         payment: PaymentProjection!
         replayed: Boolean!
@@ -17390,16 +18545,6 @@ function extendGraphqlSchema(baseSchema) {
         replayed: Boolean!
       }
 
-      type CommunicationDeliveryTransitionResult {
-        delivery: ControlledRecordProjection!
-        replayed: Boolean!
-      }
-
-      type CommunicationMessageQueueResult {
-        message: ControlledRecordProjection!
-        replayed: Boolean!
-      }
-
       type SignatureSignerSetupResult {
         id: ID!
         status: String!
@@ -17443,12 +18588,6 @@ function extendGraphqlSchema(baseSchema) {
 
       type CommunicationParticipantResult {
         participant: ControlledRecordProjection!
-        replayed: Boolean!
-      }
-
-      type CommunicationDeliveryPreparationResult {
-        message: ControlledRecordProjection!
-        deliveries: [ControlledRecordProjection!]!
         replayed: Boolean!
       }
 
@@ -17728,7 +18867,11 @@ function extendGraphqlSchema(baseSchema) {
       type ConsultationCatalogPage { services: [ConsultationService!]!, nextCursor: String }
       type ConsultationSlot { startsAt: String!, endsAt: String! }
       type ConsultationAvailability { timezone: String!, slots: [ConsultationSlot!]! }
-      type CustomerConsultation { id: ID!, serviceTitle: String!, feeMinor: Int!, currencyCode: String!, status: String!, startsAt: String, endsAt: String, timezone: String! }
+      type ConsultationServiceOpenTimes { serviceId: ID!, slots: [ConsultationSlot!]! }
+      type ConsultationOpenTimes { timezone: String!, services: [ConsultationServiceOpenTimes!]! }
+      type CustomerConsultation { id: ID!, serviceTitle: String!, feeMinor: Int!, currencyCode: String!, status: String!, startsAt: String, endsAt: String, timezone: String!, paymentState: String! }
+      type ConsultationPaymentStart { url: String, paymentId: ID!, status: String! }
+      type ConsultationPaymentStatus { status: String! }
       type CustomerConsultationPage { appointments: [CustomerConsultation!]!, nextCursor: String }
       type CustomerAccountRegistration { id: ID! }
       type Query {
@@ -17736,6 +18879,7 @@ function extendGraphqlSchema(baseSchema) {
         consultationCatalogPage(cursor: String): ConsultationCatalogPage!
         consultationService(slug: String, id: ID): ConsultationService
         consultationAvailability(serviceId: ID!): ConsultationAvailability!
+        consultationOpenTimes(serviceId: ID): ConsultationOpenTimes!
         customerConsultations: [CustomerConsultation!]!
         customerConsultationPage(cursor: String): CustomerConsultationPage!
         customerConsultation(id: ID!): CustomerConsultation
@@ -17974,6 +19118,8 @@ function extendGraphqlSchema(baseSchema) {
           providerPaymentId: String
           failureReason: String
         ): PaymentTransitionResult!
+        startPortalPayment(kind: String!, id: ID!, token: String!): PortalPaymentStartResult!
+        reconcilePortalPayment(paymentId: ID!, token: String!): PortalPaymentReconcileResult!
         recordManualPayment(
           idempotencyKey: String!
           payerId: ID!
@@ -17999,6 +19145,12 @@ function extendGraphqlSchema(baseSchema) {
         requestRefund(
           paymentId: ID!
           amountMinor: Int!
+          reason: String!
+          explanation: String!
+          idempotencyKey: String!
+        ): RefundResult!
+        refundCardPayment(
+          paymentId: ID!
           reason: String!
           explanation: String!
           idempotencyKey: String!
@@ -18093,18 +19245,7 @@ function extendGraphqlSchema(baseSchema) {
           matterId: ID
           payload: JSON
         ): ControlledRecordProjection!
-        queueCommunicationMessage(
-          messageId: ID!
-          reason: String!
-        ): CommunicationMessageQueueResult!
-        transitionCommunicationDelivery(
-          deliveryId: ID!
-          toStatus: String!
-          providerEventId: String!
-          providerMessageId: String
-          errorCode: String
-          errorMessage: String
-        ): CommunicationDeliveryTransitionResult!
+        retryWebhookDelivery(deliveryId: ID!): ControlledRecordProjection!
         transitionDocument(
           documentId: ID!
           toStatus: DocumentCommandTarget!
@@ -18174,12 +19315,6 @@ function extendGraphqlSchema(baseSchema) {
           participantId: ID!
           reason: String!
         ): CommunicationParticipantResult!
-        prepareCommunicationDeliveries(
-          messageId: ID!
-          participantIds: [ID!]!
-          integrationConnectionId: ID
-          reason: String!
-        ): CommunicationDeliveryPreparationResult!
 
         applyContactImport(
           connectionId: ID!
@@ -18244,6 +19379,8 @@ function extendGraphqlSchema(baseSchema) {
           reason: String
         ): ControlledRecordProjection!
         cancelOwnConsultation(consultationId: ID!, reason: String): ControlledRecordProjection!
+        startConsultationPayment(consultationId: ID!): ConsultationPaymentStart!
+        reconcileConsultationPayment(consultationId: ID!): ConsultationPaymentStatus!
         prepareRetainerAgreement(
           matterId: ID!
           clientId: ID!
@@ -18333,6 +19470,7 @@ function extendGraphqlSchema(baseSchema) {
         consultationCatalogPage,
         consultationService,
         consultationAvailability,
+        consultationOpenTimes,
         customerConsultations,
         customerConsultationPage,
         customerConsultation,
@@ -18390,11 +19528,14 @@ function extendGraphqlSchema(baseSchema) {
         assembleDraftInvoice,
         transitionInvoice,
         transitionPayment,
+        startPortalPayment,
+        reconcilePortalPayment,
         allocatePayment,
         recordManualPayment,
         reversePaymentAllocation,
         requestRefund,
         reviewRefund,
+        refundCardPayment,
         recordRefundProviderOutcome,
         recordPortalDiscoveryPolicy,
         executePortalGrant: (_root, { data }, context) => executePortalGrant(_root, data, context),
@@ -18411,8 +19552,7 @@ function extendGraphqlSchema(baseSchema) {
         rotateIntegrationCredential,
         transitionIntegrationConnection,
         enqueueWebhookDelivery,
-        queueCommunicationMessage,
-        transitionCommunicationDelivery,
+        retryWebhookDelivery,
         transitionDocument,
         addDocumentSigner,
         transitionDocumentSigner,
@@ -18423,7 +19563,6 @@ function extendGraphqlSchema(baseSchema) {
         rotateWebhookSigningSecret,
         addCommunicationParticipant,
         removeCommunicationParticipant,
-        prepareCommunicationDeliveries,
         applyContactImport,
         preparePracticeExport,
         startClientIntake,
@@ -18433,6 +19572,8 @@ function extendGraphqlSchema(baseSchema) {
         scheduleConsultation,
         transitionConsultation,
         cancelOwnConsultation,
+        startConsultationPayment,
+        reconcileConsultationPayment,
         prepareRetainerAgreement,
         transitionRetainerAgreement,
         recordDocketEntry,
@@ -18447,6 +19588,96 @@ function extendGraphqlSchema(baseSchema) {
       }
     }
   });
+}
+
+// features/keystone/lib/s3-storage.ts
+function s3ForcePathStyle(endpoint) {
+  let hostname = "";
+  try {
+    hostname = endpoint ? new URL(endpoint).hostname : "";
+  } catch {
+  }
+  return !(hostname === "storageapi.dev" || hostname.endsWith(".storageapi.dev"));
+}
+
+// features/keystone/database-url.ts
+var POOL_SIZES = { web: 15, worker: 5 };
+var OVERRIDE_ENV = {
+  web: "DATABASE_CONNECTION_LIMIT",
+  worker: "DATABASE_CONNECTION_LIMIT_WORKER"
+};
+function pooledDatabaseUrl(url, role = "web") {
+  if (!url || !/^postgres(ql)?:\/\//.test(url)) return url;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (parsed.searchParams.has("connection_limit")) return url;
+  const override = Number(process.env[OVERRIDE_ENV[role]]);
+  parsed.searchParams.set("connection_limit", String(Number.isInteger(override) && override > 0 ? override : POOL_SIZES[role]));
+  return parsed.toString();
+}
+
+// features/keystone/lib/keystonePrismaErrors.ts
+var RAW_METHOD = /^\$(queryRaw|executeRaw|queryRawUnsafe|executeRawUnsafe|queryRawTyped|runCommandRaw)$/;
+var clients = /* @__PURE__ */ new WeakMap();
+var delegates = /* @__PURE__ */ new WeakMap();
+function isKeystonePrismaError(value) {
+  return value instanceof Error && value.extensions?.code === "KS_PRISMA_ERROR";
+}
+function rethrowKeystonePrismaError(value) {
+  if (!isKeystonePrismaError(value)) return value;
+  const prisma = value.extensions.prisma ?? {};
+  throw Object.assign(value, { code: prisma.code, meta: prisma.meta, clientVersion: prisma.clientVersion });
+}
+function throwing(result) {
+  if (!result || typeof result.then !== "function") return rethrowKeystonePrismaError(result);
+  const settled = () => result.then(rethrowKeystonePrismaError);
+  return new Proxy(result, {
+    get(target, key) {
+      if (key === "then") return (ok, fail) => settled().then(ok, fail);
+      if (key === "catch") return (fail) => settled().catch(fail);
+      if (key === "finally") return (done) => settled().finally(done);
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
+}
+function throwingDelegate(delegate) {
+  const cached = delegates.get(delegate);
+  if (cached) return cached;
+  const wrapped = new Proxy(delegate, {
+    get(target, key) {
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? (...args) => throwing(value.apply(target, args)) : value;
+    }
+  });
+  delegates.set(delegate, wrapped);
+  return wrapped;
+}
+function throwKeystonePrismaErrors(client) {
+  const cached = clients.get(client);
+  if (cached) return cached;
+  const wrapped = new Proxy(client, {
+    get(target, key) {
+      const value = Reflect.get(target, key, target);
+      if (key === "$transaction" && typeof value === "function") {
+        return (work, ...options) => {
+          if (typeof work === "function") return value.call(target, (tx) => work(throwKeystonePrismaErrors(tx)), ...options);
+          return Promise.resolve(value.call(target, work, ...options)).then((results) => Array.isArray(results) ? results.map(rethrowKeystonePrismaError) : results);
+        };
+      }
+      if (key === "$extends" && typeof value === "function") return (...args) => throwKeystonePrismaErrors(value.apply(target, args));
+      if (typeof key === "string" && RAW_METHOD.test(key) && typeof value === "function") return (...args) => throwing(value.apply(target, args));
+      if (typeof value === "function") return value.bind(target);
+      if (typeof key === "string" && !key.startsWith("$") && value && typeof value === "object" && typeof value.findFirst === "function") return throwingDelegate(value);
+      return value;
+    }
+  });
+  clients.set(client, wrapped);
+  return wrapped;
 }
 
 // features/keystone/index.ts
@@ -18495,8 +19726,10 @@ var { withAuth } = (0, import_auth.createAuth)({
     // Staff (any firm membership or the bootstrap principal) recover on the dashboard;
     // storefront customers recover on /account/reset.
     async sendToken({ itemId, identity, token, context }) {
-      const purpose = await passwordResetPurpose(context.sudo().prisma, String(itemId));
-      await sendPasswordResetEmail(token, identity, void 0, purpose);
+      const prisma = context.sudo().prisma;
+      const purpose = await passwordResetPurpose(prisma, String(itemId));
+      const wording = await passwordEmailWording(prisma, String(itemId)).catch(() => ({ kind: "reset", firmName: null }));
+      await sendPasswordResetEmail(token, identity, void 0, purpose, wording);
     }
   },
   sessionData: `
@@ -18526,12 +19759,28 @@ var { withAuth } = (0, import_auth.createAuth)({
   `
 });
 var keystone_default = withAuth(
-  (0, import_core21.config)({
+  (0, import_core22.config)({
     db: {
       provider: "postgresql",
-      url: databaseURL
+      url: pooledDatabaseUrl(databaseURL),
+      // Keystone returns failed queries as values; this makes them throw so transactions roll back.
+      extendPrismaClient: throwKeystonePrismaErrors
     },
     lists: models,
+    // Uploaded images (attorney portraits) share the deployment's S3_* bucket with document files.
+    storage: {
+      my_images: {
+        kind: "s3",
+        type: "image",
+        bucketName: process.env.S3_BUCKET_NAME ?? "keystone-test",
+        region: process.env.S3_REGION ?? "us-east-1",
+        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "keystone",
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "keystone",
+        endpoint: process.env.S3_ENDPOINT ?? "https://sfo3.digitaloceanspaces.com",
+        signed: { expiry: 5e3 },
+        forcePathStyle: s3ForcePathStyle(process.env.S3_ENDPOINT)
+      }
+    },
     ui: {
       isAccessAllowed: ({ session }) => permissions.canAccessDashboard({ session })
     },

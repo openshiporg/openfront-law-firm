@@ -227,7 +227,7 @@ npm start
 The included [Railway configuration](railway.toml) defines this app's build and startup lifecycle. Provision services and secrets separately.
 
 ### Scaling Considerations
-Keep the shared PostgreSQL database, session secrets, and configured object storage consistent across application processes. Review background delivery and integration requirements before choosing a serverless runtime; a source import does not supply persistent workers.
+Keep the shared PostgreSQL database, session secrets, and configured object storage consistent across application processes. The application runs no background workers or timers: webhooks are sent on the request that causes them, and staff can retry a failed delivery from the Integrations desk.
 
 ## Contributing
 

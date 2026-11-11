@@ -195,56 +195,6 @@ export const CommunicationMessage = list({
       many: true,
       access: { create: canManageCommunications, update: denyAll },
     }),
-    deliveries: readOnlyRelationship("CommunicationDelivery.message", true),
-    ...trackingFields,
-  },
-});
-
-export const CommunicationDelivery = list({
-  access: {
-    ...communicationAccess,
-    operation: { ...communicationAccess.operation, update: denyAll },
-    filter: { ...communicationAccess.filter, update: () => false },
-  },
-  graphql: { omit: { create: true, update: true, delete: true } },
-  hooks: firmOwnedHooks({ lifecycle: "communicationDelivery", controlledStatus: true }),
-  ui: { listView: { initialColumns: ["message", "channel", "status", "recipientAddress", "attemptCount"] } },
-  fields: {
-    firm: firmRelationship(),
-    matter: relationship({ ref: "Matter" }),
-    message: requiredRelationship("CommunicationMessage.deliveries"),
-    integrationConnection: relationship({ ref: "IntegrationConnection" }),
-    channel: select({
-      type: "enum",
-      options: [
-        { label: "Email", value: "email" },
-        { label: "SMS", value: "sms" },
-        { label: "Portal", value: "portal" },
-      ],
-      validation: { isRequired: true },
-    }),
-    status: select({
-      type: "enum",
-      options: [
-        { label: "Pending", value: "pending" },
-        { label: "Sent", value: "sent" },
-        { label: "Delivered", value: "delivered" },
-        { label: "Failed", value: "failed" },
-        { label: "Bounced", value: "bounced" },
-      ],
-      defaultValue: "pending",
-      validation: { isRequired: true },
-    }),
-    recipientContact: relationship({ ref: "Contact" }),
-    recipientAddress: text({ access: messageFieldAccess }),
-    provider: text(),
-    providerMessageId: text({ isIndexed: true }),
-    attemptCount: integer({ defaultValue: 0, validation: { min: 0 } }),
-    lastAttemptAt: timestamp(),
-    deliveredAt: timestamp(),
-    errorCode: text(),
-    errorMessage: text({ access: messageFieldAccess, ui: { displayMode: "textarea" } }),
-    providerMetadata: json({ access: messageFieldAccess }),
     ...trackingFields,
   },
 });

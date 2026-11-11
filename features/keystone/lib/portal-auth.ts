@@ -392,16 +392,14 @@ async function readPortalSharedResourceInTransaction(rawToken: string, shareId: 
     select: { id: true, subject: true, primaryChannel: true, status: true, lastMessageAt: true },
   });
   if (!resource || resource.id !== share.communicationThreadId) throw new Error("Shared communication thread is unavailable.");
-  // Client-safe projection only: messages this client actually sent, or that were
-  // actually sent/delivered TO this client. Internal notes, drafts, queued or
-  // failed messages and messages to other participants never leave the firm.
+  // Client-safe projection only: messages this client sent. Outbound messages are not
+  // shown (the application sends no client email). Internal notes, drafts and
+  // messages to other participants never leave the firm.
   const messages = await client.communicationMessage.findMany({
     where: {
       threadId: resource.id, firmId: identity.firmId, matterId: share.matterId,
       OR: [
         { direction: "inbound", status: "received", senderContactId: identity.contactId },
-        { direction: "outbound", status: { in: ["sent", "delivered"] },
-          deliveries: { some: { recipientContactId: identity.contactId, status: { in: ["sent", "delivered"] } } } },
       ],
     },
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],

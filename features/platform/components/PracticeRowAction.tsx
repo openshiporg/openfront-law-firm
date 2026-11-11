@@ -50,9 +50,6 @@ const transitions: Record<string, Record<string, Action>> = {
     in_progress: { operation: 'completeTask', label: 'Complete task' },
     blocked: { operation: 'startTask', label: 'Resume task' },
   },
-  Message: {
-    draft: { operation: 'queueMessage', label: 'Queue message' },
-  },
   Document: {
     draft: { operation: 'publishDocument', label: 'Publish version' },
     active: { operation: 'archiveDocument', label: 'Archive document' },
@@ -79,6 +76,12 @@ const transitions: Record<string, Record<string, Action>> = {
   },
   'Legal hold': {
     active: { operation: 'releaseHold', label: 'Release hold' },
+  },
+  'Webhook delivery': {
+    pending: { operation: 'retryWebhook', label: 'Send now' },
+    processing: { operation: 'retryWebhook', label: 'Retry delivery' },
+    failed: { operation: 'retryWebhook', label: 'Retry delivery' },
+    dead_letter: { operation: 'retryWebhook', label: 'Retry delivery' },
   },
   Connection: {
     pending: { operation: 'activateIntegration', label: 'Activate connection' },

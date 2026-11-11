@@ -2,7 +2,6 @@
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 import { formatMoneyLabel } from '@/features/platform/lib/money'
-import { communicationDispatchState } from '@/features/shared/dispatch-outcome'
 
 import type { PracticeOverviewQueueItem, PracticeWorkspace, PracticeWorkspaceResponse, PracticeWorkspaceSection } from '../types'
 import { WORK_QUEUE_PAGE_SIZE, workQueuePageInfo } from '../lib/workQueuePagination'
@@ -150,20 +149,7 @@ const signatureRequestPageQuery = `
   }
 `
 
-const deliveryPageQuery = `
-  query CommunicationDeliveryWorkQueuePage($skip: Int!) {
-    communicationDeliveries(
-      where: { status: { in: [pending, failed, bounced] } }
-      orderBy: [{ updatedAt: desc }, { id: asc }]
-      take: ${WORK_QUEUE_PAGE_SIZE}
-      skip: $skip
-    ) {
-      id status channel errorCode attemptCount lastAttemptAt message { subject }
-    }
-  }
-`
-
-type WorkQueuePages = { intake?: number; conflicts?: number; relationships?: number; payments?: number; invoices?: number; deadlines?: number; tasks?: number; documents?: number; signatures?: number; delivery?: number }
+type WorkQueuePages = { intake?: number; conflicts?: number; relationships?: number; payments?: number; invoices?: number; deadlines?: number; tasks?: number; documents?: number; signatures?: number }
 type ConflictCheckRecord = {
   status: string | null
   createdAt: string | null
@@ -216,16 +202,6 @@ type SignatureRequestRecord = {
   status: string
   updatedAt: string | null
 }
-type DeliveryRecord = {
-  id: string
-  errorCode?: string | null
-  message: { subject: string | null } | null
-  status: string
-  channel: string
-  attemptCount: number | null
-  lastAttemptAt: string | null
-}
-
 function toIso(value: string | null) {
   if (!value) return null
   const date = new Date(value)
@@ -336,19 +312,6 @@ function mapSignatureRequest(record: SignatureRequestRecord, canAct: boolean): P
     status: record.status,
     at: toIso(record.updatedAt),
     href: `/dashboard/platform/documents#signatures-${encodeURIComponent(record.id)}`,
-    canAct,
-  }
-}
-
-function mapDelivery(record: DeliveryRecord, canAct: boolean): PracticeOverviewQueueItem {
-  return {
-    id: record.id,
-    kind: 'Delivery',
-    title: record.message?.subject ? `Delivery · ${record.message.subject}` : 'Message delivery',
-    subtitle: `${record.channel} · ${record.attemptCount ?? 0} attempts · ${communicationDispatchState(record.status, record.errorCode).guidance}`,
-    status: communicationDispatchState(record.status, record.errorCode).status,
-    at: toIso(record.lastAttemptAt),
-    href: `/dashboard/platform/communications#delivery-${encodeURIComponent(record.id)}`,
     canAct,
   }
 }
@@ -516,19 +479,6 @@ async function pageSignatureRequestSection(section: PracticeWorkspaceSection, re
   return { section: withPageInfo({ ...section, items: response.data.signatureRequests.map((record) => mapSignatureRequest(record, canAct)) }, page.page, response.data.signatureRequests.length) }
 }
 
-async function pageDeliverySection(section: PracticeWorkspaceSection, requestedPage: number) {
-  const page = workQueuePageInfo(section.total, requestedPage, section.items.length)
-  const canAct = section.items[0]?.canAct ?? false
-  if (page.page === 1) return { section: withPageInfo(section, page.page, section.items.length) }
-
-  const response = await keystoneClient<{ communicationDeliveries: DeliveryRecord[] | null }>(deliveryPageQuery, {
-    skip: (page.page - 1) * page.pageSize,
-  })
-  if (!response.success) return { error: response.error }
-  if (!Array.isArray(response.data.communicationDeliveries)) return { error: 'The authorized delivery page could not be loaded.' }
-  return { section: withPageInfo({ ...section, items: response.data.communicationDeliveries.map((record) => mapDelivery(record, canAct)) }, page.page, response.data.communicationDeliveries.length) }
-}
-
 export async function getPracticeWorkspace(
   category: string,
   workPages: WorkQueuePages = {},
@@ -537,7 +487,7 @@ export async function getPracticeWorkspace(
   if (!response.success) return { success: false, error: response.error }
 
   const workspace = response.data.practiceWorkspace
-  if (category !== 'work' && category !== 'communications' && category !== 'documents' && category !== 'intake' && category !== 'billing' && category !== 'contacts') return { success: true, data: workspace }
+  if (category !== 'work' && category !== 'documents' && category !== 'intake' && category !== 'billing' && category !== 'contacts') return { success: true, data: workspace }
 
   const hasInvoiceReadScope = category === 'billing' && workspace.sections.some((section) => section.key === 'invoices')
   const [sections, invoiceMetadataRegister] = await Promise.all([
@@ -549,7 +499,6 @@ export async function getPracticeWorkspace(
       if (category === 'billing' && section.key === 'invoices') return datedInvoiceSection(section)
       if (category === 'work' && section.key === 'deadlines') return pageDeadlineSection(section, workPages.deadlines ?? 1)
       if (category === 'work' && section.key === 'tasks') return pageTaskSection(section, workPages.tasks ?? 1)
-      if (category === 'communications' && section.key === 'delivery') return pageDeliverySection(section, workPages.delivery ?? 1)
       if (category === 'documents' && section.key === 'documents') return pageDocumentSection(section, workPages.documents ?? 1)
       if (category === 'documents' && section.key === 'signatures') return pageSignatureRequestSection(section, workPages.signatures ?? 1)
       return Promise.resolve({ section })

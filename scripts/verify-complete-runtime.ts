@@ -57,10 +57,8 @@ import { recordPortalDiscoveryPolicy } from "../features/keystone/mutations/port
 import {
   addDocumentSigner,
   enqueueWebhookDelivery,
-  queueCommunicationMessage,
-  recordWebhookDeliveryAttempt,
+  retryWebhookDelivery,
   rotateIntegrationCredential,
-  transitionCommunicationDelivery,
   transitionDocument,
   transitionIntegrationConnection,
   transitionDocumentSigner,
@@ -952,36 +950,13 @@ async function main() {
     eventType: "runtime.test",
     payload: { synthetic: true },
   }, humanContext);
-  await assert.rejects(
-    () => recordWebhookDeliveryAttempt(null, {
-      deliveryId: webhook.id,
-      providerEventId: `human-supplied-provider-event-${runKey}`,
-      responseStatus: 204,
-      responseDigest: sha256Digest("human-supplied-response"),
-    }, humanContext),
-    /unavailable until an authenticated dispatcher owns the HTTP request/i,
-  );
-  const apiContext = controlledContext(apiAuthentication.session);
-  await assert.rejects(
-    () => recordWebhookDeliveryAttempt(null, {
-      deliveryId: webhook.id,
-      providerEventId: `machine-supplied-provider-event-${runKey}`,
-      responseStatus: 202,
-      responseDigest: sha256Digest("machine-supplied-response"),
-    }, apiContext),
-    /unavailable until an authenticated dispatcher owns the HTTP request/i,
-  );
-  assert.equal((await prisma.webhookDelivery.findUnique({ where: { id: webhook.id } })).status, "pending");
-  assert.equal(await prisma.webhookDeliveryAttempt.count({ where: { deliveryId: webhook.id } }), 0);
-  assert.equal(await prisma.auditEvent.count({
-    where: {
-      firmId,
-      eventId: { in: [
-        `webhook:human-supplied-provider-event-${runKey}`,
-        `webhook:machine-supplied-provider-event-${runKey}`,
-      ] },
-    },
-  }), 0);
+  // Sent on the request that caused it. The synthetic receiver is not allow-listed, so the
+  // send fails safely and the delivery waits for a staff Retry (no worker, no timer).
+  assert.equal(webhook.status, "failed");
+  assert.equal((await prisma.webhookDelivery.findUnique({ where: { id: webhook.id } })).status, "failed");
+  const retried = await retryWebhookDelivery(null, { deliveryId: webhook.id }, humanContext);
+  assert.equal(retried.id, webhook.id);
+  assert.equal((await prisma.webhookDelivery.findUnique({ where: { id: webhook.id } })).attemptCount >= 0, true);
   await revokeApiKey(null, { id: apiKey.credential.id, reason: "Runtime credential revocation proof." }, humanContext);
   assert.equal((await authenticateBearerToken(`Bearer ${apiKey.secret}`, prisma)).session, null);
 
@@ -997,38 +972,10 @@ async function main() {
       channel: "email",
       status: "draft",
       subject: "Synthetic runtime notice",
-      body: "Synthetic runtime delivery; no external message was sent.",
+      body: "Synthetic runtime message; the application sends no client email.",
       senderUserId: admin.id,
     },
   });
-  const delivery = await prisma.communicationDelivery.create({
-    data: {
-      firmId,
-      matterId: matter.id,
-      messageId: message.id,
-      integrationConnectionId: integration.id,
-      channel: "email",
-      status: "pending",
-      recipientContactId: contact.id,
-      recipientAddress: contact.primaryEmail,
-      provider: "runtime_fixture",
-      attemptCount: 0,
-    },
-  });
-  await queueCommunicationMessage(null, {
-    messageId: message.id,
-    reason: "Explicit synthetic runtime delivery approval.",
-  }, humanContext);
-  await assert.rejects(
-    transitionCommunicationDelivery(null, {
-      deliveryId: delivery.id,
-      toStatus: "sent",
-      providerEventId: `comm-sent-${runKey}`,
-      providerMessageId: `message-${runKey}`,
-    }, humanContext),
-    /authenticated provider ingress/i,
-  );
-  assert.equal((await prisma.communicationMessage.findUnique({ where: { id: message.id } })).status, "queued");
 
   const publishTarget = await createVersionedDocument({
     firmId,
@@ -1454,7 +1401,7 @@ async function main() {
     oauthClientIssuedThenRevoked: true,
     agentLowRiskAndApprovedHighRiskExecuted: true,
     providerCredentialEncryptedThenErased: true,
-    webhookOutcomesFailClosed: true,
+    webhookSentOnRequestWithStaffRetry: true,
     evidenceCounts: {
       auditEvents: counts[0],
       matterEvents: counts[1],

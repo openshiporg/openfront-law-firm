@@ -69,7 +69,7 @@ const workspaceCopy: Record<WorkspaceCategory, WorkspaceCopy> = {
   },
   communications: {
     title: 'Communications',
-    description: 'Track matter/intake conversations, drafts, attachments, and delivery evidence. No outbound/inbound mail or messaging worker is represented as configured.',
+    description: 'Track matter/intake conversations, drafts, and attachments. The application sends no client email or SMS.',
     queue: null,
     metricKeys: [],
   },
@@ -117,7 +117,7 @@ const workspaceCopy: Record<WorkspaceCategory, WorkspaceCopy> = {
   },
   integrations: {
     title: 'Integrations',
-    description: 'Configure encrypted provider records, OAuth clients, API keys, subscriptions, and delivery evidence. Provider adapters, signed ingress, and outbound workers remain deployment integrations.',
+    description: 'Configure encrypted provider records, OAuth clients, API keys, subscriptions, and delivery evidence. Outbound webhooks are sent on the request that causes them; staff can retry failures.',
     queue: null,
     metricKeys: [],
   },

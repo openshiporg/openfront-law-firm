@@ -1,7 +1,6 @@
 'use server'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
-import { communicationDispatchState } from '@/features/shared/dispatch-outcome'
 
 import { formatInstant, validTimeZone } from '../lib/datetime'
 import { getFirmTimeZone } from '../lib/firmTimeZone'
@@ -134,7 +133,7 @@ const drillIns: Record<string, DrillInDefinition> = {
     }],
   },
   thread: {
-    root: 'communicationThread', kind: 'Communication thread', notice: 'Messages are shown newest first. Sending happens only through the controlled queue and delivery evidence.',
+    root: 'communicationThread', kind: 'Communication thread', notice: 'Messages are shown newest first.',
     query: `communicationThread(where: { id: $id }) { id subject status primaryChannel lastMessageAt ${matterFields} intake { intakeNumber title } participantsCount messagesCount messages(orderBy: [{ createdAt: desc }, { id: asc }], take: ${LIST_LIMIT}) { id subject body direction status createdAt } }`,
     title: (r) => label(r.subject, 'Untitled conversation'),
     facts: (r, f) => [['Matter / intake', r.matter ? matter(r) : `${r.intake?.intakeNumber ?? 'Firm-level'} · ${r.intake?.title ?? ''}`], ['Primary channel', label(r.primaryChannel)], ['Last activity', f.date(r.lastMessageAt)], ['Participants', label(r.participantsCount, '0')], ['Messages', label(r.messagesCount, '0')]],
@@ -150,10 +149,10 @@ const drillIns: Record<string, DrillInDefinition> = {
     }],
   },
   message: {
-    root: 'communicationMessage', kind: 'Message', notice: 'Outbound messages are sent only through controlled queueing and delivery evidence. Message content cannot be edited after it is recorded.',
-    query: `communicationMessage(where: { id: $id }) { id subject body status direction channel queuedAt sentAt receivedAt ${matterFields} thread { id subject } deliveriesCount attachmentsCount attachments(orderBy: [{ versionNumber: desc }, { id: asc }], take: ${LIST_LIMIT}) { id versionNumber fileName byteSize checksumSha256 document { id title } } }`,
+    root: 'communicationMessage', kind: 'Message', notice: 'Message content cannot be edited after it is recorded. The application does not send client email.',
+    query: `communicationMessage(where: { id: $id }) { id subject body status direction channel queuedAt sentAt receivedAt ${matterFields} thread { id subject } attachmentsCount attachments(orderBy: [{ versionNumber: desc }, { id: asc }], take: ${LIST_LIMIT}) { id versionNumber fileName byteSize checksumSha256 document { id title } } }`,
     title: (r) => label(r.subject, label(r.thread?.subject, 'Untitled message')),
-    facts: (r, f) => [['Matter', matter(r)], ['Thread', label(r.thread?.subject)], ['Direction', label(r.direction)], ['Channel', label(r.channel)], ['Queued', f.date(r.queuedAt)], ['Sent / received', r.sentAt ? f.date(r.sentAt) : f.date(r.receivedAt)], ['Deliveries', label(r.deliveriesCount, '0')], ['Attachments', label(r.attachmentsCount, '0')]],
+    facts: (r, f) => [['Matter', matter(r)], ['Thread', label(r.thread?.subject)], ['Direction', label(r.direction)], ['Channel', label(r.channel)], ['Queued', f.date(r.queuedAt)], ['Sent / received', r.sentAt ? f.date(r.sentAt) : f.date(r.receivedAt)], ['Attachments', label(r.attachmentsCount, '0')]],
     related: (r) => [matterLink(r), r.thread?.id ? { label: 'Open conversation', href: `/dashboard/platform/communications/thread/${encodeURIComponent(String(r.thread.id))}` } : null],
     lists: (r) => [
       { title: 'Message', total: r.body ? 1 : 0, rows: r.body ? [{ title: label(r.subject, 'No subject'), meta: String(r.body) }] : [] },
@@ -167,13 +166,6 @@ const drillIns: Record<string, DrillInDefinition> = {
         })),
       },
     ],
-  },
-  delivery: {
-    root: 'communicationDelivery', kind: 'Delivery', notice: 'Delivery outcomes are retained as provider evidence. Retrying and provider dispatch are not simulated from this desk.',
-    query: `communicationDelivery(where: { id: $id }) { id status channel attemptCount lastAttemptAt deliveredAt recipientAddress provider errorCode recipientContact { displayName } ${matterFields} message { id subject thread { subject } } }`,
-    title: (r) => `Delivery to ${label(r.recipientContact?.displayName, label(r.recipientAddress, 'recipient'))}`,
-    facts: (r, f) => [['Message', label(r.message?.subject, label(r.message?.thread?.subject, 'Untitled message'))], ['Recipient', `${label(r.recipientContact?.displayName, 'Contact not linked')} · ${label(r.recipientAddress, 'no address')}`], ['Channel', label(r.channel)], ['Provider', label(r.provider)], ['Attempts', label(r.attemptCount, '0')], ['Last attempt', f.date(r.lastAttemptAt)], ['Delivered', f.date(r.deliveredAt)], ['Outcome', communicationDispatchState(String(r.status ?? ''), typeof r.errorCode === 'string' ? r.errorCode : null).guidance || label(r.status)]],
-    related: (r) => [matterLink(r), r.message?.id ? { label: 'Open message', href: `/dashboard/platform/communications/message/${encodeURIComponent(String(r.message.id))}` } : null],
   },
   'time-entry': {
     root: 'timeEntry', kind: 'Time entry', notice: 'Billability and lifecycle review happen before billing assembly. Approved or billed source records cannot be freely rewritten.',
@@ -209,7 +201,7 @@ export async function getPlatformDrillIn(kind: string, id: string): Promise<Resu
     success: true,
     data: {
       title: definition.title(record),
-      status: kind === 'delivery' ? communicationDispatchState(String(record.status ?? 'recorded'), typeof record.errorCode === 'string' ? record.errorCode : null).status : typeof record.status === 'string' && record.status ? record.status : 'recorded',
+      status: typeof record.status === 'string' && record.status ? record.status : 'recorded',
       kind: definition.kind,
       facts: definition.facts(record, format),
       notice: definition.notice,

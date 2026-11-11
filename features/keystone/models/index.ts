@@ -19,7 +19,6 @@ import {
   CommunicationThread,
   CommunicationParticipant,
   CommunicationMessage,
-  CommunicationDelivery,
 } from "./communications";
 import {
   Document,
@@ -102,7 +101,6 @@ const modelDefinitions = {
   CommunicationThread,
   CommunicationParticipant,
   CommunicationMessage,
-  CommunicationDelivery,
   Document,
   DocumentVersion,
   SignatureRequest,

@@ -32,7 +32,6 @@ import {
 } from "./legalWorkflows";
 import { postTrustTransaction } from "./postTrustTransaction";
 import {
-  queueCommunicationMessage,
   transitionDocument,
   transitionSignatureRequest,
 } from "./providerWorkflows";
@@ -250,13 +249,6 @@ async function dispatchAction(action: any, approvedContext: Context) {
       documentId: data.documentId,
       reason: data.reason,
       confirmation: data.confirmation,
-    }, approvedContext);
-  }
-  if (action.actionType === "communication.send") {
-    await assertActionMatterResource(approvedContext.prisma, action, "communicationMessage", data.messageId);
-    return queueCommunicationMessage(null, {
-      messageId: data.messageId,
-      reason: data.reason,
     }, approvedContext);
   }
   if (action.actionType === "document.publish") {

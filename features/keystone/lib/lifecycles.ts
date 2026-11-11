@@ -112,13 +112,6 @@ export const lifecycles = {
     received: [],
     cancelled: [],
   },
-  communicationDelivery: {
-    pending: ["sent", "failed"],
-    sent: ["delivered", "failed", "bounced"],
-    delivered: [],
-    failed: ["pending"],
-    bounced: [],
-  },
   document: {
     draft: ["active", "archived"],
     active: ["archived"],
@@ -245,11 +238,11 @@ export const lifecycles = {
     revoked: [],
   },
   webhookDelivery: {
-    pending: ["processing", "failed"],
-    processing: ["succeeded", "failed"],
-    failed: ["pending", "dead_letter"],
+    pending: ["processing", "failed", "dead_letter"],
+    processing: ["succeeded", "failed", "dead_letter"],
+    failed: ["pending", "processing", "dead_letter"],
     succeeded: [],
-    dead_letter: [],
+    dead_letter: ["processing"],
   },
   retentionPolicy: {
     draft: ["active", "retired"],

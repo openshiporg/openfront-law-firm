@@ -8,7 +8,6 @@ const emptyCopy: Record<string, string> = {
   consultations: 'No consultations booked',
   credentials: 'No machine access to review',
   deadlines: 'No deadlines awaiting review',
-  delivery: 'No deliveries need follow-up',
   directory: 'No contacts yet',
   docket: 'No docket activity',
   documents: 'No documents in progress',

@@ -89,17 +89,16 @@ import {
 import {
   addDocumentSigner,
   enqueueWebhookDelivery,
-  queueCommunicationMessage,
+  retryWebhookDelivery,
   rotateIntegrationCredential,
   rotateWebhookSigningSecret,
-  transitionCommunicationDelivery,
   transitionDocument,
   transitionIntegrationConnection,
   transitionDocumentSigner,
   transitionSignatureRequest,
 } from "./providerWorkflows";
 import { ingestDocumentVersion, prepareSignatureRequest, setDocumentCurrentVersion } from "./documentVersionWorkflows";
-import { addCommunicationParticipant, prepareCommunicationDeliveries, removeCommunicationParticipant } from "./communicationWorkflows";
+import { addCommunicationParticipant, removeCommunicationParticipant } from "./communicationWorkflows";
 import {
   assignDocumentRetentionPolicy,
   disposeRetainedDocument,
@@ -456,16 +455,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         replayed: Boolean!
       }
 
-      type CommunicationDeliveryTransitionResult {
-        delivery: ControlledRecordProjection!
-        replayed: Boolean!
-      }
-
-      type CommunicationMessageQueueResult {
-        message: ControlledRecordProjection!
-        replayed: Boolean!
-      }
-
       type SignatureSignerSetupResult {
         id: ID!
         status: String!
@@ -509,12 +498,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
 
       type CommunicationParticipantResult {
         participant: ControlledRecordProjection!
-        replayed: Boolean!
-      }
-
-      type CommunicationDeliveryPreparationResult {
-        message: ControlledRecordProjection!
-        deliveries: [ControlledRecordProjection!]!
         replayed: Boolean!
       }
 
@@ -1172,18 +1155,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           matterId: ID
           payload: JSON
         ): ControlledRecordProjection!
-        queueCommunicationMessage(
-          messageId: ID!
-          reason: String!
-        ): CommunicationMessageQueueResult!
-        transitionCommunicationDelivery(
-          deliveryId: ID!
-          toStatus: String!
-          providerEventId: String!
-          providerMessageId: String
-          errorCode: String
-          errorMessage: String
-        ): CommunicationDeliveryTransitionResult!
+        retryWebhookDelivery(deliveryId: ID!): ControlledRecordProjection!
         transitionDocument(
           documentId: ID!
           toStatus: DocumentCommandTarget!
@@ -1253,12 +1225,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           participantId: ID!
           reason: String!
         ): CommunicationParticipantResult!
-        prepareCommunicationDeliveries(
-          messageId: ID!
-          participantIds: [ID!]!
-          integrationConnectionId: ID
-          reason: String!
-        ): CommunicationDeliveryPreparationResult!
 
         applyContactImport(
           connectionId: ID!
@@ -1498,8 +1464,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         rotateIntegrationCredential,
         transitionIntegrationConnection,
         enqueueWebhookDelivery,
-        queueCommunicationMessage,
-        transitionCommunicationDelivery,
+        retryWebhookDelivery,
         transitionDocument,
         addDocumentSigner,
         transitionDocumentSigner,
@@ -1510,7 +1475,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         rotateWebhookSigningSecret,
         addCommunicationParticipant,
         removeCommunicationParticipant,
-        prepareCommunicationDeliveries,
         applyContactImport,
         preparePracticeExport,
         startClientIntake,

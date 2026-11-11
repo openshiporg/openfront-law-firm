@@ -189,7 +189,7 @@ export const WebhookSubscription = list({
       defaultValue: [],
     }),
     signingSecretDigest: secretText("Signing secret digest"),
-    // A digest cannot produce outbound HMACs; the dispatcher decrypts this server-side only.
+    // A digest cannot produce outbound HMACs; the webhook sender decrypts this server-side only.
     signingSecretEncrypted: secretText("Encrypted outbound signing secret envelope"),
     lastDeliveredAt: timestamp(),
     deliveries: readOnlyRelationship("WebhookDelivery.subscription", true),

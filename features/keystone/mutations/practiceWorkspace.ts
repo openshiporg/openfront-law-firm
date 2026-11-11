@@ -3,7 +3,7 @@ import type { Context } from ".keystone/types";
 import { formatInstant } from "../../platform/lib/datetime";
 import { formatMoneyLabel } from "../../platform/lib/money";
 import { activeFirmId, permissions, type PermissionKey } from "../access";
-import { communicationDispatchState, webhookDispatchState } from "../../shared/dispatch-outcome";
+import { webhookDispatchState } from "../../shared/dispatch-outcome";
 import { practiceOverview, type PracticeOverviewQueueItem } from "./practiceOverview";
 
 const trustAccountTypeLabels: Record<string, string> = {
@@ -171,22 +171,16 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
   ],
   communications: [
     {
-      key: "drafts", title: "Drafts ready for review", description: "Outbound drafts that can be queued only after recipients and controlled deliveries exist.",
+      key: "drafts", title: "Drafts ready for review", description: "Outbound drafts awaiting review.",
       model: "CommunicationMessage", permissions: ["canReadCommunications", "canManageCommunications"], where: { status: { equals: "draft" } }, orderBy: { updatedAt: "desc" },
-      query: "id subject direction channel status updatedAt matter { matterNumber } thread { subject } deliveriesCount", kind: "Message",
-      map: (record) => ({ id: record.id, title: record.subject || record.thread?.subject || "Untitled draft", subtitle: `${matterLabel(record)} · ${record.channel} · ${record.deliveriesCount ?? 0} controlled deliveries`, status: record.status, at: iso(record.updatedAt) }),
+      query: "id subject direction channel status updatedAt matter { matterNumber } thread { subject }", kind: "Message",
+      map: (record) => ({ id: record.id, title: record.subject || record.thread?.subject || "Untitled draft", subtitle: `${matterLabel(record)} · ${record.channel} · recorded draft`, status: record.status, at: iso(record.updatedAt) }),
     },
     {
       key: "threads", title: "Conversation queue", description: "Open matter and intake threads, ordered by recent activity.",
       model: "CommunicationThread", permissions: ["canReadCommunications", "canReadMatters"], where: { status: { equals: "open" } }, orderBy: { lastMessageAt: "desc" },
       query: "id subject status primaryChannel lastMessageAt matter { matterNumber } intake { intakeNumber } messagesCount", kind: "Thread",
       map: (record) => ({ id: record.id, title: record.subject, subtitle: `${record.matter?.matterNumber ?? record.intake?.intakeNumber ?? "Firm-level"} · ${record.primaryChannel} · ${record.messagesCount ?? 0} messages`, status: record.status, at: iso(record.lastMessageAt) }),
-    },
-    {
-      key: "delivery", title: "Delivery follow-up", description: "Failed, bounced, and pending provider handoffs requiring operator attention.",
-      model: "CommunicationDelivery", permissions: ["canReadCommunications"], where: { status: { in: ["pending", "failed", "bounced"] } }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-      query: "id status channel errorCode attemptCount lastAttemptAt message { subject }", kind: "Delivery",
-      map: (record) => ({ id: record.id, title: record.message?.subject ? `Delivery · ${record.message.subject}` : "Message delivery", subtitle: `${record.channel} · ${record.attemptCount ?? 0} attempts · ${communicationDispatchState(record.status, record.errorCode).guidance}`, status: communicationDispatchState(record.status, record.errorCode).status, at: iso(record.lastAttemptAt) }),
     },
   ],
   "time-expenses": [
@@ -329,7 +323,7 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       map: (record) => ({ id: record.id, title: record.name, subtitle: `${record.provider} · ${record.category} · ${record.office?.name ?? "all offices"}`, status: record.status, at: iso(record.lastErrorAt ?? record.lastSyncedAt ?? record.updatedAt) }),
     },
     {
-      key: "webhooks", title: "Webhook deliveries", description: "Queued, sent, unresolved and rejected deliveries. A delivery with an unknown outcome must be checked, not resent.",
+      key: "webhooks", title: "Webhook deliveries", description: "Webhooks go out on the request that causes them. A failed or interrupted delivery can be retried by staff.",
       model: "WebhookDelivery", permissions: ["canReadIntegrations", "canManageIntegrations"], where: { status: { in: ["pending", "processing", "failed", "dead_letter"] } }, orderBy: { updatedAt: "desc" },
       query: "id eventId eventType status lastError attemptCount nextAttemptAt updatedAt subscription { name } matter { matterNumber }", kind: "Webhook delivery",
       map: (record) => ({ id: record.id, title: record.eventType, subtitle: `${record.subscription?.name ?? "Subscription"} · ${record.eventId} · ${record.attemptCount ?? 0} attempts · ${webhookDispatchState(record.status, record.lastError).guidance}`, status: webhookDispatchState(record.status, record.lastError).status, at: iso(record.nextAttemptAt ?? record.updatedAt) }),
@@ -349,7 +343,7 @@ export const workspaceListQueries: Record<string, string> = {
   Contact: "contacts", MatterParty: "matterParties", Consultation: "consultations", DocketEntry: "docketEntries",
   Deadline: "deadlines", LegalTask: "legalTasks", Document: "documents", SignatureRequest: "signatureRequests",
   CommunicationMessage: "communicationMessages", CommunicationThread: "communicationThreads",
-  CommunicationDelivery: "communicationDeliveries", TimeEntry: "timeEntries", Expense: "expenses", Invoice: "invoices",
+  TimeEntry: "timeEntries", Expense: "expenses", Invoice: "invoices",
   Payment: "payments", TrustAccount: "trustAccounts", TrustLedgerAccount: "trustLedgerAccounts",
   TrustReconciliation: "trustReconciliations", PortalAccount: "portalAccounts", PortalMatterAccess: "portalMatterAccesses",
   PortalShare: "portalShares", RetentionHold: "retentionHolds", RetentionAction: "retentionActions",
@@ -376,7 +370,6 @@ export const workspaceRegisterOptions: Record<string, WorkspaceRegisterOptions> 
   "documents:signatures": { dateField: "updatedAt" },
   "communications:drafts": { search: ["subject"], dateField: "updatedAt", nameField: "subject" },
   "communications:threads": { search: ["subject"], dateField: "lastMessageAt", nameField: "subject" },
-  "communications:delivery": { dateField: "lastAttemptAt" },
   "time-expenses:time": { search: ["description"], dateField: "workDate", nameField: "description" },
   "time-expenses:expenses": { search: ["description"], dateField: "incurredAt", nameField: "description" },
   "billing:invoices": { search: ["invoiceNumber"], dateField: "dueAt", nameField: "invoiceNumber" },
@@ -433,13 +426,13 @@ const actionPermissions: Partial<Record<string, PermissionKey>> = {
   Matter: "canManageMatters",
   Deadline: "canManageCalendar",
   Task: "canManageTasks",
-  Message: "canManageCommunications",
   Document: "canManageDocuments",
   "Time entry": "canManageBilling",
   Expense: "canManageBilling",
   Invoice: "canManageBilling",
   "Legal hold": "canManageRetention",
   Connection: "canManageIntegrations",
+  "Webhook delivery": "canManageIntegrations",
   "Trust account": "canManageTrust",
   "Client ledger": "canManageTrust",
   Reconciliation: "canManageTrust",

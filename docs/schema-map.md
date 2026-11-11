@@ -63,7 +63,6 @@ Who creates: **M** = firm staff (merchant), **C** = customer (prospect or client
 | CommunicationThread | Matter or intake conversation | subject, primaryChannel | matter, intake, participants, messages | M | open / archived / closed |
 | CommunicationParticipant | Recipient on a thread | participantRole, displayAddress | user, contact, portalAccount | M `addCommunicationParticipant` | active / removed |
 | CommunicationMessage | Message | direction, channel, body | thread, deliveries | M (draft), `queueCommunicationMessage` | draft → queued → sent → delivered / failed; received; cancelled |
-| CommunicationDelivery | Per-recipient delivery | channel, status, attempts | message, recipientContact | S `prepareCommunicationDeliveries` | pending → sent → delivered / failed / bounced |
 
 ### Billing, payments and trust
 | List | Purpose | Key fields | Relationships | Created by | States |
@@ -165,7 +164,7 @@ Covered by a parent page, with no page of their own:
 - **Matter workspace:** MatterStatusEvent, MatterParty, MatterTeamMember, EthicalWallMember.
 - **Conflict panel:** ConflictSearchTerm, ConflictMatch, ConflictDisposition.
 - **Document detail:** DocumentVersion, DocumentSigner, SignatureEvent.
-- **Thread detail:** CommunicationParticipant, CommunicationDelivery.
+- **Thread detail:** CommunicationParticipant.
 - **Invoice / Billing:** InvoiceLine, PaymentAllocation.
 - **Accounting:** TrustLedgerEntry, TrustBalanceSnapshot.
 - **Portal:** PortalSession, PortalGrantIntent, PortalDiscoveryPolicy.

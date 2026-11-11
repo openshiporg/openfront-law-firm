@@ -1,5 +1,5 @@
 import { assertCurrentCommandActor } from "./command-authority";
-import { assertCurrentCommunicationRecipient, communicationQueueDigest } from "./communicationWorkflows";
+import { deliverWebhook } from "../webhooks/webhook-sender";
 import { assertWebhookWireIdentity } from "../webhooks/wire-contract";
 import type { Context } from ".keystone/types";
 
@@ -169,7 +169,7 @@ export async function enqueueWebhookDelivery(
   if (!eventType) throw new Error("Webhook event type is required.");
   assertWebhookWireIdentity(deliveryEventId, eventType);
   const prisma = context.prisma as any;
-  return runSerializableTransaction(prisma, async (tx: any) => {
+  const created = await runSerializableTransaction(prisma, async (tx: any) => {
     await assertCurrentCommandActor(tx, context, "canManageIntegrations");
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`webhook-delivery:${firmId}:${deliveryEventId}`}))`;
     const [connection, subscription] = await Promise.all([
@@ -201,169 +201,26 @@ export async function enqueueWebhookDelivery(
     });
     return delivery;
   });
+  // Sent on this request, after the record is committed. A failure stays visible for a staff Retry.
+  const sent = await deliverWebhook(prisma, created.id, { actor: workflowActor(context, userId) }).catch(() => null);
+  return { id: created.id, status: sent?.status ?? created.status };
 }
 
-export async function recordWebhookDeliveryAttempt(
+/** Staff Retry for a failed, dead-lettered or interrupted webhook delivery: one more send now. */
+export async function retryWebhookDelivery(
   _root: unknown,
-  _args: {
-    deliveryId: string;
-    providerEventId: string;
-    responseStatus?: number | null;
-    responseDigest?: string | null;
-    errorCode?: string | null;
-    errorMessage?: string | null;
-  },
-  _context: Context,
-): Promise<never> {
-  void _root;
-  void _args;
-  void _context;
-  throw new Error("Webhook delivery attempt recording is unavailable until an authenticated dispatcher owns the HTTP request.");
-}
-
-export async function queueCommunicationMessage(
-  _root: unknown,
-  args: { messageId: string; reason: string },
+  args: { deliveryId: string },
   context: Context,
 ) {
-  const { firmId, userId } = requirePermission(context, "canManageCommunications", { humanOnly: true });
-  const reason = boundedReason(args.reason, "Communication send reason", 5, 2000);
+  const { firmId, userId } = requirePermission(context, "canManageIntegrations");
   const prisma = context.prisma as any;
-  return runSerializableTransaction(prisma, async (tx: any) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`message:${firmId}:${args.messageId}`}))`;
-    const message = await tx.communicationMessage.findFirst({
-      where: { id: args.messageId, firmId },
-      include: { deliveries: true },
-    });
-    if (!message) throw new Error("Communication message was not found in the active firm.");
-    if (message.matterId) await assertMatterAccess(tx, firmId, message.matterId, userId);
-    for (const delivery of message.deliveries) {
-      await assertCurrentCommunicationRecipient(tx, message, delivery.providerMetadata?.participantId ?? "", delivery.recipientAddress);
-    }
-    if (message.status === "queued") return { message, replayed: true };
-    assertLifecycleTransition("communicationMessage", message.status, "queued");
-    if (!message.deliveries.length || message.deliveries.some((delivery: any) => delivery.status !== "pending")) {
-      throw new Error("Message queueing requires at least one pending controlled delivery.");
-    }
-    const queued = await tx.communicationMessage.update({
-      where: { id: message.id },
-      data: { status: "queued", queuedAt: new Date() },
-    });
-    await recordAuditEvent(tx, {
-      firmId,
-      eventType: "communication.message_queued",
-      category: "integration",
-      actorUserId: userId,
-      matterId: message.matterId,
-      metadata: { messageId: message.id, deliveryCount: message.deliveries.length, reasonDigest: sha256Digest(reason), authenticationType: "human", intentVersion: 1, requestDigest: communicationQueueDigest(message, message.deliveries) },
-    });
-    return { message: queued, replayed: false };
-  });
-}
-
-export async function transitionCommunicationDelivery(
-  _root: unknown,
-  args: {
-    deliveryId: string;
-    toStatus: "sent" | "delivered" | "failed" | "bounced";
-    providerEventId: string;
-    providerMessageId?: string | null;
-    errorCode?: string | null;
-    errorMessage?: string | null;
-  },
-  context: Context,
-) {
-  requirePermission(context, "canManageCommunications", { humanOnly: true });
-  throw new Error("Communication delivery outcomes are unavailable until authenticated provider ingress is configured.");
-  const { session, firmId, userId } = requirePermission(context, "canManageCommunications");
-  const providerEventId = eventId(args.providerEventId);
-  const providerMessageId = optionalBoundedText(args.providerMessageId, "Provider message ID", 500);
-  const errorCode = optionalBoundedText(args.errorCode, "Provider error code", 200);
-  const errorMessage = optionalBoundedText(args.errorMessage, "Provider error message", 2000);
-  const prisma = context.prisma as any;
-  const auditId = `communication:${providerEventId}`;
-  const requestDigest = sha256Digest({
-    deliveryId: args.deliveryId,
-    toStatus: args.toStatus,
-    providerMessageId: providerMessageId ?? null,
-    errorCode: errorCode ?? null,
-    errorMessage: errorMessage ?? null,
-  });
-  return runSerializableTransaction(prisma, async (tx: any) => {
-    await assertCurrentCommandActor(tx, context, "canManageCommunications");
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${auditId}))`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`communication-delivery:${firmId}:${args.deliveryId}`}))`;
-    const replay = await tx.auditEvent.findFirst({ where: { firmId, eventId: auditId } });
-    const delivery = await tx.communicationDelivery.findFirst({ where: { id: args.deliveryId, firmId } });
-    if (!delivery) throw new Error("Communication delivery was not found in the active firm.");
-    if (delivery.matterId) await assertMatterAccess(tx, firmId, delivery.matterId, userId);
-    if (replay) {
-      if (replay.metadata?.requestDigest !== requestDigest) {
-        throw new Error("Communication provider event ID was reused with a different payload.");
-      }
-      return { delivery, replayed: true };
-    }
-    assertLifecycleTransition("communicationDelivery", delivery.status, args.toStatus);
-    const now = new Date();
-    const updated = await tx.communicationDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: args.toStatus,
-        providerMessageId: providerMessageId ?? "",
-        attemptCount: { increment: 1 },
-        lastAttemptAt: now,
-        deliveredAt: args.toStatus === "delivered" ? now : null,
-        errorCode: errorCode ?? "",
-        errorMessage: errorMessage ?? "",
-      },
-    });
-    const [message, deliveryStates] = await Promise.all([
-      tx.communicationMessage.findUnique({ where: { id: delivery.messageId } }),
-      tx.communicationDelivery.findMany({
-        where: { messageId: delivery.messageId },
-        select: { status: true },
-      }),
-    ]);
-    const statuses = deliveryStates.map((item: any) => item.status);
-    const messageTarget = statuses.every((status: string) => status === "delivered")
-      ? "delivered"
-      : statuses.every((status: string) => new Set(["failed", "bounced"]).has(status))
-        ? "failed"
-        : statuses.some((status: string) => new Set(["sent", "delivered"]).has(status))
-          ? "sent"
-          : null;
-    if (message && messageTarget && message.status !== messageTarget) {
-      assertLifecycleTransition("communicationMessage", message.status, messageTarget);
-      await tx.communicationMessage.update({
-        where: { id: message.id },
-        data: {
-          status: messageTarget,
-          ...(messageTarget === "sent" ? { sentAt: now } : {}),
-        },
-      });
-    }
-    await tx.auditEvent.create({
-      data: {
-        firmId,
-        eventId: auditId,
-        eventType: `communication.delivery_${args.toStatus}`,
-        category: "integration",
-        outcome: new Set(["failed", "bounced"]).has(args.toStatus) ? "failed" : "succeeded",
-        ...workflowActor(context, userId),
-        matterId: delivery.matterId,
-        occurredAt: now,
-        metadata: {
-          deliveryId: delivery.id,
-          fromStatus: delivery.status,
-          providerMessageId,
-          credentialId: session.credentialId ?? null,
-          requestDigest,
-        },
-      },
-    });
-    return { delivery: updated, replayed: false };
-  });
+  const delivery = await prisma.webhookDelivery.findFirst({ where: { id: args.deliveryId, firmId }, select: { id: true, matterId: true } });
+  if (!delivery) throw new Error("Webhook delivery was not found in the active firm.");
+  await assertCurrentCommandActor(prisma, context, "canManageIntegrations");
+  if (delivery.matterId) await assertMatterAccess(prisma, firmId, delivery.matterId, userId);
+  const result = await deliverWebhook(prisma, delivery.id, { force: true, actor: workflowActor(context, userId) });
+  if (result.outcome === "skipped") throw new Error(result.reason === "not_retryable" ? "This delivery is already sent or being sent." : "This delivery could not be retried.");
+  return { id: delivery.id, status: result.status };
 }
 
 export async function addDocumentSigner(

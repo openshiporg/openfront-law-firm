@@ -3,12 +3,10 @@
 import { revalidatePath } from 'next/cache'
 
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
-import type { ContactEmailMethod, MessageDeliverySetup, ParticipantRow, RecipientActionState, ThreadRecipientSetup } from './recipientTypes'
+import type { ContactEmailMethod, ParticipantRow, RecipientActionState, ThreadRecipientSetup } from './recipientTypes'
 
 const PARTICIPANT_FIELDS = 'id participantRole status displayAddress addedAt user { name } contact { displayName } portalAccount { email }'
 const CONTACT_ROLES = new Set(['client', 'external_counsel', 'third_party'])
-const EMAIL = /^[^\s@<>,;()"]+@[^\s@<>,;()"]+\.[^\s@<>,;()"]+$/
-const MAX_RECIPIENTS = 50
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim()
@@ -99,66 +97,4 @@ export async function removeParticipantAction(previous: RecipientActionState, fo
   if (!result.success) return { ok: false, message: 'The recipient was not removed. Communication management permission and access to the matter are required.', revision }
   refreshThread(threadId)
   return { ok: true, message: 'Recipient removed.', revision }
-}
-
-export async function getMessageDeliveries(messageId: string): Promise<MessageDeliverySetup | null> {
-  const response = await keystoneClient<{ communicationMessage: { status: string | null; direction: string | null; channel: string | null; thread: { id: string; participants: ParticipantRow[] } | null; deliveries: MessageDeliverySetup['deliveries'] } | null }>(`
-    query MessageDeliveries($id: ID!) {
-      communicationMessage(where: { id: $id }) {
-        status direction channel
-        thread { id participants(where: { status: { equals: active } }, orderBy: [{ addedAt: asc }, { id: asc }], take: 100) { ${PARTICIPANT_FIELDS} } }
-        deliveries(orderBy: [{ id: asc }], take: 100) { id status recipientAddress provider attemptCount recipientContact { displayName } }
-      }
-    }
-  `, { id: messageId })
-  if (!response.success || !response.data.communicationMessage) return null
-  const message = response.data.communicationMessage
-  const connections = await keystoneClient<{ integrationConnections: Array<{ id: string; name: string; provider: string }> }>(`
-    query EmailConnections { integrationConnections(where: { status: { equals: active }, category: { equals: email } }, orderBy: [{ name: asc }], take: 25) { id name provider } }
-  `)
-  return {
-    status: message.status,
-    direction: message.direction,
-    channel: message.channel,
-    threadId: message.thread?.id ?? null,
-    deliveries: message.deliveries ?? [],
-    participants: message.thread?.participants ?? [],
-    connections: connections.success ? connections.data.integrationConnections ?? [] : [],
-  }
-}
-
-export async function prepareDeliveriesAction(previous: RecipientActionState, formData: FormData): Promise<RecipientActionState> {
-  const revision = previous.revision + 1
-  const messageId = text(formData, 'messageId')
-  const participantIds = [...new Set(formData.getAll('participantIds').map((value) => String(value).trim()).filter(Boolean))]
-  const integrationConnectionId = text(formData, 'integrationConnectionId') || null
-  const reason = text(formData, 'reason')
-  if (!messageId) return { ok: false, message: 'Message is missing.', revision }
-  if (!participantIds.length) return { ok: false, message: 'Choose at least one recipient.', revision }
-  if (participantIds.length > MAX_RECIPIENTS) return { ok: false, message: `Choose ${MAX_RECIPIENTS} recipients or fewer.`, revision }
-  if (reason.length < 5 || reason.length > 2000) return { ok: false, message: 'Enter a reason between 5 and 2,000 characters.', revision }
-  const setup = await getMessageDeliveries(messageId)
-  if (!setup) return { ok: false, message: 'This message is unavailable.', revision }
-  if (setup.status !== 'draft') return { ok: false, message: 'Deliveries can be prepared only for draft messages.', revision }
-  if (setup.direction !== 'outbound') return { ok: false, message: 'Only outbound messages have deliveries.', revision }
-  if (setup.channel !== 'email') return { ok: false, message: 'Only email deliveries can be prepared.', revision }
-  if (setup.deliveries.some((delivery) => delivery.status !== 'pending')) return { ok: false, message: 'This message already has delivery outcomes.', revision }
-  const active = new Map(setup.participants.map((participant) => [participant.id, participant]))
-  for (const id of participantIds) {
-    const participant = active.get(id)
-    if (!participant) return { ok: false, message: 'Every recipient must be an active participant of this thread.', revision }
-    if (!participant.displayAddress || !EMAIL.test(participant.displayAddress)) return { ok: false, message: 'Every recipient needs one valid email address.', revision }
-  }
-  if (integrationConnectionId && !setup.connections.some((connection) => connection.id === integrationConnectionId)) return { ok: false, message: 'Choose an active email connection.', revision }
-  const result = await keystoneClient<{ prepareCommunicationDeliveries: { deliveries: Array<{ id: string }> } }>(`
-    mutation PrepareDeliveries($messageId: ID!, $participantIds: [ID!]!, $integrationConnectionId: ID, $reason: String!) {
-      prepareCommunicationDeliveries(messageId: $messageId, participantIds: $participantIds, integrationConnectionId: $integrationConnectionId, reason: $reason) { deliveries { id } }
-    }
-  `, { messageId, participantIds, integrationConnectionId, reason })
-  if (!result.success) return { ok: false, message: 'Deliveries were not prepared. A recipient’s address or access may have changed; review the thread recipients.', revision }
-  revalidatePath(`/dashboard/platform/communications/message/${messageId}`)
-  if (setup.threadId) revalidatePath(`/dashboard/platform/communications/thread/${setup.threadId}`)
-  revalidatePath('/dashboard/platform/communications')
-  const count = result.data.prepareCommunicationDeliveries.deliveries.length
-  return { ok: true, message: `${count} ${count === 1 ? 'delivery' : 'deliveries'} prepared. Queue the message to send.`, revision }
 }

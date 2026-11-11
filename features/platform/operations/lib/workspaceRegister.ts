@@ -40,7 +40,7 @@ const historyModels: Partial<Record<string, keyof typeof lifecycles>> = {
   Matter: 'matter', Intake: 'intake', Consultation: 'consultation', ConflictCheck: 'conflictCheck',
   LegalTask: 'legalTask', Deadline: 'deadline', DocketEntry: 'docketEntry', Document: 'document',
   SignatureRequest: 'signatureRequest', CommunicationMessage: 'communicationMessage',
-  CommunicationThread: 'communicationThread', CommunicationDelivery: 'communicationDelivery',
+  CommunicationThread: 'communicationThread',
   TimeEntry: 'timeEntry', Expense: 'expense', Invoice: 'invoice',
 }
 const historyCategories = new Set(['intake', 'matters', 'work', 'documents', 'communications', 'time-expenses', 'billing'])
