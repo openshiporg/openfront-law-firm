@@ -10,19 +10,15 @@ export type PortalBrand = {
 }
 
 /**
- * Portal lockup: the same sanitized StoreLogo renderer and persisted logo/hue as
+ * Portal lockup (mark and name only): the same sanitized StoreLogo renderer and persisted logo/hue as
  * the public storefront. Callers pass only a session-bound or published brand;
  * an unverified visitor gets the neutral fallback.
  */
 export function FirmBrand({ brand }: { brand: PortalBrand }) {
   const name = brand.name?.trim() || brand.displayName?.trim() || NEUTRAL_FIRM_NAME
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <StoreLogo icon={brand.logoIcon ?? ''} hue={brand.logoColor ?? '0'} />
-      <div className="min-w-0">
-        <p className="truncate font-[family-name:var(--font-display)] text-lg font-semibold leading-tight text-foreground">{name}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{brand.brandTagline || 'Client portal'}</p>
-      </div>
+    <div className="sf-firm sf-firm--portal">
+      <span className="sf-firm__row"><StoreLogo icon={brand.logoIcon ?? ''} hue={brand.logoColor ?? '0'} /><span className="sf-firm__name">{name}</span></span>
     </div>
   )
 }

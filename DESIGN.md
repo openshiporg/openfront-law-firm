@@ -324,8 +324,8 @@ A square mark (8px, 1px corners) beside a 12px/500 (platform) or 14px/600 (site)
 ### Don't:
 - **Don't** describe or restyle the shared dashboard shell (sidebar, header, breadcrumbs) as part of this system.
 - **Don't** stack forms above records on a platform page; put commands in the actions deck.
-- **Don't** use pill-shaped buttons, pill segmented tracks or rounded-xl cards in either world.
+- **Don't** use pill-shaped buttons, pill segmented tracks or rounded-xl cards in either world. The one exception is the storefront sign-in tabs (`sf-tabs`): a recessed track with the current tab raised.
 - **Don't** spend rust or the firm's pen on backgrounds, headings or decoration.
 - **Don't** put a box inside a box; a platform empty state is one quiet line.
-- **Don't** introduce a second display face or a serif on the public site.
+- **Don't** use a serif on the public site. It has two sans families: Bricolage Grotesque for the wordmark, names and headings, Libre Franklin for text.
 - **Don't** colour actions with margin red or oxblood.

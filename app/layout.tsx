@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Libre_Franklin, Newsreader } from "next/font/google";
+import { Bricolage_Grotesque, Geist, Geist_Mono, Libre_Franklin } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,11 +19,10 @@ const franklin = Libre_Franklin({
   weight: ["400", "500", "600", "700", "800"],
 });
 
-// Public site display serif (Altair): a wide editorial serif for names and headlines.
-const newsreader = Newsreader({
-  variable: "--font-newsreader",
+// Public site display sans (Altair): the wordmark, names and headings. Text stays in Franklin.
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
   subsets: ["latin"],
-  style: ["normal", "italic"],
   axes: ["opsz"],
 });
 
@@ -45,7 +44,7 @@ export default function RootLayout({
         <link href="/favicon.svg" rel="icon" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${franklin.variable} ${newsreader.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${franklin.variable} ${bricolage.variable} antialiased`}
       >
         {children}
       </body>

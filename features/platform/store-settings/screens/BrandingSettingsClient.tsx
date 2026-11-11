@@ -94,7 +94,7 @@ export function BrandingSettingsClient({ setup, publication = 'unpublished' }: {
               <div className="flex min-w-0 items-center gap-3">
                 <span aria-hidden="true" className="block size-10 shrink-0 [&>svg]:size-full" style={{ filter: `hue-rotate(${theme['--sf-logo-hue']}deg)` }} dangerouslySetInnerHTML={{ __html: safeStoreLogo(preview.icon) }} />
                 <div className="min-w-0">
-                  <p className="truncate font-serif text-lg font-semibold leading-tight tracking-tight">{previewName}</p>
+                  <p className="truncate font-[family-name:var(--font-bricolage)] text-lg font-semibold leading-tight tracking-tight">{previewName}</p>
                   {preview.tagline.trim() ? <p className="mt-0.5 line-clamp-2 text-xs leading-5 opacity-70">{preview.tagline}</p> : null}
                 </div>
               </div>

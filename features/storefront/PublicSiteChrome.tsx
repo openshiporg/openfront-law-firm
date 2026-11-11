@@ -10,23 +10,16 @@ import { StoreBrand as FirmLink } from './StoreBrand'
 import { MobilePublicMenu } from './MobilePublicMenu'
 import { StorefrontDock } from './StorefrontDock'
 import { StorefrontNav } from './StorefrontNav'
-import { officeLocality } from './lib/locality'
 
 const LEFT_NAV = [['Practice areas', '/practice-areas'], ['Attorneys', '/attorneys'], ['About', '/about']] as const
 const RIGHT_NAV = [['Contact', '/contact'], ['Client portal', '/portal']] as const
-
-/** The office's town for the masthead ("Portland, Maine"), read from Store Settings' active office. */
-export function firmPlace(settings: StorefrontSettings) {
-  const place = officeLocality(settings.officeAddress)
-  return place ? `${place.city}, ${place.state}` : null
-}
 
 export function PublicSiteHeader({ settings }: { settings: StorefrontSettings }) {
   return (
     <header className="sf-header">
       <div className="sf-header__bar">
         <StorefrontNav links={LEFT_NAV} />
-        <FirmLink settings={settings} place={firmPlace(settings)} />
+        <FirmLink settings={settings} />
         <div className="sf-header__actions">
           <div className="sf-track">
             <StorefrontNav links={RIGHT_NAV} className="contents" label="Clients" />
@@ -48,7 +41,7 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
       <div className="sf-shell">
         <div className="sf-foot__grid">
           <div className="grid content-start gap-3">
-            <FirmLink settings={settings} place={firmPlace(settings)} />
+            <FirmLink settings={settings} />
             {settings.tagline ? <p className="sf-fine max-w-[32ch]">{settings.tagline}</p> : null}
             {settings.supportEmail ? <a href={`mailto:${settings.supportEmail}`} className="sf-link inline-flex min-h-11 items-center text-base"><EmailText value={settings.supportEmail} /></a> : null}
           </div>
