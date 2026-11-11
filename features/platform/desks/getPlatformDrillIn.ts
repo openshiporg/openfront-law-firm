@@ -19,7 +19,7 @@ export type PlatformDrillIn = {
   lists: PlatformDrillInList[]
 }
 
-type Result = { success: true; data: PlatformDrillIn } | { success: false; error: string }
+type Result = { success: true; data: PlatformDrillIn } | { success: false; error: string; notFound?: boolean }
 type RelatedRecord = Record<string, unknown> & { id?: string }
 type RecordValue = Record<string, unknown> & {
   matter?: RelatedRecord & { office?: RelatedRecord | null }
@@ -194,14 +194,14 @@ const drillIns: Record<string, DrillInDefinition> = {
 export async function getPlatformDrillIn(kind: string, id: string): Promise<Result> {
   const definition = Object.hasOwn(drillIns, kind) ? drillIns[kind] : undefined
   const recordId = id.trim()
-  if (!definition || !recordId || recordId.length > 200) return { success: false, error: 'This platform record is unavailable.' }
+  if (!definition || !recordId || recordId.length > 200) return { success: false, error: 'This platform record is unavailable.', notFound: true }
   const [response, firmZone] = await Promise.all([
     keystoneClient<Record<string, RecordValue | null>>(`query PlatformDrillIn($id: ID!) { ${definition.query} }`, { id: recordId }),
     getFirmTimeZone(),
   ])
   if (!response.success) return { success: false, error: response.error }
   const record = response.data[definition.root]
-  if (!record) return { success: false, error: 'This record is unavailable in the current authorization scope.' }
+  if (!record) return { success: false, error: 'This record is unavailable in the current authorization scope.', notFound: true }
   // Record zone first (deadline/consultation), then the matter's office, then the firm.
   const zone = validTimeZone(definition.zone?.(record)) ?? validTimeZone(record.matter?.office?.timezone) ?? firmZone
   const format: Format = { date: (value) => formatInstant(value, zone) }

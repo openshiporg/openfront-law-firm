@@ -23,7 +23,7 @@ export type MatterWorkspaceData = {
   notices: string[]
 }
 
-type Result<T> = { success: true; data: T } | { success: false; error: string }
+type Result<T> = { success: true; data: T } | { success: false; error: string; notFound?: boolean }
 type WorkspaceRow = MatterWorkspaceData['sections'][number]['rows'][number]
 // Each projection adds only identity fields whose read access equals the row's own list
 // access; people identities resolve to null (shown as restricted) without people-read.
@@ -196,7 +196,7 @@ export async function getMatterWorkspace(
   pages: { teamPage?: number; partyPage?: number; communicationPage?: number; deadlinePage?: number; taskPage?: number; documentPage?: number; invoicePage?: number } = {},
 ): Promise<Result<MatterWorkspaceData>> {
   const id = matterId.trim()
-  if (!id || id.length > 200) return { success: false, error: 'Matter reference is invalid.' }
+  if (!id || id.length > 200) return { success: false, error: 'Matter reference is invalid.', notFound: true }
   const matter = await query<{ matter: MatterWorkspaceData['matter'] | null }>(`
     query MatterWorkspaceIdentity($id: ID!) {
       matter(where: { id: $id }) {
@@ -209,7 +209,7 @@ export async function getMatterWorkspace(
     }
   `, { id })
   if (!matter.success) return matter
-  if (!matter.data.matter) return { success: false, error: 'Matter is unavailable in the current authorization scope.' }
+  if (!matter.data.matter) return { success: false, error: 'Matter is unavailable in the current authorization scope.', notFound: true }
   const zone = validTimeZone(matter.data.matter.office?.timezone) ?? await getFirmTimeZone()
 
   const [teamCount, partyCount, communicationCount, deadlineCount, taskCount, documentCount, invoiceCount] = await Promise.all([

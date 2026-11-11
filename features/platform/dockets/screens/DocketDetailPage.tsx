@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, BriefcaseBusiness } from 'lucide-react'
 
@@ -14,6 +15,7 @@ const trail = [{ label: 'Courts & dockets', href: '/dashboard/platform/dockets' 
 export async function DocketDetailPage({ params }: { params: Promise<{ docketId: string }> }) {
   const { docketId } = await params
   const [result, timeZone] = await Promise.all([getDocketDetail(docketId), getFirmTimeZone()])
+  if (!result.success && result.notFound) notFound()
   if (!result.success) return <PracticePage title="Docket unavailable" description="Docket unavailable" trail={[...trail, { label: 'Docket unavailable' }]}><PracticeLoadError message={result.error} /></PracticePage>
   const { docket, versions } = result.data
   const open = docket.status !== 'closed'

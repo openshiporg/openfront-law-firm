@@ -46,7 +46,7 @@ export type LegalAiMatterWorkspace = {
   notices: string[]
 }
 
-type Result<T> = { success: true; data: T } | { success: false; error: string }
+type Result<T> = { success: true; data: T } | { success: false; error: string; notFound?: boolean }
 
 const matterFields = `
   id
@@ -104,7 +104,7 @@ export type LegalAiEvidencePages = { documentPage?: number; taskPage?: number; d
 
 export async function getLegalAiMatterWorkspace(matterId: string, pages: LegalAiEvidencePages = {}): Promise<Result<LegalAiMatterWorkspace>> {
   const id = matterId.trim()
-  if (!id || id.length > 200) return { success: false, error: 'Matter reference is invalid.' }
+  if (!id || id.length > 200) return { success: false, error: 'Matter reference is invalid.', notFound: true }
 
   const matterResult = await boundedQuery<{ matter: LegalAiMatterSummary | null }>(`
     query LegalAiMatter($id: ID!) {
@@ -112,7 +112,7 @@ export async function getLegalAiMatterWorkspace(matterId: string, pages: LegalAi
     }
   `, { id })
   if (!matterResult.success) return matterResult
-  if (!matterResult.data.matter) return { success: false, error: 'Matter is unavailable in the current authorization scope.' }
+  if (!matterResult.data.matter) return { success: false, error: 'Matter is unavailable in the current authorization scope.', notFound: true }
 
   // Each collection has independent availability. A denied/failed count is
   // UNKNOWN, never zero, and cannot remove another collection's continuation.

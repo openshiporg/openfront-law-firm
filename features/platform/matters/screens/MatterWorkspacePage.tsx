@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, BrainCircuit, Gavel, ReceiptText, Settings2 } from 'lucide-react'
 
@@ -14,6 +15,7 @@ import { ConfidentialityPanel, EthicalWallsPanel, MatterTeamPanel, StatusHistory
 
 export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 1, communicationPage = 1, deadlinePage = 1, taskPage = 1, documentPage = 1, invoicePage = 1 }: { matterId: string; teamPage?: number; partyPage?: number; communicationPage?: number; deadlinePage?: number; taskPage?: number; documentPage?: number; invoicePage?: number }) {
   const [result, timeZone, admin] = await Promise.all([getMatterWorkspace(matterId, { teamPage, partyPage, communicationPage, deadlinePage, taskPage, documentPage, invoicePage }), getFirmTimeZone(), getMatterAdministration(matterId)])
+  if (!result.success && result.notFound) notFound()
   if (!result.success) {
     return <PracticePage title="Matter unavailable" description="The requested matter was not returned within the current authorization scope." trail={[{ label: 'Matters', href: '/dashboard/platform/matters' }, { label: 'Matter unavailable' }]}><ErrorBanner>{result.error}</ErrorBanner></PracticePage>
   }

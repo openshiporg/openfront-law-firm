@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ArrowUpRight, Settings2 } from 'lucide-react'
 
@@ -25,10 +26,9 @@ export async function PlatformDrillInPage({ desk, kind, recordId }: { desk: Excl
   const deskHref = `/dashboard/platform/${desk}`
   // A drill-in only resolves kinds that belong to its desk, so a record can never render
   // under another domain's URL and navigation.
-  if (!deskDetailKinds(desk).includes(kind)) {
-    return <PracticePage title="Record unavailable" description="The requested platform record does not belong to this desk." trail={[{ label: deskName, href: deskHref }, { label: 'Record unavailable' }]}><PracticeLoadError message="This record is not available from this desk." /></PracticePage>
-  }
+  if (!deskDetailKinds(desk).includes(kind)) notFound()
   const [result, workspace] = await Promise.all([getPlatformDrillIn(kind, recordId), getPracticeWorkspace(desk)])
+  if (!result.success && result.notFound) notFound()
   if (!result.success) return <PracticePage title="Record unavailable" description="The requested platform record was not returned within the current authorization scope." trail={[{ label: deskName, href: deskHref }, { label: 'Record unavailable' }]}><PracticeLoadError message={result.error} /></PracticePage>
   const record = result.data
   // Transition controls follow the same permission the desk computed for this kind; the

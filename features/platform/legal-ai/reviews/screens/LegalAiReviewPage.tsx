@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
@@ -21,6 +22,7 @@ export async function LegalAiReviewPage({ reviewId }: { reviewId: string }) {
   // Launch-scope review IDs intentionally resolve to authorized Matter IDs. No
   // parallel review or matter store is implied until a controlled run model exists.
   const result = await getLegalAiMatterWorkspace(reviewId)
+  if (!result.success && result.notFound) notFound()
   if (!result.success) {
     return (
       <LegalAiPage title="Review unavailable" description="The requested review evidence set is outside the current authorization scope or does not exist.">

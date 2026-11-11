@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { formatInstant, validTimeZone } from '@/features/platform/lib/datetime'
 import Link from 'next/link'
@@ -23,6 +24,7 @@ function BackLink({ href, children }: { href: string; children: ReactNode }) {
 export async function LegalAiMatterPage({ matterId, pages = {} }: { matterId: string; pages?: LegalAiEvidencePages }) {
   const result = await getLegalAiMatterWorkspace(matterId, pages)
 
+  if (!result.success && result.notFound) notFound()
   if (!result.success) {
     return (
       <LegalAiPage title="Matter evidence unavailable" description="The requested matter was not returned within the current authorization scope.">

@@ -1,8 +1,9 @@
+import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 
 import { PracticePage } from '@/features/platform/components/PracticeSurface'
-import { EmptyState, ErrorBanner, Meta, MetaGrid, Panel, StatusDot, statusLabel, statusTone } from '@/features/platform/components/ui'
+import { ErrorBanner, Meta, MetaGrid, Panel, StatusDot, statusLabel, statusTone } from '@/features/platform/components/ui'
 import { formatInstant } from '@/features/platform/lib/datetime'
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 
@@ -50,9 +51,7 @@ export async function ContactDetailPage({ params }: { params: Promise<{ contactI
   if (result.status === 'error') {
     return <PracticePage title="Contact" description="Contact" trail={trail('Contact')}><ErrorBanner title="Contact unavailable">{result.message}</ErrorBanner></PracticePage>
   }
-  if (result.status === 'missing') {
-    return <PracticePage title="Contact" description="Contact" trail={trail('Not found')}><EmptyState title="Contact not found" /></PracticePage>
-  }
+  if (result.status === 'missing') notFound()
 
   const { contact, addresses, methods, matters, intakes, portalAccounts } = result
   return (

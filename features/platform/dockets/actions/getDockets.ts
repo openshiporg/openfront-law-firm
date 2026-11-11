@@ -2,7 +2,7 @@ import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 
 import { DOCKET_STATUSES, type CourtRow, type DocketDetail, type DocketRow, type DocumentVersionOption } from '../lib/docketTypes'
 
-type Result<T> = { success: true; data: T } | { success: false; error: string }
+type Result<T> = { success: true; data: T } | { success: false; error: string; notFound?: boolean }
 
 const docketFields = 'id docketNumber title status filedAt court { id name } matter { id matterNumber title } entriesCount'
 
@@ -37,7 +37,7 @@ export async function getDocketRegister({ status, q }: { status: string; q: stri
 
 export async function getDocketDetail(docketId: string): Promise<Result<{ docket: DocketDetail; versions: DocumentVersionOption[] }>> {
   const id = docketId.trim()
-  if (!id || id.length > 200) return { success: false, error: 'Docket reference is invalid.' }
+  if (!id || id.length > 200) return { success: false, error: 'Docket reference is invalid.', notFound: true }
   const response = await keystoneClient<{ docket: DocketDetail | null }>(`
     query DocketDetail($id: ID!) {
       docket(where: { id: $id }) {
@@ -52,7 +52,7 @@ export async function getDocketDetail(docketId: string): Promise<Result<{ docket
   `, { id })
   if (!response.success) return { success: false, error: 'This docket is unavailable in your current access.' }
   const docket = response.data.docket
-  if (!docket) return { success: false, error: 'This docket is unavailable in your current access.' }
+  if (!docket) return { success: false, error: 'This docket is unavailable in your current access.', notFound: true }
   let versions: DocumentVersionOption[] = []
   if (docket.matter?.id) {
     const options = await keystoneClient<{ documentVersions: Array<{ id: string; fileName: string | null; versionNumber: number | null; document: { title: string | null } | null }> | null }>(`
