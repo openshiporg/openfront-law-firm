@@ -206,9 +206,9 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
     },
     {
       key: "payments", title: "Payments and refunds", description: "Receipts and provider state that still require capture, settlement, allocation, or review.",
-      model: "Payment", permissions: ["canReadPayments", "canManagePayments", "canReadBilling"], where: { status: { in: ["pending", "authorized", "captured"] } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      query: "id paymentNumber status createdAt amountMinor currencyCode payer { displayName }", kind: "Payment",
-      map: (record) => ({ id: record.id, title: record.paymentNumber, subtitle: `${ledgerMoney(record.amountMinor, record.currencyCode)} · ${record.payer?.displayName ?? "Payer unavailable"}`, status: record.status, at: iso(record.createdAt) }),
+      model: "Payment", permissions: ["canReadPayments", "canManagePayments", "canReadBilling"], where: { status: { in: ["pending", "authorized", "captured", "refunded"] } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      query: "id paymentNumber status createdAt amountMinor refundedMinor currencyCode payer { displayName }", kind: "Payment",
+      map: (record) => ({ id: record.id, title: record.paymentNumber, subtitle: `${ledgerMoney(record.amountMinor, record.currencyCode)}${record.refundedMinor > 0 && record.status !== "refunded" ? ` · ${ledgerMoney(record.refundedMinor, record.currencyCode)} refunded` : ""} · ${record.payer?.displayName ?? "Payer unavailable"}`, status: record.status, at: iso(record.createdAt) }),
     },
   ],
   accounting: [

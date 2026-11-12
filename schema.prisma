@@ -3422,6 +3422,7 @@ enum PaymentStatusType {
   authorized
   captured
   settled
+  refunded
   failed
   cancelled
 }

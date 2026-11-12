@@ -190,8 +190,9 @@ export const lifecycles = {
   payment: {
     pending: ["authorized", "failed", "cancelled"],
     authorized: ["captured", "failed", "cancelled"],
-    captured: ["settled", "failed"],
+    captured: ["settled", "refunded", "failed"],
     settled: [],
+    refunded: [],
     failed: [],
     cancelled: [],
   },
@@ -205,6 +206,7 @@ export const lifecycles = {
     cancelled: ["captured"],
     captured: ["settled"],
     settled: [],
+    refunded: [],
   },
   refund: {
     requested: ["approved", "cancelled"],

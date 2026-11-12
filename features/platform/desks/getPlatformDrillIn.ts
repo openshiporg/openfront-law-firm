@@ -74,6 +74,24 @@ const matterLink = (record: RecordValue) => record.matter?.id
 const count = (value: unknown) => (typeof value === 'number' ? value : 0)
 const bytes = (value: unknown) => (typeof value === 'number' ? `${value.toLocaleString('en')} bytes` : 'size not recorded')
 
+type FeePayment = { paymentNumber?: string | null; status?: string | null; amountMinor?: number | null; refundedMinor?: number | null; currencyCode?: string | null; refunds?: Array<{ refundNumber?: string | null; status?: string | null }> }
+
+/** Paid, refunded or due, as staff need it on the consultation: the fee payment is keyed `consultation:<id>`. */
+function consultationFeeState(payment: FeePayment | null | undefined) {
+  if (payment === undefined) return 'Payment state unavailable'
+  if (!payment) return 'No card payment recorded'
+  const number = payment.paymentNumber ? ` · ${payment.paymentNumber}` : ''
+  const refund = payment.refunds?.find((row) => row.status === 'succeeded')
+  const refundNumber = refund?.refundNumber ? ` · ${refund.refundNumber}` : ''
+  const refunded = Number(payment.refundedMinor ?? 0)
+  if (payment.status === 'refunded' || (refunded > 0 && refunded >= Number(payment.amountMinor ?? 0))) return `Refunded ${money(refunded, payment.currencyCode)}${number}${refundNumber}`
+  if (payment.status === 'captured' || payment.status === 'settled') {
+    return refunded > 0 ? `Paid ${money(payment.amountMinor, payment.currencyCode)}, ${money(refunded, payment.currencyCode)} refunded${number}` : `Paid by card ${money(payment.amountMinor, payment.currencyCode)}${number}`
+  }
+  if (payment.status === 'pending' || payment.status === 'authorized') return `Awaiting card payment${number}`
+  return `Not paid (${label(payment.status)})${number}`
+}
+
 const drillIns: Record<string, DrillInDefinition> = {
   task: {
     root: 'legalTask', kind: 'Task', notice: 'Task transitions remain controlled and completion is checked against unfinished dependencies.',
@@ -99,10 +117,14 @@ const drillIns: Record<string, DrillInDefinition> = {
   },
   consultation: {
     root: 'consultation', kind: 'Consultation', notice: 'Consultation times are shown in the consultation’s own time zone. Calendar delivery and reminders require a configured integration.',
-    query: 'consultation(where: { id: $id }) { id status startsAt endsAt timezone location intake { id intakeNumber title } host { name } }',
+    query: 'consultation(where: { id: $id }) { id status startsAt endsAt timezone location feeMinor currencyCode intake { id intakeNumber title } host { name } }',
     title: (r) => label(r.intake?.title, 'Prospective-client consultation'),
     zone: (r) => r.timezone,
-    facts: (r, f) => [['Intake', label(r.intake?.intakeNumber)], ['Host', label(r.host?.name, 'Unassigned')], ['Starts', f.date(r.startsAt)], ['Ends', f.date(r.endsAt)], ['Time zone', label(r.timezone)], ['Location', label(r.location)]],
+    facts: (r, f) => [
+      ['Intake', label(r.intake?.intakeNumber)], ['Host', label(r.host?.name, 'Unassigned')], ['Starts', f.date(r.startsAt)], ['Ends', f.date(r.endsAt)], ['Time zone', label(r.timezone)], ['Location', label(r.location)],
+      ['Consultation fee', Number(r.feeMinor) > 0 ? money(r.feeMinor, r.currencyCode) : 'No fee'],
+      ...(Number(r.feeMinor) > 0 && r.feePayment !== 'hidden' ? [['Fee payment', consultationFeeState(r.feePayment as FeePayment | null | undefined)] as [string, string]] : []),
+    ],
     related: (r) => [r.intake?.id ? { label: 'Open intake pipeline', href: `/dashboard/platform/intake#pipeline-${encodeURIComponent(String(r.intake.id))}` } : null],
   },
   document: {
@@ -194,6 +216,13 @@ export async function getPlatformDrillIn(kind: string, id: string): Promise<Resu
   if (!response.success) return { success: false, error: response.error }
   const record = response.data[definition.root]
   if (!record) return { success: false, error: 'This record is unavailable in the current authorization scope.', notFound: true }
+  if (kind === 'consultation' && Number(record.feeMinor) > 0) {
+    // Read with the viewer's own payment access; a role without it sees the fee but not the payment.
+    const fee = await keystoneClient<{ authenticatedItem: { role?: { permissions?: string[] | null } | null } | null; payments: FeePayment[] }>(`query ConsultationFee($key: String!) { authenticatedItem { ... on User { role { permissions } } } payments(where: { idempotencyKey: { equals: $key } }, take: 1) { paymentNumber status amountMinor refundedMinor currencyCode refunds(orderBy: [{ createdAt: desc }], take: 5) { refundNumber status } } }`, { key: `consultation:${recordId}` })
+    const granted = fee.success ? fee.data.authenticatedItem?.role?.permissions ?? [] : []
+    const canSeePayments = ['canReadPayments', 'canManagePayments', 'canReadBilling', 'canReadTrust'].some((key) => granted.includes(key))
+    record.feePayment = !fee.success ? 'hidden' : canSeePayments ? fee.data.payments?.[0] ?? null : 'hidden'
+  }
   // Record zone first (deadline/consultation), then the matter's office, then the firm.
   const zone = validTimeZone(definition.zone?.(record)) ?? validTimeZone(record.matter?.office?.timezone) ?? firmZone
   const format: Format = { date: (value) => formatInstant(value, zone) }

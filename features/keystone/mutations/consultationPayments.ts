@@ -4,7 +4,7 @@ import { isHumanIdentitySession } from "../access";
 import { prismaWithoutGraphQLErrorConversion, runSerializableTransaction } from "../lib/transactions";
 import { createPayment, getPaymentStatus, refundPayment } from "../utils/paymentProviderAdapter";
 import { reconcilePaymentByProviderId } from "./portalPayments";
-import { recordAuditEvent } from "./workflow-helpers";
+import { applyPaymentRefund, recordAuditEvent } from "./workflow-helpers";
 
 /**
  * Paid consultations (Clio Grow / Calendly-style): a practice area with a consultation
@@ -22,6 +22,7 @@ export type ConsultationPaymentState = "none" | "due" | "paid" | "refunded" | "e
 /** Pure: the client-facing payment state of one consultation. */
 export function consultationPaymentState(row: { feeMinor: number; status: string }, payment: { status: string; amountMinor: number; refundedMinor?: number | null } | null): ConsultationPaymentState {
   if (row.feeMinor <= 0) return "none";
+  if (payment?.status === "refunded") return "refunded";
   if (payment && ["captured", "settled"].includes(payment.status)) {
     return (payment.refundedMinor ?? 0) >= payment.amountMinor ? "refunded" : "paid";
   }
@@ -39,7 +40,7 @@ export async function releaseUnpaidConsultations(tx: any, firmId: string) {
   const stale = await tx.consultation.findMany({ where: { firmId, status: "requested", feeMinor: { gt: 0 }, createdAt: { lt: cutoff } }, select: { id: true, intakeId: true, feeMinor: true, status: true, createdAt: true }, take: 50 });
   for (const row of stale) {
     const payment = await tx.payment.findFirst({ where: { firmId, idempotencyKey: consultationPaymentKey(row.id) }, select: { status: true } });
-    if (!unpaidRequestExpired(row, Boolean(payment && ["captured", "settled"].includes(payment.status)))) continue;
+    if (!unpaidRequestExpired(row, Boolean(payment && ["captured", "settled", "refunded"].includes(payment.status)))) continue;
     await tx.consultation.update({ where: { id: row.id }, data: { status: "cancelled", cancellationReason: "Consultation fee was not paid; the time was released." } });
     if (payment) await tx.payment.updateMany({ where: { firmId, idempotencyKey: consultationPaymentKey(row.id), status: "pending" }, data: { status: "cancelled", failedAt: new Date(), failureReason: "Checkout window ended" } });
     await recordAuditEvent(tx, { firmId, eventType: "consultation.payment_expired", category: "financial", intakeId: row.intakeId, metadata: { consultationId: row.id } });
@@ -75,7 +76,7 @@ export async function startConsultationPayment(_root: unknown, args: { consultat
   if (!provider) throw new Error("Online payment is not configured for this firm.");
   const key = consultationPaymentKey(consultation.id);
   let payment = await prisma.payment.findFirst({ where: { firmId: consultation.firmId, idempotencyKey: key } });
-  if (payment && ["captured", "settled"].includes(payment.status)) return { url: null, paymentId: payment.id, status: "paid" };
+  if (payment && ["captured", "settled", "refunded"].includes(payment.status)) return { url: null, paymentId: payment.id, status: consultationPaymentState(consultation, payment) };
   if (!payment) {
     payment = await prisma.payment.create({ data: {
       firmId: consultation.firmId, payerId: payer.id, paymentNumber: `PAY-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`,
@@ -113,7 +114,7 @@ export async function reconcileConsultationPayment(_root: unknown, args: { consu
   const consultation = await ownedConsultation(prisma, context, args.consultationId);
   const payment = await consultationPaymentFor(prisma, consultation);
   if (!payment?.providerPaymentId) return { status: consultationPaymentState(consultation, payment) };
-  if (!["captured", "settled"].includes(payment.status)) {
+  if (!["captured", "settled", "refunded"].includes(payment.status)) {
     const result = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, payment.payerId);
     if (result.status === "captured" && !(result as any).replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
   }
@@ -146,7 +147,7 @@ export async function refundConsultationFee(prisma: any, input: { firmId: string
       idempotencyKey: key, status: "succeeded", reason: "client_request", amountMinor, currencyCode: payment.currencyCode,
       explanation: input.explanation.slice(0, 4000), requestedById: requester, requestedAt: now, processedAt: now, providerRefundId,
     } });
-    await tx.payment.update({ where: { id: payment.id }, data: { refundedMinor: { increment: amountMinor } } });
+    await applyPaymentRefund(tx, payment.id, amountMinor);
     await recordAuditEvent(tx, { firmId: input.firmId, eventType: "refund.succeeded", category: "financial", actorUserId: input.actorUserId, paymentId: payment.id, metadata: { refundId: refund.id, providerRefundId, amountMinor, source: "consultation_cancelled", consultationId: input.consultationId } });
     return refund;
   });

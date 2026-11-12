@@ -9,7 +9,8 @@ type SidebarUser = { role?: { canAccessDashboard?: boolean | null; permissions?:
 
 /**
  * Platform destination -> permissions, any one of which opens it. A destination not
- * listed stays visible. Display only: every page and command enforces its own access.
+ * listed stays visible. The sidebar hides the rest, and the proxy answers 404 for them
+ * by direct URL (canOpenPlatformPath); every command still enforces its own access.
  */
 export const platformDestinationPermissions: Record<string, readonly string[]> = {
   intake: ['canReadIntake', 'canManageIntake', 'canRunConflictChecks'],
@@ -42,6 +43,13 @@ function roleAllows(slug: string, user: SidebarUser) {
   const required = platformDestinationPermissions[slug]
   if (!Array.isArray(granted) || !required) return true
   return required.some((permission) => granted.includes(permission))
+}
+
+/** The same check as the sidebar for a /dashboard/platform/<slug>/... URL: false means 404. */
+export function canOpenPlatformPath(pathname: string, user: SidebarUser) {
+  const match = /^\/dashboard\/platform\/([^/?#]+)/.exec(pathname)
+  if (!match) return true
+  return roleAllows(match[1], user)
 }
 
 /** Only an explicit false hides navigation; an unknown user is left to the middleware. */

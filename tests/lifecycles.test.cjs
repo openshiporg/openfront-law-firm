@@ -75,3 +75,9 @@ test("graphql redaction keeps guard reasons and hides everything else", () => {
   assert.equal(out[3].message, "A consultation must end after it starts.");
   for (const i of [4, 5, 6]) assert.match(out[i].message, /could not be completed/);
 });
+
+test("a captured payment refunded in full can only end as refunded", () => {
+  assert.ok(lifecycles.payment.captured.includes("refunded"));
+  assert.deepEqual(lifecycles.payment.refunded, []);
+  assert.deepEqual(lifecycles.providerPayment.refunded, []);
+});

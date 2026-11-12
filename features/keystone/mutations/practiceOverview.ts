@@ -104,8 +104,11 @@ export function compareQueueItems(left: Pick<PracticeOverviewQueueItem, "at" | "
 }
 
 async function workOverview(context: any) {
-  const canReadCalendar = permissions.canReadCalendar({ session: context.session });
-  const canReadTasks = permissions.canReadTasks({ session: context.session });
+  // Deadlines and tasks always belong to a matter: a role that cannot read matters cannot open
+  // them, so Today does not list them for it (they read "Matter unavailable" with a dead action).
+  const canReadMatters = permissions.canReadMatters({ session: context.session });
+  const canReadCalendar = canReadMatters && permissions.canReadCalendar({ session: context.session });
+  const canReadTasks = canReadMatters && permissions.canReadTasks({ session: context.session });
   const [deadlineCount, deadlines, taskCount, tasks] = await Promise.all([
     canReadCalendar
       ? context.query.Deadline.count({ where: { status: { in: ["draft", "pending"] } } })

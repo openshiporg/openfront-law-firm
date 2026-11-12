@@ -7,7 +7,7 @@ import { sha256Digest } from '../lib/digests'
 import { recordAuditEvent } from './workflow-helpers'
 import { consultationPaymentKey, consultationPaymentState, releaseUnpaidConsultations } from './consultationPayments'
 import { assertCurrentCommandActor } from './command-authority'
-import { adversePartyContact, normalizeConflictTerm, parseAdversePartyNames } from './intakeWorkflows'
+import { adversePartyContact, normalizeConflictTerm, parseAdversePartyNames, splitPersonName } from './intakeWorkflows'
 import { loadActiveHumanSession } from '../lib/machine-auth'
 import {
   FIRST_CONTACT_ACKNOWLEDGMENT,
@@ -368,7 +368,7 @@ export async function bookClientConsultation(
     if (!insideHours) throw new Error('Select an available time.')
     if (!receiver) throw new Error('This time is no longer available. Choose another time.')
     const suffix = randomUUID().slice(0, 8).toUpperCase()
-    const contact = await tx.contact.create({ data: { firmId: firm.id, firstName: user.name, lastName: '', contactType: 'person', status: 'prospective_client', primaryEmail: user.email, conflictSearchAliases: [] } })
+    const contact = await tx.contact.create({ data: { firmId: firm.id, ...splitPersonName(user.name), contactType: 'person', status: 'prospective_client', primaryEmail: user.email, conflictSearchAliases: [] } })
     const intake = await tx.intake.create({ data: { firmId: firm.id, intakeNumber: `INT-${suffix}`, title: `${service.name} consultation`, status: 'new', source: 'website', primaryContactId: contact.id, openedById: receiver.userId, assignedToId: receiver.userId, officeId: receiver.officeId, summary, adversePartySummary: firstContact.opposingParties } })
     await tx.intakeParticipant.create({ data: { firmId: firm.id, intakeId: intake.id, contactId: contact.id, participantRole: 'prospective_client', status: 'active' } })
     const acceptedAt = new Date()

@@ -33,6 +33,7 @@ test('payment state: free, due, paid, refunded, expired', () => {
   assert.equal(payments.consultationPaymentState({ feeMinor: 15000, status: 'requested' }, { status: 'pending', amountMinor: 15000 }), 'due');
   assert.equal(payments.consultationPaymentState({ feeMinor: 15000, status: 'requested' }, { status: 'captured', amountMinor: 15000, refundedMinor: 0 }), 'paid');
   assert.equal(payments.consultationPaymentState({ feeMinor: 15000, status: 'cancelled' }, { status: 'captured', amountMinor: 15000, refundedMinor: 15000 }), 'refunded');
+  assert.equal(payments.consultationPaymentState({ feeMinor: 15000, status: 'cancelled' }, { status: 'refunded', amountMinor: 15000, refundedMinor: 15000 }), 'refunded');
   assert.equal(payments.consultationPaymentState({ feeMinor: 15000, status: 'cancelled' }, null), 'expired');
 });
 

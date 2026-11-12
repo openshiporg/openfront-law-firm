@@ -82,6 +82,7 @@ export const Payment = list({
         { label: "Authorized", value: "authorized" },
         { label: "Captured", value: "captured" },
         { label: "Settled", value: "settled" },
+        { label: "Refunded", value: "refunded" },
         { label: "Failed", value: "failed" },
         { label: "Cancelled", value: "cancelled" },
       ],

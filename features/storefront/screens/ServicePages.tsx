@@ -258,6 +258,8 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
   if (lookup?.status === 'unavailable') return <ServiceUnavailable title="Choose an appointment" retryHref={`/consultation?service=${encodeURIComponent(selected ?? '')}`} />
   const service = lookup?.status === 'ok' ? lookup.data : null
   const notice = settings.isLocalFictional ? FIXTURE_FIRST_CONTACT_NOTICE : settings.publication.firstContactNotice
+  // While booking is open, a named service that does not exist (or is not public) is a missing record.
+  if (selected && !service && settings.bookingEnabled && notice) notFound()
   if (!service || !settings.bookingEnabled || !notice) {
     const open = Boolean(settings.bookingEnabled && notice)
     // Without a chosen service, the published practice areas are offered directly.
@@ -265,7 +267,7 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
     const choices = catalog?.status === 'ok' ? catalog.data.services : []
     return <PublicPage><div className="sf-shell sf-page"><div className="sf-narrow grid gap-6">
       <h1 className="sf-title">{open ? 'Choose an appointment' : 'Online booking is not available'}</h1>
-      <p role="status" className="sf-notice sf-notice--plain">{open ? (selected ? 'This appointment is not available. Choose a practice area.' : 'Choose a practice area to see open times.') : 'This firm is not taking consultation requests online. Contact the firm directly.'}</p>
+      <p role="status" className="sf-notice sf-notice--plain">{open ? 'Choose a practice area to see open times.' : 'This firm is not taking consultation requests online. Contact the firm directly.'}</p>
       {choices.length ? <div className="sf-track sf-slots__track">{choices.map((choice) => <Link key={choice.id} className="sf-pill sf-pill--raised" href={`/consultation?service=${encodeURIComponent(choice.id)}`}>{choice.name}</Link>)}</div> : null}
       <div className="sf-track">{open && !choices.length ? <Link className="sf-pill sf-pill--raised" href="/practice-areas">Practice areas</Link> : null}<Link className={open ? 'sf-pill' : 'sf-pill sf-pill--raised'} href="/contact">Contact the firm</Link></div>
     </div></div></PublicPage>

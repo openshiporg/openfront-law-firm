@@ -35,6 +35,13 @@ export function parseAdversePartyNames(summary: string | null, exclude: string[]
   return names
 }
 
+/** A person's full name as first and last name: the last word is the surname. */
+export function splitPersonName(name: string) {
+  const parts = name.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
+  const lastName = parts.length > 1 ? parts.pop() as string : ''
+  return { firstName: parts.join(' '), lastName }
+}
+
 export function adversePartyContact(name: string) {
   if (organizationSuffix.test(name)) return { contactType: 'organization' as const, firstName: '', lastName: '', organizationName: name }
   const parts = name.split(' ')

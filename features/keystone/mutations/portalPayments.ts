@@ -74,7 +74,7 @@ export async function reconcilePaymentByProviderId(prisma: any, paymentId: strin
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`portal-payment:${payment.firmId}:${payment.id}`}))`;
     const current = await tx.payment.findFirst({ where: { id: payment.id, firmId: payment.firmId, ...(payerId ? { payerId } : {}) } });
     if (!current) throw new Error("Payment is no longer available.");
-    if (["captured", "settled"].includes(current.status)) return { status: current.status, paymentId: current.id, replayed: true };
+    if (["captured", "settled", "refunded"].includes(current.status)) return { status: current.status, paymentId: current.id, replayed: true };
     // The provider confirmed the charge above, so money exists whatever we recorded before: a
     // cancelled/failed row (checkout window ended) is still captured, never left charged-but-unrecorded.
     assertLifecycleTransition("providerPayment", current.status, "captured");

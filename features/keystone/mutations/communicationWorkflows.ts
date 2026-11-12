@@ -3,9 +3,7 @@ import type { Context } from ".keystone/types";
 import { sha256Digest } from "../lib/digests";
 import { runSerializableTransaction } from "../lib/transactions";
 import { boundPortalShare, portalShareCandidateWhere, portalShareHeaderSelect, portalShareIsCurrent } from "../lib/portal-share-binding";
-import { assertCurrentCommandActor, type AuthorityContext } from "./command-authority";
-import { loadActiveHumanSession } from "../lib/machine-auth";
-import type { Session } from "../access";
+import { assertCurrentCommandActor } from "./command-authority";
 import {
   assertMatterAccess,
   boundedReason,
@@ -14,7 +12,6 @@ import {
   workflowActor,
 } from "./workflow-helpers";
 
-const MAX_RECIPIENTS = 50;
 const participantRoles = new Set(["staff", "client", "external_counsel", "third_party"]);
 const singleEmailAddress = /^[^\s@<>,;()"]+@[^\s@<>,;()"]+\.[^\s@<>,;()"]+$/;
 

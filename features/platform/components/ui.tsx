@@ -53,7 +53,7 @@ const markTones: Record<Tone, string> = {
 const RISK = ['overdue', 'missed', 'failed', 'blocked', 'conflict_found', 'suspended', 'rejected', 'declined', 'cancelled', 'canceled', 'void', 'voided', 'bounced', 'expired', 'revoked', 'disputed', 'no_show', 'error', 'dead_letter']
 const PENDING = ['pending', 'draft', 'requested', 'submitted', 'in_review', 'review', 'awaiting', 'queued', 'screening', 'needs_review', 'partially_paid', 'partial', 'held', 'on_hold', 'hold', 'unverified', 'proposed', 'invited', 'onboarding', 'preparing', 'sent', 'scheduled', 'retrying']
 const DONE = ['open', 'active', 'approved', 'issued', 'delivered', 'completed', 'cleared', 'paid', 'verified', 'posted', 'reconciled', 'published', 'accepted', 'connected', 'enabled', 'signed', 'converted', 'billed', 'closed_won']
-const QUIET = ['closed', 'archived', 'released', 'disposed', 'inactive', 'disabled', 'superseded', 'withdrawn']
+const QUIET = ['refunded', 'closed', 'archived', 'released', 'disposed', 'inactive', 'disabled', 'superseded', 'withdrawn']
 
 /** One mapping from a practice status to a tone, used in every status column. */
 export function statusTone(status: string | null | undefined): Tone {

@@ -13,6 +13,7 @@ import {
   assertMatterTeamCapability,
   boundedReason,
   optionalBoundedText,
+  applyPaymentRefund,
   recordAuditEvent,
   requirePermission,
 } from "./workflow-helpers";
@@ -767,10 +768,7 @@ export async function recordRefundProviderOutcome(
       },
     });
     if (args.toStatus === "succeeded") {
-      await tx.payment.update({
-        where: { id: refund.paymentId },
-        data: { refundedMinor: { increment: refund.amountMinor } },
-      });
+      await applyPaymentRefund(tx, refund.paymentId, refund.amountMinor);
     }
     await tx.auditEvent.create({
       data: {
@@ -985,7 +983,7 @@ export async function refundCardPayment(
         approvedById: userId, approvedAt: now, processedAt: now, providerRefundId,
       },
     });
-    await tx.payment.update({ where: { id: payment.id }, data: { refundedMinor: { increment: amountMinor } } });
+    await applyPaymentRefund(tx, payment.id, amountMinor);
     await recordAuditEvent(tx, {
       firmId, eventType: "refund.succeeded", category: "financial", actorUserId: userId, matterId,
       invoiceId: payment.invoiceId, paymentId: payment.id,

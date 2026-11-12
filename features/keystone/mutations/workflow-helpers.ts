@@ -99,6 +99,18 @@ export async function assertMatterTeamCapability(
   }
 }
 
+/**
+ * Adds a succeeded refund to its payment. A captured payment refunded in full moves to
+ * `refunded`, so every list reads the refund instead of "Captured". Settled stays final.
+ */
+export async function applyPaymentRefund(tx: any, paymentId: string, amountMinor: number) {
+  const updated = await tx.payment.update({ where: { id: paymentId }, data: { refundedMinor: { increment: amountMinor } } });
+  if (updated.refundedMinor >= updated.amountMinor && updated.status === "captured") {
+    return tx.payment.update({ where: { id: paymentId }, data: { status: "refunded" } });
+  }
+  return updated;
+}
+
 export async function recordAuditEvent(tx: any, data: {
   firmId: string;
   eventType: string;

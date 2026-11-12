@@ -158,6 +158,25 @@ export async function transitionConsultation(
   return result;
 }
 
+/** A client who cancels their only open consultation has withdrawn the inquiry: the intake
+ * closes as withdrawn and its open conflict checks are cancelled, so neither stays in a queue. */
+export async function withdrawIntakeAfterClientCancel(tx: any, input: { firmId: string; intakeId: string; consultationId: string; actorUserId: string }) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`intake:${input.firmId}:${input.intakeId}`}))`;
+  const otherOpen = await tx.consultation.count({ where: { firmId: input.firmId, intakeId: input.intakeId, id: { not: input.consultationId }, status: { in: reservedStatuses } } });
+  if (otherOpen) return;
+  const intake = await tx.intake.findFirst({ where: { id: input.intakeId, firmId: input.firmId }, select: { id: true, status: true } });
+  const now = new Date();
+  if (intake && ["new", "screening", "conflict_review", "consultation", "decision"].includes(intake.status)) {
+    assertLifecycleTransition("intake", intake.status, "withdrawn");
+    await tx.intake.update({ where: { id: intake.id }, data: { status: "withdrawn", declineReason: "Client cancelled the consultation.", decidedAt: now } });
+    await recordAuditEvent(tx, { firmId: input.firmId, eventType: "intake.withdrawn", category: "legal_workflow", actorUserId: input.actorUserId, actorType: "customer", intakeId: intake.id, metadata: { fromStatus: intake.status, toStatus: "withdrawn", cause: "consultation_cancelled_by_client", consultationId: input.consultationId } });
+  }
+  await tx.conflictCheck.updateMany({
+    where: { firmId: input.firmId, intakeId: input.intakeId, status: { in: ["requested", "running", "review_required"] } },
+    data: { status: "cancelled", completedAt: now, summary: "Cancelled: the client cancelled the consultation." },
+  });
+}
+
 /** The customer who booked a consultation may cancel it while it is still upcoming.
  * Ownership is the account on the consultation itself, re-read in this transaction. */
 export async function cancelOwnConsultation(
@@ -194,6 +213,7 @@ export async function cancelOwnConsultation(
       intakeId: consultation.intakeId,
       metadata: { consultationId: consultation.id, fromStatus: consultation.status },
     });
+    await withdrawIntakeAfterClientCancel(tx, { firmId: consultation.firmId, intakeId: consultation.intakeId, consultationId: consultation.id, actorUserId: session.itemId });
     return { ...projection(updated), firmId: consultation.firmId };
   });
   // Cancelling before the start refunds any paid consultation fee in full.

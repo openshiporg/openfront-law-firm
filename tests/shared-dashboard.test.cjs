@@ -193,6 +193,19 @@ test('sidebar follows the role: an attorney sees practice desks, not firm admini
   assert.equal(access.visiblePlatformItems(items, [], { role: { canAccessDashboard: true } }).length, items.length);
 });
 
+test('a platform page hidden from the sidebar cannot be opened by direct URL', () => {
+  const access = sandbox().load('features/dashboard/lib/sidebarAccess.ts');
+  const intake = { role: { canAccessDashboard: true, permissions: ['canAccessDashboard', 'canReadIntake', 'canReadCalendar'] } };
+  assert.equal(access.canOpenPlatformPath('/dashboard/platform/intake', intake), true);
+  assert.equal(access.canOpenPlatformPath('/dashboard/platform/work/consultation/abc', intake), true);
+  for (const slug of ['team', 'billing', 'firm', 'ai/providers', 'payment-providers', 'matters/abc'])
+    assert.equal(access.canOpenPlatformPath(`/dashboard/platform/${slug}`, intake), false, slug);
+  // Pages with no permission entry, other dashboard routes and older session shapes stay open.
+  assert.equal(access.canOpenPlatformPath('/dashboard/platform/today', intake), true);
+  assert.equal(access.canOpenPlatformPath('/dashboard/contacts', intake), true);
+  assert.equal(access.canOpenPlatformPath('/dashboard/platform/team', { role: { canAccessDashboard: true } }), true);
+});
+
 test('formatInZone: viewer zone by default, explicit zone when given, labelled', () => {
   const t = sandbox().load('features/dashboard/lib/storeTime.ts');
   const d = new Date('2026-11-02T18:00:00Z');

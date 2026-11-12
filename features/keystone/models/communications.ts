@@ -1,6 +1,5 @@
 import { list } from "@keystone-6/core";
 import {
-  integer,
   json,
   relationship,
   select,
