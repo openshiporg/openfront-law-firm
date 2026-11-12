@@ -83,6 +83,10 @@ const transitions: Record<string, Record<string, Action>> = {
     failed: { operation: 'retryWebhook', label: 'Retry delivery' },
     dead_letter: { operation: 'retryWebhook', label: 'Retry delivery' },
   },
+  'Webhook subscription': {
+    active: { operation: 'revokeWebhook', label: 'Revoke subscription' },
+    paused: { operation: 'revokeWebhook', label: 'Revoke subscription' },
+  },
   Connection: {
     pending: { operation: 'activateIntegration', label: 'Activate connection' },
     needs_reauth: { operation: 'activateIntegration', label: 'Mark reauthorized' },

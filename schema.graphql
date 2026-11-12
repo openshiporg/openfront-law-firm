@@ -9064,6 +9064,7 @@ type Mutation {
   transitionIntegrationConnection(connectionId: ID!, toStatus: String!, reason: String!): IntegrationTransitionResult!
   enqueueWebhookDelivery(connectionId: ID!, subscriptionId: ID!, eventId: String!, eventType: String!, matterId: ID, payload: JSON): ControlledRecordProjection!
   retryWebhookDelivery(deliveryId: ID!): ControlledRecordProjection!
+  revokeWebhookSubscription(subscriptionId: ID!, reason: String!): ControlledRecordProjection!
   transitionDocument(documentId: ID!, toStatus: DocumentCommandTarget!, reason: String!): DocumentTransitionResult!
   addDocumentSigner(requestId: ID!, contactId: ID, portalAccountId: ID, name: String!, email: String!, signingOrder: Int, providerSignerId: String): SignatureSignerSetupResult!
   transitionDocumentSigner(signerId: ID!, toStatus: String!, providerEventId: String!, evidenceDigest: String!): SignatureTransitionResult!

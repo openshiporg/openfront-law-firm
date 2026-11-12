@@ -323,6 +323,12 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       map: (record) => ({ id: record.id, title: record.name, subtitle: `${record.provider} · ${record.category} · ${record.office?.name ?? "all offices"}`, status: record.status, at: iso(record.lastErrorAt ?? record.lastSyncedAt ?? record.updatedAt) }),
     },
     {
+      key: "subscriptions", title: "Webhook subscriptions", description: "Endpoints that receive webhooks. Staff can revoke a subscription to stop all sends to it.",
+      model: "WebhookSubscription", permissions: ["canReadIntegrations", "canManageIntegrations"], where: { status: { in: ["active", "paused"] } }, orderBy: { updatedAt: "desc" },
+      query: "id name status endpointUrl lastDeliveredAt updatedAt connection { name }", kind: "Webhook subscription",
+      map: (record) => ({ id: record.id, title: record.name, subtitle: `${record.connection?.name ?? "Connection"} · ${record.endpointUrl}`, status: record.status, at: iso(record.lastDeliveredAt ?? record.updatedAt) }),
+    },
+    {
       key: "webhooks", title: "Webhook deliveries", description: "Webhooks go out on the request that causes them. A failed or interrupted delivery can be retried by staff.",
       model: "WebhookDelivery", permissions: ["canReadIntegrations", "canManageIntegrations"], where: { status: { in: ["pending", "processing", "failed", "dead_letter"] } }, orderBy: { updatedAt: "desc" },
       query: "id eventId eventType status lastError attemptCount nextAttemptAt updatedAt subscription { name } matter { matterNumber }", kind: "Webhook delivery",
@@ -348,7 +354,7 @@ export const workspaceListQueries: Record<string, string> = {
   TrustReconciliation: "trustReconciliations", PortalAccount: "portalAccounts", PortalMatterAccess: "portalMatterAccesses",
   PortalShare: "portalShares", RetentionHold: "retentionHolds", RetentionAction: "retentionActions",
   IntegrationConnection: "integrationConnections", ExternalRecordLink: "externalRecordLinks", AuditEvent: "auditEvents",
-  WebhookDelivery: "webhookDeliveries", ApiKey: "apiKeys",
+  WebhookDelivery: "webhookDeliveries", WebhookSubscription: "webhookSubscriptions", ApiKey: "apiKeys",
 };
 
 // Full-register controls. Search paths only name text the register already projects, so a
@@ -433,6 +439,7 @@ const actionPermissions: Partial<Record<string, PermissionKey>> = {
   "Legal hold": "canManageRetention",
   Connection: "canManageIntegrations",
   "Webhook delivery": "canManageIntegrations",
+  "Webhook subscription": "canManageIntegrations",
   "Trust account": "canManageTrust",
   "Client ledger": "canManageTrust",
   Reconciliation: "canManageTrust",

@@ -206,6 +206,37 @@ export async function enqueueWebhookDelivery(
   return { id: created.id, status: sent?.status ?? created.status };
 }
 
+/** Staff revoke of a webhook subscription: terminal, stops sends and drops the signing secret. */
+export async function revokeWebhookSubscription(
+  _root: unknown,
+  args: { subscriptionId: string; reason: string },
+  context: Context,
+) {
+  const { firmId, userId } = requirePermission(context, "canManageIntegrations", { humanOnly: true });
+  const reason = boundedReason(args.reason, "Webhook revoke reason", 5, 2000);
+  const prisma = context.prisma as any;
+  return runSerializableTransaction(prisma, async (tx: any) => {
+    await assertCurrentCommandActor(tx, context, "canManageIntegrations");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`webhook-subscription:${firmId}:${args.subscriptionId}`}))`;
+    const subscription = await tx.webhookSubscription.findFirst({ where: { id: args.subscriptionId, firmId }, select: { id: true, status: true } });
+    if (!subscription) throw new Error("Webhook subscription was not found in the active firm.");
+    if (subscription.status === "revoked") return { id: subscription.id, status: "revoked" };
+    const updated = await tx.webhookSubscription.update({
+      where: { id: subscription.id },
+      data: { status: "revoked", signingSecretEncrypted: "", signingSecretDigest: "" },
+      select: { id: true, status: true },
+    });
+    await recordAuditEvent(tx, {
+      firmId,
+      eventType: "integration.webhook_subscription_revoked",
+      category: "integration",
+      actorUserId: userId,
+      metadata: { subscriptionId: subscription.id, fromStatus: subscription.status, reasonDigest: sha256Digest(reason) },
+    });
+    return updated;
+  });
+}
+
 /** Staff Retry for a failed, dead-lettered or interrupted webhook delivery: one more send now. */
 export async function retryWebhookDelivery(
   _root: unknown,

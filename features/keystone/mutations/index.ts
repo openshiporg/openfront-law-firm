@@ -90,6 +90,7 @@ import {
   addDocumentSigner,
   enqueueWebhookDelivery,
   retryWebhookDelivery,
+  revokeWebhookSubscription,
   rotateIntegrationCredential,
   rotateWebhookSigningSecret,
   transitionDocument,
@@ -1156,6 +1157,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           payload: JSON
         ): ControlledRecordProjection!
         retryWebhookDelivery(deliveryId: ID!): ControlledRecordProjection!
+        revokeWebhookSubscription(subscriptionId: ID!, reason: String!): ControlledRecordProjection!
         transitionDocument(
           documentId: ID!
           toStatus: DocumentCommandTarget!
@@ -1465,6 +1467,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         transitionIntegrationConnection,
         enqueueWebhookDelivery,
         retryWebhookDelivery,
+        revokeWebhookSubscription,
         transitionDocument,
         addDocumentSigner,
         transitionDocumentSigner,
