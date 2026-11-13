@@ -68,7 +68,7 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
         </div>
         <div className="sf-foot__base">
           <p>This site is general information, not legal advice. Contacting us doesn’t make us your lawyers.</p>
-          <p>{firmName}{settings.isLocalFictional ? ' · Fictional local workspace' : ''}</p>
+          <p>{firmName}</p>
         </div>
       </div>
     </footer>

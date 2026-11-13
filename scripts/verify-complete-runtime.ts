@@ -75,7 +75,6 @@ import {
 } from "../features/keystone/mutations/agentActions";
 import { assertMatterAccess } from "../features/keystone/mutations/workflow-helpers";
 import { assertMaintainedMigrationTarget } from "./deploy-maintained-migrations";
-import { requireOwnedOfflineDatabase } from "../features/keystone/lib/local-fixture";
 
 const prisma = prismaWithoutGraphQLErrorConversion(keystoneContext.prisma) as any;
 const runKey = randomUUID().replaceAll("-", "").slice(0, 12);
@@ -179,10 +178,6 @@ async function ensureReviewer(firmId: string) {
 }
 
 async function assertRuntimeProofTarget() {
-  if (process.env.RUN_OWNED_DATABASE_TESTS === "1") {
-    await requireOwnedOfflineDatabase(prisma);
-    return;
-  }
   if (process.env.ALLOW_RUNTIME_PROOF === "runtime_law_firm") {
     assertMaintainedMigrationTarget({
       databaseUrl: process.env.DATABASE_URL,

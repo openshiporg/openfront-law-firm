@@ -3,19 +3,16 @@
  * authoritative booking command (client-safe; no server imports).
  *
  * Live firms show their own published first-contact notice (PublicSitePolicy),
- * versioned per publication. The offline fixture uses the fixed notice below.
+ * versioned per publication.
  * The acknowledgment sentence is the existing repository copy; final wording
  * for a real firm is the firm's own (published) notice.
  */
-export const FIXTURE_FIRST_CONTACT_NOTICE =
-  'Fictional local appointment. No legal advice or attorney-client relationship. Share only what is reasonably necessary to assess fit. Do not send documents, account numbers, medical records, or unnecessary confidential details.'
-
 export const FIRST_CONTACT_ACKNOWLEDGMENT =
   'I understand that submitting this request does not create an attorney-client relationship, the firm has not agreed to represent me, and I should not rely on this form for emergencies or deadlines.'
 
 /** Version string the client echoes back; the server recomputes it at commit. */
-export function firstContactVersion(mode: 'fixture' | 'live', liveVersion = 0) {
-  return mode === 'fixture' ? 'fixture-v1' : `live-v${liveVersion}`
+export function firstContactVersion(version = 0) {
+  return `live-v${version}`
 }
 
 export class FirstContactValidationError extends Error {}

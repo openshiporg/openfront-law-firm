@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useSyncExternalStore } from "react";
 import { useOnboardingApi } from "../hooks/useOnboardingApi";
 import { useFormStatus } from "react-dom";
 
-import { getSyntheticSeedAvailability, type OnboardingState } from "../actions/onboarding";
+import { type OnboardingState } from "../actions/onboarding";
 import seed from "../lib/seed.json";
 import { Logo } from "@/features/dashboard/components/Logo";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { ErrorBanner, Notice, Panel, StatusDot, Track, fieldClass, labelClass, pillPrimaryClass, trackClass, trackItemClass } from "@/features/platform/components/ui";
+import { ErrorBanner, Notice, Panel, Track, fieldClass, labelClass, pillPrimaryClass, trackClass, trackItemClass } from "@/features/platform/components/ui";
 import { LogoPicker } from "@/features/platform/store-settings/LogoPicker";
 import { LOGO_ICONS } from "@/features/platform/store-settings/lib/untitled-logo-registry";
 import { STOREFRONT_ACCENT_PRESETS } from "@/features/storefront/lib/accent";
@@ -35,7 +35,6 @@ const initialState: OnboardingState = {
     timezone: "UTC",
     currencyCode: "USD",
     practiceAreaName: "",
-    seedSyntheticDemo: false,
   },
 };
 
@@ -126,19 +125,10 @@ function Field({
  * slug, first office, office code, timezone and currency. Branding, support
  * email and the practice-area name are optional and fall back to server defaults.
  */
-export function FirmSetupForm({ offlineSampleAvailable: preflight, inDialog = false }: { offlineSampleAvailable?: boolean; inDialog?: boolean }) {
+export function FirmSetupForm({ inDialog = false }: { inDialog?: boolean }) {
   const [state, action] = useOnboardingApi(initialState);
   const actionForm = useKeptForm(action, state)
   const listId = useId();
-  // Server pages pass the preflight; the dialog asks the same viewer query after mount.
-  const [checked, setChecked] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (preflight !== undefined) return;
-    let current = true;
-    getSyntheticSeedAvailability().then((available) => { if (current) setChecked(available); }, () => { if (current) setChecked(false); });
-    return () => { current = false; };
-  }, [preflight]);
-  const offlineSampleAvailable = preflight ?? checked ?? false;
 
   useEffect(() => {
     if (state.redirectTo) window.location.assign(state.redirectTo);
@@ -209,18 +199,6 @@ export function FirmSetupForm({ offlineSampleAvailable: preflight, inDialog = fa
             </fieldset>
           </Panel>
 
-          <Panel title="Sample data" bodyClassName="space-y-2">
-            <label className={cn("flex min-h-11 items-center gap-3 text-sm font-medium", offlineSampleAvailable ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground")}>
-              <input type="checkbox" name="seedSyntheticDemo" value="yes" defaultChecked={offlineSampleAvailable && state.values.seedSyntheticDemo} disabled={!offlineSampleAvailable} aria-describedby={`${listId}-sample`} className="size-5 shrink-0 accent-foreground" />
-              Add sample services, clients and matters
-            </label>
-            <p id={`${listId}-sample`} className="flex items-center gap-2 text-xs text-muted-foreground">
-              <StatusDot tone={offlineSampleAvailable ? "emerald" : "zinc"} />
-              {offlineSampleAvailable
-                ? "Sample records are fictional and stay in this offline test database."
-                : "Sample records are available only on an owned offline test database."}
-            </p>
-          </Panel>
 
           {state.message ? <ErrorBanner>{state.message}</ErrorBanner> : null}
 

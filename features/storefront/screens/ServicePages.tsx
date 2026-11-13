@@ -10,7 +10,7 @@ import { getPublishedAttorneys } from '../lib/attorneys'
 import { firstAdmission, officeLocality } from '../lib/locality'
 import { getStorefrontSettings, NEUTRAL_FIRM_NAME } from '../lib/storefront-settings'
 import { firmMetadata } from '../lib/metadata'
-import { FIXTURE_FIRST_CONTACT_NOTICE, firstContactVersion } from '../lib/first-contact'
+import { firstContactVersion } from '../lib/first-contact'
 import { appointmentNotice, appointmentPaymentState, appointmentStatus, reconcileConsultationFee, formatAppointmentTime, getConsultationAvailability, getConsultationCatalog, getConsultationService, getConsultationServiceById, getConsultationOpenTimes, getCustomerConsultation, slotLabel, slotsByDay, slotTimeLabel, spreadTimes, timezoneLabel, getCustomerConsultations, type Service } from '../lib/consultation-data'
 import { ConsultationBookingForm } from '../CustomerForms'
 import { CancelConsultationForm } from '../CancelConsultationForm'
@@ -78,7 +78,7 @@ function countWord(n: number) {
 /** Home: the firm's people in black and white, the booking bar, practice areas and attorneys. */
 export async function HomePage() {
   const settings = await getStorefrontSettings()
-  const published = settings.isConfigured && (settings.isLocalFictional || settings.publication.mode === 'live')
+  const published = settings.isConfigured && settings.publication.mode === 'live'
   const [catalog, openTimes, attorneys] = await Promise.all([
     published ? getConsultationCatalog(null) : Promise.resolve(null),
     published && settings.bookingEnabled ? getConsultationOpenTimes(null) : Promise.resolve(null),
@@ -177,7 +177,7 @@ export async function ServiceDetailPage({ params }: { params: Promise<{ slug: st
   if (result.status !== 'ok') return <ServiceUnavailable title="Practice areas" retryHref={`/practice-areas/${encodeURIComponent(slug)}`} />
   const service = result.data
   if (!service) notFound()
-  const published = settings.isLocalFictional || settings.publication.mode !== 'closed'
+  const published = settings.publication.mode !== 'closed'
   const [openTimes, attorneys] = await Promise.all([
     settings.bookingEnabled ? getConsultationOpenTimes(service.id) : Promise.resolve(null),
     getPublishedAttorneys(published),
@@ -257,7 +257,7 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
   const lookup = selected ? await getConsultationServiceById(selected) : null
   if (lookup?.status === 'unavailable') return <ServiceUnavailable title="Choose an appointment" retryHref={`/consultation?service=${encodeURIComponent(selected ?? '')}`} />
   const service = lookup?.status === 'ok' ? lookup.data : null
-  const notice = settings.isLocalFictional ? FIXTURE_FIRST_CONTACT_NOTICE : settings.publication.firstContactNotice
+  const notice = settings.publication.firstContactNotice
   // While booking is open, a named service that does not exist (or is not public) is a missing record.
   if (selected && !service && settings.bookingEnabled && notice) notFound()
   if (!service || !settings.bookingEnabled || !notice) {
@@ -278,7 +278,7 @@ export async function BookingPage({ searchParams }: { searchParams: Promise<{ se
   const availability = await getConsultationAvailability(service.id)
   if (availability.status !== 'ok') return <ServiceUnavailable title={service.name} retryHref={`/consultation?service=${encodeURIComponent(service.id)}`} />
   const slots = availability.data.slots
-  const acknowledgmentVersion = firstContactVersion(settings.isLocalFictional ? 'fixture' : 'live', settings.publication.firstContactNoticeVersion)
+  const acknowledgmentVersion = firstContactVersion(settings.publication.firstContactNoticeVersion)
   return <PublicPage><div className="sf-shell sf-page">
     <nav aria-label="Breadcrumb"><ol className="alt-crumbs"><li><Link href="/practice-areas">Practice areas</Link></li><li><Link href={`/practice-areas/${encodeURIComponent(service.publicSlug)}`}>{service.name}</Link></li></ol></nav>
     <div className="sf-split sf-split--wide-aside">

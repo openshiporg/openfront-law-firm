@@ -24,7 +24,6 @@ export type OnboardingState = {
     timezone: string;
     currencyCode: string;
     practiceAreaName: string;
-    seedSyntheticDemo: boolean;
   };
 };
 
@@ -47,7 +46,6 @@ export async function completeOnboarding(
     timezone: String(formData.get('timezone') ?? 'UTC'),
     currencyCode: String(formData.get('currencyCode') ?? 'USD'),
     practiceAreaName: String(formData.get('practiceAreaName') ?? ''),
-    seedSyntheticDemo: formData.get('seedSyntheticDemo') === 'yes',
   };
   // Onboarding and Store Settings share one accent vocabulary: a palette preset,
   // or "match logo hue" (no explicit brand color).
@@ -71,7 +69,6 @@ export async function completeOnboarding(
       $timezone: String!
       $currencyCode: String!
       $practiceAreaName: String
-      $seedSyntheticDemo: Boolean
     ) {
       completeFirmOnboarding(
         firmName: $firmName
@@ -88,7 +85,6 @@ export async function completeOnboarding(
         timezone: $timezone
         currencyCode: $currencyCode
         practiceAreaName: $practiceAreaName
-        seedSyntheticDemo: $seedSyntheticDemo
       ) { firm { id } }
     }
   `, {
@@ -106,7 +102,6 @@ export async function completeOnboarding(
     timezone: values.timezone,
     currencyCode: values.currencyCode,
     practiceAreaName: values.practiceAreaName.trim() || null,
-    seedSyntheticDemo: values.seedSyntheticDemo,
   });
   if (!response.success) return { message: response.error, values, redirectTo: null };
   return {
@@ -136,14 +131,3 @@ export async function dismissOnboarding() {
   return { success: true, data: response.data.updateUser };
 }
 
-/**
- * Pre-submit availability of the fictional sample setup. The onboarding command
- * still enforces fixture admission and authority itself; this only lets the form
- * show the option as unavailable instead of letting the transaction fail.
- */
-export async function getSyntheticSeedAvailability(): Promise<boolean> {
-  const response = await keystoneClient<{ viewerCanSeedSyntheticDemo: boolean }>(`
-    query SyntheticSeedAvailability { viewerCanSeedSyntheticDemo }
-  `);
-  return response.success && response.data.viewerCanSeedSyntheticDemo === true;
-}

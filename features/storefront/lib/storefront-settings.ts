@@ -2,7 +2,6 @@ import { keystoneContext } from "@/features/keystone/context"
 import { connection } from 'next/server'
 import { NEUTRAL_FIRM_NAME, resolveStorefrontAccent } from "./accent"
 import { safeStoreLogo, normalizeStoreLogoColor } from '@/features/shared/store-logo'
-import { isLocalFixtureFirm } from '@/features/keystone/lib/local-fixture'
 
 /**
  * Public storefront projection of platform-owned firm settings.
@@ -16,7 +15,7 @@ import { isLocalFixtureFirm } from '@/features/keystone/lib/local-fixture'
 
 /** Firm-published customer capabilities and the firm's own public text. */
 export type StorefrontPublication = {
-  mode: 'fixture' | 'live' | 'closed'
+  mode: 'live' | 'closed'
   privacyNotice: string | null
   privacyNoticeVersion: number
   firstContactNotice: string | null
@@ -40,9 +39,8 @@ export type StorefrontSettings = {
   officeAddress: string[]
   logoIcon: string
   logoColor: string
-  isLocalFictional: boolean
   isConfigured: boolean
-  /** Customer accounts are open (owned offline fixture, or the firm published them). */
+  /** Customer accounts are open (the firm published them). */
   accountsEnabled: boolean
   /** Consultation booking is open; the booking command re-checks this itself. */
   bookingEnabled: boolean
@@ -98,7 +96,7 @@ async function publishedPolicy(firmId: string): Promise<{ publication: Storefron
  * exposed. Falls back to a truthful unset state on any failure.
  */
 export async function getStorefrontSettings(): Promise<StorefrontSettings> {
-  // Mutable branding and fixture admission must not freeze at build time.
+  // Mutable branding and publication must not freeze at build time.
   await connection()
   interface FirmRow {
     id: string
@@ -108,7 +106,6 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
     brandColor?: string | null
     supportEmail?: string | null
     status?: string | null
-    isDemo?: boolean | null
     logoIcon?: string | null
     logoColor?: string | null
   }
@@ -118,7 +115,7 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
     const rows = (await keystoneContext.sudo().query.Firm.findMany({
       where: { status: { equals: "active" } },
       take: 2,
-      query: "id name displayName brandTagline brandColor supportEmail status isDemo logoIcon logoColor",
+      query: "id name displayName brandTagline brandColor supportEmail status logoIcon logoColor",
     })) as unknown as FirmRow[]
     firm = rows?.length === 1 ? rows[0] : null
   } catch {
@@ -128,7 +125,7 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
   // Published identity requires active configuration, not legal authority.
   // Onboarding/suspended/closed, or no firm at all, is a truthful unset state.
   if (!firm || firm.status !== "active") {
-    return { firmName: null, tagline: null, accentHex: null, supportEmail: null, officePhone: null, officeAddress: [], logoIcon: safeStoreLogo(null), logoColor: '0', isLocalFictional: false, isConfigured: false, accountsEnabled: false, bookingEnabled: false, publication: CLOSED_PUBLICATION }
+    return { firmName: null, tagline: null, accentHex: null, supportEmail: null, officePhone: null, officeAddress: [], logoIcon: safeStoreLogo(null), logoColor: '0', isConfigured: false, accountsEnabled: false, bookingEnabled: false, publication: CLOSED_PUBLICATION }
   }
 
   const firmName = resolveFirmName(firm)
@@ -142,14 +139,9 @@ export async function getStorefrontSettings(): Promise<StorefrontSettings> {
     officeAddress = (office?.address ?? '').split('\n').map((line: string) => line.trim()).filter(Boolean).slice(0, 5).map((line: string) => line.slice(0, 120))
     if (/^\+?[\d\s().\-]{7,30}$/.test(candidatePhone) && candidatePhone.replace(/\D/g, '').length >= 7) officePhone = candidatePhone
   } catch {}
-  const isLocalFictional = await isLocalFixtureFirm(keystoneContext.prisma, firm.id)
-  // Synthetic firms outside the owned fixture are never published as a real firm.
-  const published = isLocalFictional
-    ? { publication: { ...CLOSED_PUBLICATION, mode: 'fixture' as const }, accountsEnabled: true, bookingEnabled: true }
-    : firm.isDemo ? { publication: CLOSED_PUBLICATION, accountsEnabled: false, bookingEnabled: false } : await publishedPolicy(firm.id)
+  const published = await publishedPolicy(firm.id)
   return {
     firmName,
-    isLocalFictional,
     ...published,
     logoIcon: safeStoreLogo(firm.logoIcon),
     logoColor: normalizeStoreLogoColor(firm.logoColor),

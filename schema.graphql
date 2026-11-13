@@ -9096,8 +9096,7 @@ type Mutation {
   changeIntakeParticipant(participantId: ID!, participantRole: String, notes: String, remove: Boolean, reason: String!): PartyChangeResult!
   addMatterParty(matterId: ID!, contactId: ID!, partyRole: String!, side: String, representedById: ID, counselContactId: ID, isPrimaryClient: Boolean, notes: String): PartyChangeResult!
   changeMatterParty(partyId: ID!, partyRole: String, side: String, notes: String, remove: Boolean, reason: String!): PartyChangeResult!
-  completeFirmOnboarding(firmName: String!, firmSlug: String!, firmDisplayName: String, firmShortName: String, brandTagline: String, brandColor: String, supportEmail: String, logoIcon: String, logoColor: String, officeName: String!, officeCode: String!, timezone: String!, currencyCode: String!, practiceAreaName: String, seedSyntheticDemo: Boolean): FirmOnboardingResult!
-  seedSyntheticDemoScenario(synthetic: Boolean!): SyntheticDemoScenarioResult!
+  completeFirmOnboarding(firmName: String!, firmSlug: String!, firmDisplayName: String, firmShortName: String, brandTagline: String, brandColor: String, supportEmail: String, logoIcon: String, logoColor: String, officeName: String!, officeCode: String!, timezone: String!, currencyCode: String!, practiceAreaName: String): FirmOnboardingResult!
 }
 
 union UserAuthenticationWithPasswordResult = UserAuthenticationWithPasswordSuccess | UserAuthenticationWithPasswordFailure
@@ -9382,7 +9381,6 @@ type Query {
   viewerCanRunConflictChecks: Boolean!
   viewerCanResolveConflicts: Boolean!
   viewerNeedsFirmOnboarding: Boolean!
-  viewerCanSeedSyntheticDemo: Boolean!
   practiceOverview: PracticeOverview!
   practiceWorkspace(category: String!): PracticeWorkspace!
   previewContactImport(rows: [ContactImportRowInput!]!): ContactImportPreview!
@@ -10035,16 +10033,6 @@ type FirmOnboardingResult {
   membership: ControlledRecordProjection!
   role: ControlledRecordProjection!
   replayed: Boolean!
-  demoScenario: SyntheticDemoScenarioResult
-}
-
-type SyntheticDemoScenarioResult {
-  firmId: ID!
-  contactId: ID!
-  matterId: ID!
-  conflictCheckId: ID!
-  invoiceId: ID!
-  paymentId: ID!
 }
 
 input ContactImportRowInput {

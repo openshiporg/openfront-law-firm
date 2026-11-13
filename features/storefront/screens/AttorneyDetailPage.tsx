@@ -11,7 +11,7 @@ import { getStorefrontSettings } from '@/features/storefront/lib/storefront-sett
 
 async function load(slug: string) {
   const settings = await getStorefrontSettings()
-  const rows = await getPublishedAttorneys(settings.publication.mode !== 'closed' || settings.isLocalFictional, slug)
+  const rows = await getPublishedAttorneys(settings.publication.mode !== 'closed', slug)
   return { settings, person: rows === null ? undefined : rows[0] ?? null }
 }
 

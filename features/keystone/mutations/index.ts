@@ -46,7 +46,6 @@ import {
   transitionMatter,
 } from "./legalWorkflows";
 import { completeFirmOnboarding } from "./onboarding";
-import { seedSyntheticDemoScenario, viewerCanSeedSyntheticDemo } from "./syntheticScenario";
 import { startClientIntake } from "./intakeWorkflows";
 import { changeFirmMemberAccess, inviteFirmMember } from "./staffWorkflows";
 import { updateFirmRoleAuthority } from "./roleWorkflows";
@@ -546,17 +545,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         membership: ControlledRecordProjection!
         role: ControlledRecordProjection!
         replayed: Boolean!
-        demoScenario: SyntheticDemoScenarioResult
       }
 
-      type SyntheticDemoScenarioResult {
-        firmId: ID!
-        contactId: ID!
-        matterId: ID!
-        conflictCheckId: ID!
-        invoiceId: ID!
-        paymentId: ID!
-      }
 
       input ContactImportRowInput {
         sourceId: String
@@ -799,7 +789,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         viewerCanRunConflictChecks: Boolean!
         viewerCanResolveConflicts: Boolean!
         viewerNeedsFirmOnboarding: Boolean!
-        viewerCanSeedSyntheticDemo: Boolean!
         practiceOverview: PracticeOverview!
         practiceWorkspace(category: String!): PracticeWorkspace!
         previewContactImport(rows: [ContactImportRowInput!]!): ContactImportPreview!
@@ -1368,12 +1357,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           timezone: String!
           currencyCode: String!
           practiceAreaName: String
-          seedSyntheticDemo: Boolean
         ): FirmOnboardingResult!
 
-        seedSyntheticDemoScenario(
-          synthetic: Boolean!
-        ): SyntheticDemoScenarioResult!
       }
     `,
     resolvers: {
@@ -1393,7 +1378,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         viewerCanResolveConflicts: (_root: unknown, _args: unknown, context: any) => (!context.session?.authenticationType || context.session.authenticationType === 'human') && permissions.canResolveConflicts({ session: context.session }),
         viewerNeedsFirmOnboarding: (_root: unknown, _args: unknown, context: any) =>
           Boolean(context.session?.itemId && !activeFirmId(context.session)),
-        viewerCanSeedSyntheticDemo,
         practiceOverview,
         practiceWorkspace,
         previewContactImport,
@@ -1499,7 +1483,6 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         addMatterParty,
         changeMatterParty,
         completeFirmOnboarding,
-        seedSyntheticDemoScenario,
       },
     },
   });

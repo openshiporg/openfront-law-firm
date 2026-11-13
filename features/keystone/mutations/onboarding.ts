@@ -2,11 +2,9 @@ import type { Context } from ".keystone/types";
 
 import { isInteractiveHumanSession, permissionKeys, type Session } from "../access";
 import { runSerializableTransaction } from "../lib/transactions";
-import { requireOwnedOfflineDatabase } from "../lib/local-fixture";
 import { sanitizeStoreLogoSvg } from "../../shared/sanitize-store-logo";
 import { DEFAULT_STORE_LOGO_ICON, normalizeStoreLogoColor } from "../../shared/store-logo";
 import { assertCurrentCommandActor } from "./command-authority";
-import { applySyntheticDemoScenario, SYNTHETIC_DEMO_MARKER } from "./syntheticScenario";
 import { recordAuditEvent } from "./workflow-helpers";
 import { standardFirmRoles, standardRolePermissionData } from "./roleWorkflows";
 
@@ -97,8 +95,6 @@ export async function completeFirmOnboarding(
     timezone: string;
     currencyCode: string;
     practiceAreaName?: string | null;
-    /** Explicitly opt into the clearly-synthetic demo matter scenario (skip for a real/custom setup). */
-    seedSyntheticDemo?: boolean | null;
   },
   context: Context,
 ) {
@@ -142,39 +138,12 @@ export async function completeFirmOnboarding(
     if (user.activeFirm && activeMembership) {
       await assertCurrentCommandActor(tx, context, "canManageOnboarding");
       if (user.activeFirm.status !== "active" || activeMembership.role?.status !== "active" || activeMembership.role?.firmId !== user.activeFirm.id || !activeMembership.role?.canManageOnboarding) throw new Error("Current onboarding authority is required.");
-      if (args.seedSyntheticDemo === true) {
-        // Same locked, current membership authority as the standalone seed; the
-        // scenario itself refuses any firm that is not an owned offline fixture.
-        await assertCurrentCommandActor(tx, context, "canManageOnboarding");
-        const demoScenario = await applySyntheticDemoScenario(tx, {
-          firmId: user.activeFirm.id,
-          actorUserId: user.id,
-        });
-        await recordAuditEvent(tx, {
-          firmId: user.activeFirm.id,
-          eventType: "firm.synthetic_demo_seeded",
-          category: "legal_workflow",
-          outcome: "succeeded",
-          actorUserId: user.id,
-          matterId: demoScenario.matterId,
-          metadata: { synthetic: true, marker: SYNTHETIC_DEMO_MARKER },
-        });
-        return {
-          firm: user.activeFirm,
-          office: null,
-          membership: activeMembership,
-          role: activeMembership.role,
-          replayed: true,
-          demoScenario,
-        };
-      }
       return {
         firm: user.activeFirm,
         office: null,
         membership: activeMembership,
         role: activeMembership.role,
         replayed: true,
-        demoScenario: null,
       };
     }
     if (user.bootstrapRole?.status !== "active" || !user.bootstrapRole?.canManageOnboarding || user.bootstrapRole?.firmId) throw new Error("Current bootstrap onboarding authority is required.");
@@ -184,9 +153,6 @@ export async function completeFirmOnboarding(
     const duplicate = await tx.firm.findUnique({ where: { slug: firmSlug } });
     if (duplicate) throw new Error("Firm slug is already in use.");
 
-    // Fixture admission precedes ALL base/scenario writes, not merely their
-    // durable commit. Ordinary non-fixture setup does not require an offline DB.
-    if (args.seedSyntheticDemo === true) await requireOwnedOfflineDatabase(tx);
     const firm = await tx.firm.create({
       data: {
         name: firmName,
@@ -199,7 +165,6 @@ export async function completeFirmOnboarding(
         logoColor: firmLogoColor,
         slug: firmSlug,
         status: "onboarding",
-        isDemo: args.seedSyntheticDemo === true,
         defaultTimezone,
         defaultCurrency,
       },
@@ -266,29 +231,12 @@ export async function completeFirmOnboarding(
       actorUserId: user.id,
       metadata: { firmId: firm.id, officeId: office.id, roleId: role.id, membershipId: membership.id },
     });
-    let demoScenario: Awaited<ReturnType<typeof applySyntheticDemoScenario>> | null = null;
-    if (args.seedSyntheticDemo === true) {
-      demoScenario = await applySyntheticDemoScenario(tx, {
-        firmId: firm.id,
-        actorUserId: user.id,
-      });
-      await recordAuditEvent(tx, {
-        firmId: firm.id,
-        eventType: "firm.synthetic_demo_seeded",
-        category: "legal_workflow",
-        outcome: "succeeded",
-        actorUserId: user.id,
-        matterId: demoScenario.matterId,
-        metadata: { synthetic: true, marker: SYNTHETIC_DEMO_MARKER },
-      });
-    }
     return {
       firm: { ...firm, status: "active" },
       office,
       membership,
       role,
       replayed: false,
-      demoScenario: demoScenario ?? null,
     };
   });
 }

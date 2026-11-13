@@ -18,7 +18,6 @@
     "migrate:gen": "keystone build --no-ui && tsx features/keystone/view-order/generate-view-order.ts && prisma migrate dev",
     "migrate": "prisma migrate deploy",
     "migrate:maintained": "tsx scripts/deploy-maintained-migrations.ts",
-    "seed:runtime": "tsx scripts/seed-runtime-demo.ts",
     "verify:complete-runtime": "tsx scripts/verify-complete-runtime.ts"
   },
   "dependencies": {

@@ -6,8 +6,5 @@
   "timezone": "UTC",
   "logoIcon": "hexsmith",
   "logoColor": "0",
-  "accentId": "muted",
-  "templates": ["minimal", "full"],
-  "full": "Existing server-owned applySyntheticDemoScenario; strictly owned offline fictional workspace only",
-  "minimal": "Firm, office, role, membership and practice area; no sample records"
+  "accentId": "muted"
 }

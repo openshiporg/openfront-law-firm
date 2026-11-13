@@ -11,7 +11,7 @@ export async function generateMetadata() {
 
 export default async function AttorneysPage() {
   const settings = await getStorefrontSettings()
-  const attorneys = await getPublishedAttorneys(settings.publication.mode !== 'closed' || settings.isLocalFictional)
+  const attorneys = await getPublishedAttorneys(settings.publication.mode !== 'closed')
   return <PublicPage>
     <div className="sf-shell sf-page">
       <header className="sf-page__head"><h1 className="sf-title">Attorneys</h1>{attorneys?.length ? <p className="sf-lede">Each matter has one attorney who answers your calls, start to finish.</p> : null}</header>

@@ -1,7 +1,6 @@
 import type { Context } from '.keystone/types'
 import { randomUUID } from 'node:crypto'
 import { isHumanIdentitySession } from '../access'
-import { isLocalFixtureFirm } from '../lib/local-fixture'
 import { runSerializableTransaction } from '../lib/transactions'
 import { sha256Digest } from '../lib/digests'
 import { recordAuditEvent } from './workflow-helpers'
@@ -11,38 +10,32 @@ import { adversePartyContact, normalizeConflictTerm, parseAdversePartyNames, spl
 import { loadActiveHumanSession } from '../lib/machine-auth'
 import {
   FIRST_CONTACT_ACKNOWLEDGMENT,
-  FIXTURE_FIRST_CONTACT_NOTICE,
   FirstContactValidationError,
   firstContactVersion,
   hasNamedOpposingParty,
   validateFirstContact,
 } from '../../storefront/lib/first-contact'
 
-type PublicMode = 'fixture' | 'live'
-type AdmittedFirm = { firm: any; mode: PublicMode; policy: any | null }
+type AdmittedFirm = { firm: any; mode: 'live'; policy: any }
 
 /**
- * Public customer admission for exactly one active firm deployment. The owned
- * offline fixture is admitted only by the fixture validator; a real firm only
+ * Public customer admission for exactly one active firm deployment, only
  * through its operator-published PublicSitePolicy (privacy notice for accounts,
- * first-contact notice for booking). Synthetic firms are never treated as live.
+ * first-contact notice for booking).
  */
 /** Servicing accepted records is not admission to new business. The deployment
- * and fictional-local guards still apply; public policy toggles do not erase
+ * guard still applies; public policy toggles do not erase
  * a verified account's accepted history or original command receipt. */
 async function servicingFirm(tx: any) {
   await tx.$executeRaw`SELECT id FROM "Firm" WHERE status = 'active' ORDER BY id FOR SHARE`
   const firms = await tx.firm.findMany({ where: { status: 'active' }, take: 2 })
   if (firms.length !== 1) return null
   const firm = firms[0]
-  if (firm.isDemo && !await isLocalFixtureFirm(tx, firm.id)) return null
   return firm
 }
 async function publicFirm(tx: any, capability: 'accounts' | 'booking'): Promise<AdmittedFirm | null> {
   const firm = await servicingFirm(tx)
   if (!firm) return null
-  if (await isLocalFixtureFirm(tx, firm.id)) return { firm, mode: 'fixture', policy: null }
-  if (firm.isDemo) return null
   const policy = await tx.publicSitePolicy.findFirst({ where: { firmId: firm.id, status: 'published' } })
   if (!policy?.publicAccountsEnabled || !String(policy.privacyNotice ?? '').trim()) return null
   if (capability === 'booking' && (!policy.publicBookingEnabled || !String(policy.firstContactNotice ?? '').trim())) return null
@@ -207,8 +200,7 @@ async function eligibleHosts(tx: any, firm: any): Promise<Host[]> {
  * already requires that publication. Anything else stays closed to new bookings.
  */
 function requireConfiguredConsultationCalendar(admitted: AdmittedFirm) {
-  if (admitted.mode === 'fixture') return
-  if (admitted.mode === 'live' && admitted.policy?.status === 'published' && admitted.policy.publicBookingEnabled) return
+  if (admitted.policy?.status === 'published' && admitted.policy.publicBookingEnabled) return
   throw new Error('Online consultation scheduling is unavailable. Contact the firm.')
 }
 function busyWhere(firmId: string, hostId: string, start: Date, end: Date) {
@@ -299,13 +291,13 @@ export async function consultationOpenTimes(_root: unknown, args: { serviceId?: 
   })
 }
 
-function currentAcknowledgment({ mode, policy }: AdmittedFirm) {
-  const notice = mode === 'fixture' ? FIXTURE_FIRST_CONTACT_NOTICE : String(policy.firstContactNotice).trim()
+function currentAcknowledgment({ policy }: AdmittedFirm) {
+  const notice = String(policy.firstContactNotice).trim()
   return {
-    version: firstContactVersion(mode, Number(policy?.firstContactNoticeVersion ?? 0)),
+    version: firstContactVersion(Number(policy.firstContactNoticeVersion ?? 0)),
     noticeDigest: sha256Digest(notice),
     acknowledgmentDigest: sha256Digest(FIRST_CONTACT_ACKNOWLEDGMENT),
-    privacyNoticeVersion: policy ? Number(policy.privacyNoticeVersion ?? 0) : null,
+    privacyNoticeVersion: Number(policy.privacyNoticeVersion ?? 0),
   }
 }
 
@@ -341,7 +333,6 @@ export async function bookClientConsultation(
     // exact owned receipt above retains its original immutable consent snapshot.
     const admitted = await publicFirm(tx, 'booking')
     if (!admitted || admitted.firm.id !== firm.id) throw new Error('Consultation booking is unavailable.')
-    const { mode } = admitted
     requireConfiguredConsultationCalendar(admitted) // exact accepted replay above remains available
     const acknowledgment = currentAcknowledgment(admitted)
     if (args.acknowledgmentVersion !== acknowledgment.version) throw new Error('The first-contact notice has changed. Review it and submit again.')
@@ -372,7 +363,7 @@ export async function bookClientConsultation(
     const intake = await tx.intake.create({ data: { firmId: firm.id, intakeNumber: `INT-${suffix}`, title: `${service.name} consultation`, status: 'new', source: 'website', primaryContactId: contact.id, openedById: receiver.userId, assignedToId: receiver.userId, officeId: receiver.officeId, summary, adversePartySummary: firstContact.opposingParties } })
     await tx.intakeParticipant.create({ data: { firmId: firm.id, intakeId: intake.id, contactId: contact.id, participantRole: 'prospective_client', status: 'active' } })
     const acceptedAt = new Date()
-    const snapshot = { version: 2, serviceId: service.id, title: service.name, description: service.description, minutes: service.consultationMinutes, feeMinor: service.consultationFeeMinor, currencyCode: firm.defaultCurrency, isLocalFixture: mode === 'fixture', relationship: 'none', acknowledgmentVersion: acknowledgment.version }
+    const snapshot = { version: 2, serviceId: service.id, title: service.name, description: service.description, minutes: service.consultationMinutes, feeMinor: service.consultationFeeMinor, currencyCode: firm.defaultCurrency, relationship: 'none', acknowledgmentVersion: acknowledgment.version }
     await tx.intakeSubmission.create({ data: { firmId: firm.id, intakeId: intake.id, submittedByContactId: contact.id, status: 'submitted', schemaVersion: 'consultation-v2', formSchema: { fields: ['service', 'startsAt', 'jurisdiction', 'opposingParties', 'keyDeadline', 'summary', 'acknowledgment'] }, responses: { service: snapshot, startsAt: start.toISOString(), jurisdiction: firstContact.jurisdiction, opposingParties: firstContact.opposingParties, keyDeadline: firstContact.keyDeadline || null, summary, acknowledgment: { ...acknowledgment, acceptedAt: acceptedAt.toISOString() } }, submittedAt: acceptedAt } })
     const check = await tx.conflictCheck.create({ data: { firmId: firm.id, intakeId: intake.id, checkNumber: `CHK-${suffix}`, status: 'requested', requestedById: receiver.userId, searchScope: 'contacts_and_matters', searchVersion: 'v1' } })
     await tx.conflictSearchTerm.create({ data: { firmId: firm.id, checkId: check.id, term: user.name, normalizedTerm: user.name.toLowerCase(), termType: 'person', sourceContactId: contact.id } })
@@ -392,7 +383,7 @@ export async function bookClientConsultation(
       }
     }
     const row = await tx.consultation.create({ data: { firmId: firm.id, intakeId: intake.id, accountId: user.id, requestKey: args.requestKey, requestDigest: fingerprint, serviceTitle: service.name, serviceSnapshot: snapshot, feeMinor: service.consultationFeeMinor, currencyCode: firm.defaultCurrency, startsAt: start, endsAt: end, status: 'requested', timezone: receiver.timezone, hostId: receiver.userId, officeId: receiver.officeId, participants: { connect: { id: contact.id } } } })
-    await recordAuditEvent(tx, { firmId: firm.id, actorUserId: user.id, actorType: 'customer', eventType: 'consultation.requested', category: 'legal_workflow', intakeId: intake.id, metadata: { consultationId: row.id, requestDigest: fingerprint, isLocalFixture: mode === 'fixture', acknowledgmentVersion: acknowledgment.version } })
+    await recordAuditEvent(tx, { firmId: firm.id, actorUserId: user.id, actorType: 'customer', eventType: 'consultation.requested', category: 'legal_workflow', intakeId: intake.id, metadata: { consultationId: row.id, requestDigest: fingerprint, acknowledgmentVersion: acknowledgment.version } })
     return dto(row)
   })
 }

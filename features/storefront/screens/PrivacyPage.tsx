@@ -16,7 +16,6 @@ export default async function PrivacyPage() {
     <LegalPage title="Privacy notice" meta={notice ? `Version ${settings.publication.privacyNoticeVersion}` : undefined}>
       {notice ? notice.split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <>
         <p>For privacy questions, contact {firm}{settings.supportEmail ? <> at <a className="sf-link" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a></> : null}. Do not enter confidential, sensitive or time-critical information here.</p>
-        {settings.isLocalFictional ? <p>This is a fictional local workspace: accounts and appointment requests here hold fictional test information only.</p> : null}
       </>}
       <h2>Existing clients</h2>
       <p>Use only secure channels identified in your engagement materials. For questions about information in a client portal or other firm system, contact the firm using independently verified details.</p>

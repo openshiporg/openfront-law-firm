@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import { PrismaClient } from "@prisma/client";
-import { requireOwnedOfflineDatabase } from "../features/keystone/lib/local-fixture";
 
 import type { Context } from ".keystone/types";
 import type { Session } from "../features/keystone/access";
@@ -40,7 +39,6 @@ const prisma = new PrismaClient();
 const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
 
 async function main() {
-  if (process.env.RUN_OWNED_DATABASE_TESTS === "1") await requireOwnedOfflineDatabase(prisma);
   const firm = await prisma.firm.create({
     data: {
       name: `Schema proof ${suffix}`,
