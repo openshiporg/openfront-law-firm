@@ -3,6 +3,8 @@ import { PracticeLoadError, PracticePage, QueuePanel } from '@/features/platform
 import { getFirmTimeZone } from '@/features/platform/lib/firmTimeZone'
 import { formatInstant } from '@/features/platform/lib/datetime'
 import { getPracticeOverview } from '@/features/platform/operations/actions'
+import { getAuthenticatedUser } from '@/features/dashboard/actions/auth'
+import { canOpenPlatformPath } from '@/features/dashboard/lib/sidebarAccess'
 import { cn } from '@/lib/utils'
 
 // Deadlines lead: a missed court or limitation date is the costliest thing a firm can miss.
@@ -15,7 +17,11 @@ const queues = [
 ] as const
 
 export async function TodayPage() {
-  const [response, timeZone] = await Promise.all([getPracticeOverview(), getFirmTimeZone()])
+  const [response, timeZone, viewer] = await Promise.all([getPracticeOverview(), getFirmTimeZone(), getAuthenticatedUser()])
+  // Same check as the sidebar: a queue whose page the role cannot open is not shown at all.
+  const user = viewer.success ? viewer.data?.authenticatedItem : null
+  const visibleQueues = queues.filter(([, , href]) => canOpenPlatformPath(href, user))
+  const showLead = canOpenPlatformPath(lead[2], user)
 
   return (
     <PracticePage
@@ -41,7 +47,7 @@ export async function TodayPage() {
               ))}
             </nav>
           ) : null}
-          <QueuePanel
+          {showLead ? <QueuePanel
             title={lead[0]}
             description=""
             items={response.data[lead[1]]}
@@ -49,9 +55,9 @@ export async function TodayPage() {
             empty="No deadlines or tasks due"
             viewAllHref={lead[2]}
             timeZone={timeZone}
-          />
+          /> : null}
           <div className="grid items-start gap-x-6 gap-y-8 xl:grid-cols-2">
-            {queues.map(([title, key, href]) => (
+            {visibleQueues.map(([title, key, href]) => (
               <QueuePanel
                 key={key}
                 title={title}
