@@ -25,7 +25,7 @@ const NO_DIVISION_CURRENCIES = [
 
 // PayPal API base URL. The account (client id and secret) decides which
 // environment is used; this code path is the same for every account.
-const getPayPalBaseUrl = () => process.env.PAYPAL_API_BASE_URL || "https://api-m.paypal.com";
+const getPayPalBaseUrl = () => "https://api-m.paypal.com";
 
 // Format amount for PayPal API (handles no-division currencies)
 const formatPayPalAmount = (amount: number, currency: string): string => {
