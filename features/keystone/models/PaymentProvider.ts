@@ -16,7 +16,7 @@ export const PaymentProvider = list({
     code: text({ isIndexed: true, validation: { isRequired: true, match: { regex: /^pp_[a-zA-Z0-9-_]+$/ } } }),
     account: select({ type: "enum", options: [{ label: "Operating", value: "operating" }, { label: "Trust / IOLTA", value: "trust" }], validation: { isRequired: true } }),
     isInstalled: checkbox({ defaultValue: false }),
-    credentials: json({ defaultValue: {} }),
+    credentials: json({ defaultValue: {}, isFilterable: false, isOrderable: false }),
     metadata: json({ defaultValue: {} }),
     createPaymentFunction: text({ validation: { isRequired: true } }), capturePaymentFunction: text({ validation: { isRequired: true } }),
     refundPaymentFunction: text({ validation: { isRequired: true } }), getPaymentStatusFunction: text({ validation: { isRequired: true } }),
