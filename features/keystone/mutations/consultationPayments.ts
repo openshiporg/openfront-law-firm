@@ -37,8 +37,11 @@ export function unpaidRequestExpired(row: { feeMinor: number; status: string; cr
 /** Releases held times whose fee was never paid. Runs inside the booking/availability transaction. */
 export async function releaseUnpaidConsultations(tx: any, firmId: string) {
   const cutoff = new Date(Date.now() - CONSULTATION_PAYMENT_WINDOW_MS);
-  const stale = await tx.consultation.findMany({ where: { firmId, status: "requested", feeMinor: { gt: 0 }, createdAt: { lt: cutoff } }, select: { id: true, intakeId: true, feeMinor: true, status: true, createdAt: true }, take: 50 });
+  const stale = await tx.consultation.findMany({ where: { firmId, status: "requested", feeMinor: { gt: 0 }, createdAt: { lt: cutoff } }, select: { id: true, intakeId: true, feeMinor: true, status: true, createdAt: true } });
+  // One read of the fees already paid, so paid requests awaiting confirmation never crowd out lapsed holds.
+  const paidKeys = new Set((await tx.payment.findMany({ where: { firmId, idempotencyKey: { in: stale.map((row: any) => consultationPaymentKey(row.id)) }, status: { in: ["captured", "settled", "refunded"] } }, select: { idempotencyKey: true } })).map((p: any) => p.idempotencyKey));
   for (const row of stale) {
+    if (paidKeys.has(consultationPaymentKey(row.id))) continue;
     const payment = await tx.payment.findFirst({ where: { firmId, idempotencyKey: consultationPaymentKey(row.id) }, select: { status: true } });
     if (!unpaidRequestExpired(row, Boolean(payment && ["captured", "settled", "refunded"].includes(payment.status)))) continue;
     await tx.consultation.update({ where: { id: row.id }, data: { status: "cancelled", cancellationReason: "Consultation fee was not paid; the time was released." } });
