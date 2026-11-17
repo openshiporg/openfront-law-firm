@@ -84,8 +84,17 @@ export async function startConsultationPayment(_root: unknown, args: { consultat
       currencyCode: consultation.currencyCode, providerCode: provider.code, paymentProviderId: provider.id,
     } });
   }
-  // A reopened checkout gets a fresh Stripe idempotency key per attempt minute.
-  const attempt = `${key}:${Math.floor(Date.now() / 60_000)}`;
+  // Pay again while the last Checkout page is still open returns that page, so one booking never has two payable pages.
+  if (payment.providerPaymentId) {
+    const prior = await getPaymentStatus({ provider, paymentId: payment.providerPaymentId });
+    if (prior?.status === "succeeded") {
+      await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, payment.payerId);
+      return { url: null, paymentId: payment.id, status: consultationPaymentState(consultation, await consultationPaymentFor(prisma, consultation)) };
+    }
+    if (prior?.status === "open" && prior.data?.url) return { url: prior.data.url as string, paymentId: payment.id, status: "due" };
+  }
+  // A reopened checkout (the last page expired) gets a fresh Stripe idempotency key per attempt.
+  const attempt = `${key}:${randomUUID()}`;
   const page = `${webBase()}/account/appointments/${encodeURIComponent(consultation.id)}`;
   const result = await createPayment({
     provider, amount: payment.amountMinor, currency: payment.currencyCode, paymentId: payment.id, firmId: consultation.firmId, idempotencyKey: attempt,

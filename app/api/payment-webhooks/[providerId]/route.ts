@@ -33,7 +33,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!prior) await prisma.idempotencyKey.create({ data: { idempotencyKey: key, requestMethod: "POST", requestPath: "payment-provider-webhook", requestParams: { providerId, eventId: verified.event.id }, recoveryPoint: "verified", lockedAt: new Date() } });
     const payment = await prisma.payment.findFirst({ where: { id: paymentId, firmId: resource.metadata?.firmId } });
     if (!payment || payment.paymentProviderId !== resource.id && payment.providerCode !== provider.code) throw new Error("Provider event does not correlate to this payment.");
-    const settled = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId);
+    // Reconcile the Checkout this event is about, which may be an older page than the one stored.
+    const checkoutId = type === "checkout.session.completed" && typeof resource.id === "string" && resource.id.startsWith("cs_") ? resource.id : undefined;
+    const settled = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, undefined, checkoutId);
     if (settled?.status === "captured" && !(settled as any).replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
     await prisma.idempotencyKey.update({ where: { idempotencyKey: key }, data: { recoveryPoint: "completed", responseCode: 200, responseBody: { paymentId }, lockedAt: null } });
     return NextResponse.json({ received: true });

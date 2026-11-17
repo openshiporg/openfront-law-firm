@@ -64,10 +64,13 @@ export async function reconcilePortalPayment(_root: unknown, args: { paymentId: 
   return reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, payment.payerId);
 }
 
-export async function reconcilePaymentByProviderId(prisma: any, paymentId: string, firmId: string, payerId?: string) {
-  const payment = await prisma.payment.findFirst({ where: { id: paymentId, firmId, ...(payerId ? { payerId } : {}) }, include: { paymentProvider: true, invoice: true } });
+/** `checkoutId`: the Checkout a verified webhook names, when it is not the one stored (an older page the client paid). */
+export async function reconcilePaymentByProviderId(prisma: any, paymentId: string, firmId: string, payerId?: string, checkoutId?: string) {
+  const found = await prisma.payment.findFirst({ where: { id: paymentId, firmId, ...(payerId ? { payerId } : {}) }, include: { paymentProvider: true, invoice: true } });
+  const payment = found && checkoutId ? { ...found, providerPaymentId: checkoutId } : found;
   if (!payment || !payment.providerPaymentId || !payment.paymentProvider) throw new Error("Payment is not available for reconciliation.");
   const status = await getPaymentStatus({ provider: payment.paymentProvider, paymentId: payment.providerPaymentId });
+  if (checkoutId && String(status?.data?.metadata?.paymentId ?? "") !== payment.id) throw new Error("Provider checkout does not belong to this payment.");
   if (status.status !== "succeeded") return { status: payment.status, paymentId: payment.id };
   if (status.amount !== payment.amountMinor || String(status.currency).toUpperCase() !== payment.currencyCode) throw new Error("Provider payment amount or currency mismatch.");
   return runSerializableTransaction(prisma, async (tx: any) => {
