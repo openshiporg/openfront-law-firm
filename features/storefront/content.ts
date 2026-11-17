@@ -1,8 +1,8 @@
 // Public legal content must be owner-verified before publication. No practice
 // areas, attorney profiles, credentials, or response promises are bundled as
 // firm facts in this application. The anonymous (no-account) intake form stays
-// closed; signed-in consultation booking opens only through the owned offline
-// fixture or the firm's own published PublicSitePolicy.
+// closed; signed-in consultation booking opens through the firm's own published
+// PublicSitePolicy.
 export const PUBLIC_INTAKE_ENABLED = false
 
 export type PublicPracticeArea = {

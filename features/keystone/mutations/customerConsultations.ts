@@ -146,7 +146,7 @@ const BOOKING_HORIZON_MS = 14 * 86_400_000
 const SLOT_STEP_MINUTES = 30
 const CANDIDATE_STEP_MS = 15 * 60_000
 const MAX_OFFERED_SLOTS = 300
-// Fictional offline fixtures only. This is NOT a live office calendar.
+// Consultation hours offered for booking: weekdays 9:00 to 17:00 in the firm time zone.
 export const CONSULTATION_HOURS = { open: 9 * 60, close: 17 * 60, weekdays: new Set([1, 2, 3, 4, 5]) }
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 

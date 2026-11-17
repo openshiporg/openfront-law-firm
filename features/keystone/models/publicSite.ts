@@ -8,7 +8,7 @@ import { normalizePublicSlug } from "./matters";
 import { trackingFields } from "./trackingFields";
 
 /**
- * Operator-controlled publication of the public site for a real (non-fixture)
+ * Operator-controlled publication of the public site for a real
  * firm: customer accounts, consultation booking and the firm's own privacy,
  * first-contact and About text. Nothing is published until a human firm
  * manager writes the firm's notices and explicitly publishes; notice edits bump
