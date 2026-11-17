@@ -37,6 +37,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const checkoutId = type === "checkout.session.completed" && typeof resource.id === "string" && resource.id.startsWith("cs_") ? resource.id : undefined;
     const settled = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, undefined, checkoutId);
     if (settled?.status === "captured" && !(settled as any).replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
+    // A redelivered event for a fee whose cancellation refund failed retries that refund.
+    else if ((settled as any)?.replayed) await afterConsultationPaymentCaptured(prisma, payment.id, true);
     await prisma.idempotencyKey.update({ where: { idempotencyKey: key }, data: { recoveryPoint: "completed", responseCode: 200, responseBody: { paymentId }, lockedAt: null } });
     return NextResponse.json({ received: true });
   } catch (error) {

@@ -106,13 +106,23 @@ export async function startConsultationPayment(_root: unknown, args: { consultat
   return { url: result.checkoutUrl, paymentId: payment.id, status: "due" };
 }
 
+/** Retries the refund of a cancelled consultation's fee (idempotent). A provider error is logged, not shown. */
+export async function retryCancelledConsultationRefund(prisma: any, firmId: string, consultationId: string) {
+  await refundConsultationFee(prisma, { firmId, consultationId, actorUserId: null, explanation: "Consultation was cancelled; refund retried." })
+    .catch((error: unknown) => console.error("Consultation refund retry failed", error));
+}
+
 /** After a captured consultation payment: a consultation already cancelled is refunded at once. */
-export async function afterConsultationPaymentCaptured(prisma: any, paymentId: string) {
+export async function afterConsultationPaymentCaptured(prisma: any, paymentId: string, replayed = false) {
   const payment = await prisma.payment.findFirst({ where: { id: paymentId } });
   const consultationId = consultationIdFromPaymentKey(payment?.idempotencyKey);
   if (!payment || !consultationId) return;
   const consultation = await prisma.consultation.findFirst({ where: { id: consultationId, firmId: payment.firmId } });
   if (!consultation) return;
+  if (replayed) {
+    if (consultation.status === "cancelled") await retryCancelledConsultationRefund(prisma, payment.firmId, consultationId);
+    return;
+  }
   await recordAuditEvent(prisma, { firmId: payment.firmId, eventType: "consultation.fee_paid", category: "financial", intakeId: consultation.intakeId, paymentId: payment.id, metadata: { consultationId, amountMinor: payment.amountMinor } }).catch(() => undefined);
   if (consultation.status === "cancelled") await refundConsultationFee(prisma, { firmId: payment.firmId, consultationId, actorUserId: consultation.accountId, explanation: "Consultation was released before its payment completed." });
 }
@@ -126,6 +136,9 @@ export async function reconcileConsultationPayment(_root: unknown, args: { consu
   if (!["captured", "settled", "refunded"].includes(payment.status)) {
     const result = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, payment.payerId);
     if (result.status === "captured" && !(result as any).replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
+  } else if (consultation.status === "cancelled" && (payment.refundedMinor ?? 0) < payment.amountMinor) {
+    // A cancelled, paid consultation whose refund did not go through when it was cancelled is retried here.
+    await retryCancelledConsultationRefund(prisma, payment.firmId, consultation.id);
   }
   return { status: consultationPaymentState(consultation, await consultationPaymentFor(prisma, consultation)) };
 }

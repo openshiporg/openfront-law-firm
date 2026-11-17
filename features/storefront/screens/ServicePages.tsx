@@ -312,8 +312,13 @@ export async function AppointmentPage({ params, searchParams }: { params: Promis
   const result = await getCustomerConsultation(id)
   if (result.status === 'signed_out') redirect(`/account/signin?from=${encodeURIComponent(`/account/appointments/${encodeURIComponent(id)}`)}`)
   if (result.status === 'unavailable') return <ServiceUnavailable title="Appointment" retryHref={`/account/appointments/${encodeURIComponent(id)}`} />
-  const row = result.data
+  let row = result.data
   if (!row) notFound()
+  // A cancelled consultation still showing paid: retry the refund that did not go through at cancellation.
+  if (row.status === 'cancelled' && row.paymentState === 'paid' && await reconcileConsultationFee(id) === 'refunded') {
+    const again = await getCustomerConsultation(id)
+    if (again.status === 'ok' && again.data) row = again.data
+  }
   const status = appointmentStatus(row.status)
   return <PublicPage><div className="sf-shell sf-page">
     <nav aria-label="Breadcrumb"><ol className="alt-crumbs"><li><Link href="/account">Your appointments</Link></li></ol></nav>
