@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 
 import { FormSelect } from '@/components/ui/form-select'
 import { cn } from '@/lib/utils'
-import { EmptyState, Notice, Panel, RowList, TitleLine, Track, fieldClass, labelClass, pillClass, pillDangerClass, pillPrimaryClass, statusLabel, textareaClass } from '@/features/platform/components/ui'
+import { EmptyState, Panel, RowList, TitleLine, Track, fieldClass, labelClass, pillClass, pillDangerClass, pillPrimaryClass, statusLabel, textareaClass } from '@/features/platform/components/ui'
 import { formatInstant } from '@/features/platform/lib/datetime'
 import { currencyFractionDigits, formatMoneyLabel, minorUnitsToDecimal } from '@/features/platform/lib/money'
 
-import { refundCardPaymentAction, requestPaymentRefund, reviewPaymentRefund, type CardRefundablePayment, type RefundActionState, type RefundRow, type RefundSetup } from '../actions/refunds'
+import { recordManualRefundOutcome, refundCardPaymentAction, requestPaymentRefund, reviewPaymentRefund, type CardRefundablePayment, type RefundActionState, type RefundRow, type RefundSetup } from '../actions/refunds'
 import { useKeptForm } from '../../components/useKeptForm'
 
 const initial: RefundActionState = { ok: false, message: '' }
@@ -184,6 +184,42 @@ function ReviewControls({ refund, viewerId }: { refund: RefundRow; viewerId: str
   )
 }
 
+function PayoutControls({ refund }: { refund: RefundRow }) {
+  const router = useRouter()
+  const [outcome, setOutcome] = useState<'succeeded' | 'failed' | null>(null)
+  const [key] = useState(() => `refund-outcome:${refund.id}:${crypto.randomUUID()}`)
+  const [state, run, pending] = useActionState(async (previous: RefundActionState, formData: FormData) => {
+    const result = await recordManualRefundOutcome(previous, formData)
+    if (result.ok) { setOutcome(null); router.refresh() }
+    return result
+  }, initial)
+  const runForm = useKeptForm(run, state)
+
+  return (
+    <div className="grid min-w-0 gap-3">
+      <Track label={`Pay out ${refund.refundNumber}`}>
+        <button type="button" className={outcome === 'succeeded' ? pillPrimaryClass : pillClass} onClick={() => setOutcome(outcome === 'succeeded' ? null : 'succeeded')}>Mark paid out</button>
+        <button type="button" className={pillDangerClass} onClick={() => setOutcome(outcome === 'failed' ? null : 'failed')}>Mark failed</button>
+      </Track>
+      {outcome ? (
+        <form {...runForm} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
+          <input type="hidden" name="refundId" value={refund.id} />
+          <input type="hidden" name="toStatus" value={outcome} />
+          <input type="hidden" name="idempotencyKey" value={`${key}:${outcome}`} />
+          <label className={cn(labelClass, 'flex-1')}>
+            {outcome === 'succeeded' ? 'Cheque or transfer reference' : 'Why it failed'}
+            <input name={outcome === 'succeeded' ? 'reference' : 'failureReason'} required={outcome === 'failed'} minLength={outcome === 'failed' ? 3 : undefined} maxLength={500} autoComplete="off" className={fieldClass} />
+          </label>
+          <Track>
+            <button type="submit" className={outcome === 'succeeded' ? pillPrimaryClass : pillDangerClass} disabled={pending}>{pending ? 'Saving…' : outcome === 'succeeded' ? 'Confirm paid out' : 'Confirm failed'}</button>
+          </Track>
+        </form>
+      ) : null}
+      <Message state={state} />
+    </div>
+  )
+}
+
 export function BillingRefundsClient({ setup, actions }: { setup: RefundSetup; actions?: ReactNode }) {
   const [requesting, setRequesting] = useState(false)
   return (
@@ -227,13 +263,11 @@ export function BillingRefundsClient({ setup, actions }: { setup: RefundSetup; a
                 {refund.status === 'cancelled' && refund.failureReason ? <p className="text-xs text-muted-foreground">Rejected: {refund.failureReason}</p> : null}
                 {refund.status === 'failed' && refund.failureReason ? <p className="text-xs text-destructive">Failed: {refund.failureReason}</p> : null}
                 {refund.status === 'requested' ? <ReviewControls refund={refund} viewerId={setup.viewerId} /> : null}
+                {refund.manual && (refund.status === 'approved' || refund.status === 'processing') ? <PayoutControls refund={refund} /> : null}
               </li>
             ))}
           </RowList>
         )}
-        {setup.refunds.some((refund) => refund.status === 'approved') ? (
-          <Notice>Approved refunds wait for provider processing. Recording a processed, succeeded or failed outcome is disabled until authenticated provider ingress is configured.</Notice>
-        ) : null}
       </div>
     </Panel>
   )

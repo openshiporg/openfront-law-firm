@@ -694,8 +694,6 @@ export async function recordRefundProviderOutcome(
   },
   context: Context,
 ) {
-  requirePermission(context, "canManagePayments", { humanOnly: true });
-  throw new Error("Refund provider outcomes are unavailable until authenticated provider ingress is configured.");
   const { firmId, userId } = requirePermission(context, "canManagePayments", { humanOnly: true });
   const eventId = idempotencyKey(args.eventId);
   const providerRefundId = optionalBoundedText(args.providerRefundId, "Provider refund ID", 500);
@@ -733,7 +731,13 @@ export async function recordRefundProviderOutcome(
       }
       return { refund, replayed: true };
     }
-    assertLifecycleTransition("refund", refund.status, args.toStatus);
+    // Staff record the outcome only for money the firm pays back itself (cheque, wire, ACH, cash). A card
+    // refund's outcome comes from the provider, so it is never marked here.
+    if (!String(refund.payment.providerCode ?? "").startsWith("manual:")) throw new Error("Only a refund of a cheque, wire, ACH or cash payment can be marked here.");
+    // An approved manual refund is paid out (or fails) in one step.
+    const from = refund.status === "approved" && args.toStatus !== "processing" ? "processing" : refund.status;
+    assertLifecycleTransition("refund", refund.status, from === refund.status ? args.toStatus : from);
+    if (from !== refund.status) assertLifecycleTransition("refund", from, args.toStatus);
     if (args.toStatus === "succeeded" && refund.payment.paymentType === "trust_deposit") {
       const posting = refund.trustTransactions[0];
       const entryTotal = (bucket: string, direction: string) => posting?.entries.reduce(

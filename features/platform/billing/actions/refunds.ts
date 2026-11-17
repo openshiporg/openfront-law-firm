@@ -37,6 +37,8 @@ export type RefundRow = {
   approvedByName: string | null
   paymentNumber: string | null
   invoiceNumber: string | null
+  /** Paid back by the firm itself (cheque, wire, ACH, cash), so staff mark the outcome. */
+  manual: boolean
 }
 
 export type CardRefundablePayment = {
@@ -114,7 +116,7 @@ export async function getRefundSetup(): Promise<{ success: true; data: RefundSet
       refunds: Array<Omit<RefundRow, 'requestedById' | 'requestedByName' | 'approvedByName' | 'paymentNumber' | 'invoiceNumber'> & {
         requestedBy: { id: string; name: string | null } | null
         approvedBy: { name: string | null } | null
-        payment: { paymentNumber: string } | null
+        payment: { paymentNumber: string; providerCode: string | null } | null
         invoice: { invoiceNumber: string } | null
       }>
       authenticatedItem: { id: string } | null
@@ -123,7 +125,7 @@ export async function getRefundSetup(): Promise<{ success: true; data: RefundSet
         payments(where: { status: { in: [captured, settled] } }, orderBy: [{ createdAt: desc }, { id: asc }], take: 100) { ${paymentFields} }
         refunds(orderBy: [{ requestedAt: desc }, { id: asc }], take: 50) {
           id refundNumber status reason amountMinor currencyCode explanation requestedAt approvedAt failureReason
-          requestedBy { id name } approvedBy { name } payment { paymentNumber } invoice { invoiceNumber }
+          requestedBy { id name } approvedBy { name } payment { paymentNumber providerCode } invoice { invoiceNumber }
         }
         authenticatedItem { ... on User { id } }
       }
@@ -146,6 +148,7 @@ export async function getRefundSetup(): Promise<{ success: true; data: RefundSet
         approvedByName: approvedBy?.name ?? null,
         paymentNumber: payment?.paymentNumber ?? null,
         invoiceNumber: invoice?.invoiceNumber ?? null,
+        manual: String(payment?.providerCode ?? '').startsWith('manual:'),
       })),
       viewerId: response.data.authenticatedItem?.id ?? null,
       timeZone,
@@ -235,6 +238,30 @@ export async function reviewPaymentRefund(_previous: RefundActionState, formData
     return { ok: true, message: `${refund.refundNumber} ${decision === 'approve' ? 'approved' : 'rejected'}.` }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'The review was not recorded.' }
+  }
+}
+
+/** Records that an approved cheque, wire, ACH or cash refund was paid out, or that it failed. */
+export async function recordManualRefundOutcome(_previous: RefundActionState, formData: FormData): Promise<RefundActionState> {
+  try {
+    const refundId = field(formData, 'refundId')
+    const toStatus = field(formData, 'toStatus')
+    const eventId = field(formData, 'idempotencyKey')
+    const reference = field(formData, 'reference')
+    const failureReason = field(formData, 'failureReason')
+    if (!ID.test(refundId) || !/^[A-Za-z0-9:_-]{12,160}$/.test(eventId) || !['succeeded', 'failed'].includes(toStatus)) return { ok: false, message: 'Reload the page and try again.' }
+    if (toStatus === 'failed' && failureReason.length < 3) return { ok: false, message: 'Say why the refund failed.' }
+    const response = await keystoneClient<{ recordRefundProviderOutcome: { refund: { refundNumber: string; status: string } } }>(`
+      mutation RecordManualRefundOutcome($refundId: ID!, $toStatus: String!, $eventId: String!, $providerRefundId: String, $failureReason: String) {
+        recordRefundProviderOutcome(refundId: $refundId, toStatus: $toStatus, eventId: $eventId, providerRefundId: $providerRefundId, failureReason: $failureReason) { refund { refundNumber status } }
+      }
+    `, { refundId, toStatus, eventId, providerRefundId: reference || null, failureReason: toStatus === 'failed' ? failureReason : null })
+    if (!response.success) return { ok: false, message: refusalOr(response.error, 'The refund outcome was not recorded.') }
+    revalidateBilling()
+    const refund = response.data.recordRefundProviderOutcome.refund
+    return { ok: true, message: `${refund.refundNumber} ${refund.status === 'succeeded' ? 'paid out' : 'marked failed'}.` }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'The refund outcome was not recorded.' }
   }
 }
 
