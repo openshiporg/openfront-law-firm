@@ -363,7 +363,8 @@ export async function applyInvoiceAllocation(
       throw new Error("Payment allocation exceeds the invoice integer range.");
     }
     const status = invoiceStatusAfterPayment(invoice, paidMinor, now);
-    assertLifecycleTransition("invoice", invoice.status, status);
+    // Another part-payment on a part-paid invoice keeps its status; that is not a lifecycle move.
+    if (status !== invoice.status) assertLifecycleTransition("invoice", invoice.status, status);
     await tx.invoice.update({
       where: { id: invoice.id },
       data: {
