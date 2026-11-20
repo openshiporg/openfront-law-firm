@@ -26,7 +26,7 @@ export function appointmentPaymentState(row: Pick<CustomerConsultation, 'feeMino
 /** One-line notice under the appointment facts. */
 export function appointmentNotice(row: Pick<CustomerConsultation, 'feeMinor' | 'status' | 'paymentState'>) {
   if (row.paymentState === 'due') return 'Pay the consultation fee to hold this time. Unpaid requests are released after 30 minutes.'
-  if (row.paymentState === 'refunded') return 'This consultation was cancelled and the fee was refunded to your card.'
+  if (row.paymentState === 'refunded') return row.status === 'cancelled' ? 'This consultation was cancelled and the fee was refunded to your card.' : 'The consultation fee was refunded to your card.'
   if (row.status === 'requested') return row.paymentState === 'paid' ? 'Fee received. The firm runs a conflict check before confirming.' : 'The firm runs a conflict check before confirming. No payment is collected online.'
   if (row.paymentState === 'paid') return 'Fee received. Cancel before it starts for a full refund.'
   return 'No payment is collected online.'
