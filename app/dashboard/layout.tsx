@@ -3,10 +3,12 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Openfront Dashboard",
-  description: "Admin interface for Openfront",
-};
+import { getStorefrontSettings, NEUTRAL_FIRM_NAME } from "@/features/storefront/lib/storefront-settings";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const name = (await getStorefrontSettings()).firmName || NEUTRAL_FIRM_NAME;
+  return { title: { absolute: `${name} staff` }, description: `Staff dashboard for ${name}.` };
+}
 
 export default function DashboardLayout({
   children,
