@@ -9,7 +9,7 @@ export * from './consultation-presentation'
  */
 export type CustomerResult<T> = { status: 'ok'; data: T } | { status: 'signed_out' } | { status: 'unavailable' }
 
-const selection = 'id serviceTitle feeMinor currencyCode status startsAt endsAt timezone paymentState'
+const selection = 'id serviceTitle feeMinor currencyCode status startsAt endsAt timezone paymentState hostName location paidAt'
 const serviceSelection = 'id code publicSlug name description consultationFeeMinor consultationMinutes currencyCode'
 
 export type CatalogPage = { services: Service[]; nextCursor: string | null }
@@ -28,6 +28,13 @@ export async function getConsultationService(slug: string): Promise<CustomerResu
 export async function getConsultationServiceById(id: string): Promise<CustomerResult<Service | null>> {
   const result = await keystoneClient<{ consultationService: Service | null }>(`query($id: ID!) { consultationService(id: $id) { ${serviceSelection} } }`, { id })
   return result.success ? { status: 'ok', data: result.data.consultationService } : { status: 'unavailable' }
+}
+
+/** The signed-in client's own name and email, for the account page. */
+export async function getCustomerProfile(): Promise<{ name: string; email: string } | null> {
+  const viewer = await keystoneClient<{ authenticatedItem: { name: string | null; email: string | null } | null }>('{ authenticatedItem { ... on User { name email } } }')
+  const item = viewer.success ? viewer.data.authenticatedItem : null
+  return item ? { name: item.name ?? '', email: item.email ?? '' } : null
 }
 
 async function signedIn(): Promise<CustomerResult<true>> {

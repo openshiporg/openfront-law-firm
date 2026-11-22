@@ -49,6 +49,12 @@ export async function releaseUnpaidConsultations(tx: any, firmId: string) {
     if (payment) await tx.payment.updateMany({ where: { firmId, idempotencyKey: consultationPaymentKey(row.id), status: "pending" }, data: { status: "cancelled", failedAt: new Date(), failureReason: "Checkout window ended" } });
     await recordAuditEvent(tx, { firmId, eventType: "consultation.payment_expired", category: "financial", intakeId: row.intakeId, metadata: { consultationId: row.id } });
   }
+  // A free request the firm never confirmed stops being a request once its time has passed.
+  const missed = await tx.consultation.findMany({ where: { firmId, status: "requested", feeMinor: { lte: 0 }, startsAt: { lt: new Date() } }, select: { id: true, intakeId: true }, take: 50 });
+  for (const row of missed) {
+    await tx.consultation.update({ where: { id: row.id }, data: { status: "cancelled", cancellationReason: "The requested time passed before the firm confirmed it." } });
+    await recordAuditEvent(tx, { firmId, eventType: "consultation.request_lapsed", category: "legal_workflow", intakeId: row.intakeId, metadata: { consultationId: row.id } });
+  }
 }
 
 /**

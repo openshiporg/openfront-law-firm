@@ -51,12 +51,12 @@ async function account(tx: any, context: Context) {
   return user
 }
 function dto(row: any, payment: any = null) {
-  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || 'UTC', paymentState: consultationPaymentState(row, payment) }
+  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || 'UTC', paymentState: consultationPaymentState(row, payment), hostName: row.host?.name ?? null, location: row.location || null, paidAt: payment?.capturedAt?.toISOString?.() ?? null }
 }
 /** Customer DTOs carry the consultation-fee payment state (none/due/paid/refunded/expired). */
 async function withPayments(tx: any, rows: any[]) {
   const paid = rows.filter((row) => row.feeMinor > 0)
-  const payments = paid.length ? await tx.payment.findMany({ where: { firmId: paid[0].firmId, idempotencyKey: { in: paid.map((row) => consultationPaymentKey(row.id)) } }, select: { idempotencyKey: true, status: true, amountMinor: true, refundedMinor: true } }) : []
+  const payments = paid.length ? await tx.payment.findMany({ where: { firmId: paid[0].firmId, idempotencyKey: { in: paid.map((row) => consultationPaymentKey(row.id)) } }, select: { idempotencyKey: true, status: true, amountMinor: true, refundedMinor: true, capturedAt: true } }) : []
   const byKey = new Map(payments.map((payment: any) => [payment.idempotencyKey, payment]))
   return rows.map((row) => dto(row, byKey.get(consultationPaymentKey(row.id)) ?? null))
 }
@@ -366,6 +366,9 @@ export async function bookClientConsultation(
     const end = new Date(start.getTime() + service.consultationMinutes * 60000)
     if (!withinHorizon(start, Date.now())) throw new Error('Select an available time within the next fourteen days.')
     await releaseUnpaidConsultations(tx, firm.id)
+    // One client cannot hold two consultations over the same time.
+    const own = await tx.consultation.count({ where: { firmId: firm.id, accountId: user.id, status: { in: ['requested', 'scheduled'] }, startsAt: { lt: end }, endsAt: { gt: start } } })
+    if (own) throw new Error('You already have a consultation at this time. Open it from your appointments, or choose another time.')
     const everyHost = await eligibleHosts(tx, firm)
     if (!everyHost.length) throw new Error('No consultation host is available.')
     // The practice-area page names the attorneys who handle it, so the request goes to one of
@@ -450,7 +453,7 @@ export async function customerConsultation(_root: unknown, args: { id: string },
     const user = await account(tx, context)
     const firm = await servicingFirm(tx)
     if (!firm) throw new Error('Appointment history is temporarily unavailable.')
-    const row = await tx.consultation.findFirst({ where: { id: args.id, accountId: user.id, firmId: firm.id } })
+    const row = await tx.consultation.findFirst({ where: { id: args.id, accountId: user.id, firmId: firm.id }, include: { host: { select: { name: true } } } })
     return row ? (await withPayments(tx, [row]))[0] : null
   })
 }

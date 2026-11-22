@@ -155,7 +155,7 @@ export function PracticeRowAction({
       <summary className={cn(trackClass, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>
         <span className={cn(trackItemClass(true), 'h-7 px-3 text-xs')}>{action.label}</span>
       </summary>
-      <form {...formActionForm} className="absolute right-0 z-20 mt-2 box-border grid w-80 max-w-[calc(100vw-2rem)] gap-3 rounded-[6px] border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+      <form {...formActionForm} ref={(node) => { node?.scrollIntoView({ block: 'nearest' }) }} className="absolute right-0 z-20 mt-2 scroll-mb-4 box-border grid w-80 max-w-[calc(100vw-2rem)] gap-3 rounded-[6px] border border-border bg-popover p-3 text-popover-foreground shadow-lg">
         {action.alternates?.length ? (
           <label className={labelClass} htmlFor={`operation-${id}`}>
             Action

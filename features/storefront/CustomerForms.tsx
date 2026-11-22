@@ -27,23 +27,23 @@ export function CustomerAuthForm({ mode, service, from = '', at = '' }: { mode: 
  */
 function SlotPicker({ slots, timezone, initial }: { slots: AvailabilitySlot[]; timezone: string; initial: string }) {
   const [startsAt, setStartsAt] = useState(() => slots.some((slot) => slot.startsAt === initial) ? initial : '')
-  const [showAll, setShowAll] = useState(false)
   const days = slotsByDay(slots, timezone)
   const chosenIndex = days.findIndex(({ slots: list }) => list.some((slot) => slot.startsAt === startsAt))
-  const visible = showAll ? days : days.slice(0, Math.max(3, chosenIndex + 1))
+  // One day's times at a time: the client picks the day first, so the form stays short on a phone.
+  const [dayIndex, setDayIndex] = useState(Math.max(0, chosenIndex))
+  const current = days[Math.min(dayIndex, days.length - 1)]
   return <div className="sf-slots">
     <input type="hidden" name="startsAt" value={startsAt} />
-    {visible.map(({ day, slots: list }) => {
-      const [weekday, ...date] = day.split(' ')
-      return <div key={day} role="radiogroup" aria-label={day} className="alt-slots__day">
-        <span className="alt-slots__daylabel" aria-hidden="true">{weekday}<br />{date.join(' ')}</span>
-        <div className="alt-slots__times">
-          {list.map((slot) => <label key={slot.startsAt} className="sf-seg"><input type="radio" name="slotTime" value={slot.startsAt} checked={slot.startsAt === startsAt} onChange={() => setStartsAt(slot.startsAt)} /><span className="sf-pill sf-num">{slotTimeLabel(slot.startsAt, timezone)}</span></label>)}
-        </div>
-      </div>
-    })}
-    {days.length > visible.length ? <div className="sf-track"><button type="button" className="sf-pill" onClick={() => setShowAll(true)}>More days</button></div> : null}
-    <p className="sf-fine">{startsAt ? `${slotLabel(startsAt, timezone)} · ` : 'Choose a time · '}Times in {timezoneLabel(timezone)}</p>
+    <div role="group" aria-label="Day" className="alt-slots__days">
+      {days.map(({ day }, index) => {
+        const [weekday, ...date] = day.split(' ')
+        return <button key={day} type="button" className="alt-slots__daybtn sf-num" aria-pressed={index === dayIndex} onClick={() => setDayIndex(index)}><span>{weekday}</span><b>{date.join(' ')}</b></button>
+      })}
+    </div>
+    {current ? <div role="radiogroup" aria-label={`Times on ${current.day}`} className="alt-slots__times">
+      {current.slots.map((slot) => <label key={slot.startsAt} className="sf-seg"><input type="radio" name="slotTime" value={slot.startsAt} checked={slot.startsAt === startsAt} onChange={() => setStartsAt(slot.startsAt)} /><span className="sf-pill sf-num">{slotTimeLabel(slot.startsAt, timezone)}</span></label>)}
+    </div> : null}
+    <p className="sf-fine" aria-live="polite">{startsAt ? `${slotLabel(startsAt, timezone)} · ` : 'Choose a time · '}Times in {timezoneLabel(timezone)}</p>
   </div>
 }
 

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { PublicPage } from '../PublicSiteChrome'
 import { CustomerAuthForm } from '../CustomerForms'
 import { CustomerResetRedeemForm, CustomerResetRequestForm } from '../CustomerResetForms'
-import { appointmentStatus, formatAppointmentTime, getCustomerConsultations } from '../lib/consultation-data'
+import { appointmentStatus, formatAppointmentTime, getCustomerConsultations, getCustomerProfile } from '../lib/consultation-data'
 import { firmMetadata } from '../lib/metadata'
 import { getStorefrontSettings } from '../lib/storefront-settings'
 import { customerSignOut } from '../actions/customer-account'
@@ -68,15 +68,16 @@ export async function accountMetadata() { return firmMetadata('Your appointments
 export async function AccountPage({ searchParams }: { searchParams: Promise<{ after?: string | string[] }> }) {
   const { after } = await searchParams
   const cursor = typeof after === 'string' ? after : null
-  const [result, settings] = await Promise.all([getCustomerConsultations(cursor), getStorefrontSettings()])
+  const [result, settings, profile] = await Promise.all([getCustomerConsultations(cursor), getStorefrontSettings(), getCustomerProfile()])
   if (result.status === 'signed_out') redirect(cursor ? `/account/signin?from=${encodeURIComponent('/account')}` : '/account/signin')
   if (result.status === 'unavailable') return <PublicPage><div className="sf-shell sf-page"><div className="sf-narrow grid gap-6"><h1 className="sf-title">Appointments</h1><p role="alert" className="sf-notice sf-notice--plain">Your appointments could not be loaded. Nothing was changed.</p><div className="sf-track"><Link className="sf-pill sf-pill--raised" href="/account">Try again</Link><Link className="sf-pill" href="/contact">Contact the firm</Link></div></div></div></PublicPage>
   const { appointments: rows, nextCursor } = result.data
   return <PublicPage><div className="sf-shell sf-page">
     <header className="sf-page__head sf-page__head--split">
-      <div className="grid gap-3"><h1 className="sf-title">Appointments</h1><p className="sf-label">Your account</p></div>
+      <div className="grid gap-3"><h1 className="sf-title">Appointments</h1><p className="sf-label">{profile?.name ? `${profile.name} · ` : ''}{profile?.email || 'Your account'}</p></div>
       <div className="sf-track">
         {settings.bookingEnabled ? <Link className="sf-pill sf-pill--primary" href="/practice-areas">New request</Link> : null}
+        <Link className="sf-pill" href="/account/reset">Change password</Link>
         <form action={customerSignOut}><button className="sf-pill">Sign out</button></form>
       </div>
     </header>

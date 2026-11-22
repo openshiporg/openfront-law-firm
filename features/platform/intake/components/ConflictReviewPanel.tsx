@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FormSelect } from '@/components/ui/form-select'
-import { Search } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import {
@@ -35,7 +35,7 @@ export function ConflictReviewPanel({ setup, pageHrefs, timeZone }: { setup: Con
       </h2>
       {!setup.conflictChecks.length ? <EmptyState title="No conflict checks awaiting work" /> : (
         <div className="space-y-4">
-          {setup.conflictChecks.map((check) => <ConflictCheck key={check.id} check={check} setup={setup} timeZone={timeZone} />)}
+          {setup.conflictChecks.map((check, index) => <ConflictCheck key={check.id} check={check} setup={setup} timeZone={timeZone} startOpen={index === 0} />)}
         </div>
       )}
       {setup.pageCount > 1 && pageHrefs ? (
@@ -45,8 +45,10 @@ export function ConflictReviewPanel({ setup, pageHrefs, timeZone }: { setup: Con
   )
 }
 
-function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup['conflictChecks'][number]; setup: ConflictReviewSetup; timeZone: string }) {
+function ConflictCheck({ check, setup, timeZone, startOpen }: { check: ConflictReviewSetup['conflictChecks'][number]; setup: ConflictReviewSetup; timeZone: string; startOpen: boolean }) {
   const router = useRouter()
+  // A queue of checks stays scannable: one card open, the rest one line each until opened.
+  const [open, setOpen] = useState(startOpen)
   const [state, action, pending] = useActionState<ConflictReviewState, FormData>(manageConflictReview, { ok: false, message: '' })
   const actionForm = useKeptForm(action, state)
   const [outcome, setOutcome] = useState('')
@@ -103,14 +105,16 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
   const heading = check.intake ? `${check.intake.intakeNumber} · ${check.intake.title}` : check.matter ? `${check.matter.matterNumber} · ${check.matter.title}` : check.checkNumber
   return (
     <article id={`conflict-${check.id}`} className="min-w-0 scroll-mt-20 overflow-hidden rounded-[6px] border border-border bg-card">
-      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2.5 bg-[var(--lf-manila)]">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <h3 className="m-0">
+        <button type="button" aria-expanded={open} aria-controls={`conflict-body-${check.id}`} onClick={() => setOpen((value) => !value)} className={cn('flex min-h-11 w-full min-w-0 items-center gap-2 px-4 py-2.5 text-left bg-[var(--lf-manila)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50', open && 'border-b border-border')}>
           <StatusDot tone={statusTone(status)} />
-          <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{heading}</h3>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{heading}</span>
           <span className="shrink-0 whitespace-nowrap text-xs font-medium text-muted-foreground">{statusLabel(status)}</span>
-        </div>
-        <span className="font-mono text-xs text-muted-foreground">{check.checkNumber}</span>
-      </header>
+          <span className="hidden shrink-0 font-mono text-xs font-normal text-muted-foreground sm:inline">{check.checkNumber}</span>
+          <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none', open && 'rotate-180')} aria-hidden="true" />
+        </button>
+      </h3>
+      <div id={`conflict-body-${check.id}`} hidden={!open}>
 
       {detailError || state.message ? (
         <div className="space-y-1 border-b border-border px-4 py-3 text-sm">
@@ -227,6 +231,7 @@ function ConflictCheck({ check, setup, timeZone }: { check: ConflictReviewSetup[
           <Track className="justify-self-start sm:col-span-2"><button type="submit" className={pillPrimaryClass} disabled={pending || !outcome}>Record final review</button></Track>
         </form>
       ) : null}
+      </div>
     </article>
   )
 }

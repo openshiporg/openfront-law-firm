@@ -1,7 +1,7 @@
 /** Browser-safe appointment DTOs and display helpers. No server/client transport,
  * request headers, cookies or provider configuration may be imported here. */
 export type Service = { id: string; code: string; publicSlug: string; name: string; description: string; consultationFeeMinor: number; consultationMinutes: number; currencyCode: string }
-export type CustomerConsultation = { id: string; serviceTitle: string; feeMinor: number; currencyCode: string; status: string; startsAt: string | null; endsAt: string | null; timezone: string; paymentState?: string }
+export type CustomerConsultation = { id: string; serviceTitle: string; feeMinor: number; currencyCode: string; status: string; startsAt: string | null; endsAt: string | null; timezone: string; paymentState?: string; hostName?: string | null; location?: string | null; paidAt?: string | null }
 export type AvailabilitySlot = { startsAt: string; endsAt: string }
 export type ServiceAvailability = { timezone: string; slots: AvailabilitySlot[] }
 
@@ -17,9 +17,14 @@ export function appointmentStatus(status: string, paymentState?: string) {
   if (status === 'requested' && paymentState === 'due') return { label: 'Payment due', tone: 'sf-dot--accent' }
   return appointmentLabels[status] ?? { label: status.replaceAll('_', ' ').replace(/^./, first => first.toUpperCase()) || 'Unknown', tone: 'sf-dot--slate' }
 }
-export function appointmentPaymentState(row: Pick<CustomerConsultation, 'feeMinor' | 'status' | 'paymentState'>) {
+export function appointmentPaymentState(row: Pick<CustomerConsultation, 'feeMinor' | 'status' | 'paymentState' | 'paidAt' | 'timezone'>) {
   if (row.feeMinor <= 0) return 'No consultation fee'
-  if (row.paymentState === 'paid') return 'Paid by card'
+  if (row.paymentState === 'paid') {
+    const paid = row.paidAt ? new Date(row.paidAt) : null
+    if (!paid || !Number.isFinite(paid.getTime())) return 'Paid by card'
+    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' }
+    try { return `Paid by card on ${new Intl.DateTimeFormat('en-US', { ...options, timeZone: row.timezone }).format(paid)}` } catch { return `Paid by card on ${new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(paid)}` }
+  }
   if (row.paymentState === 'refunded') return 'Refunded to your card'
   if (row.paymentState === 'due') return 'Due now — pay to hold this time'
   if (row.status === 'cancelled') return 'Cancelled — no payment collected'

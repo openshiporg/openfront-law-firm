@@ -320,6 +320,7 @@ export async function AppointmentPage({ params, searchParams }: { params: Promis
     if (again.status === 'ok' && again.data) row = again.data
   }
   const status = appointmentStatus(row.status, row.paymentState)
+  const settings = await getStorefrontSettings()
   return <PublicPage><div className="sf-shell sf-page">
     <nav aria-label="Breadcrumb"><ol className="alt-crumbs"><li><Link href="/account">Your appointments</Link></li></ol></nav>
     <div className="sf-narrow grid gap-8">
@@ -329,7 +330,8 @@ export async function AppointmentPage({ params, searchParams }: { params: Promis
         <p className="sf-lede sf-num">{formatAppointmentTime(row.startsAt, row.timezone)}</p>
       </header>
       <dl className="sf-facts">
-        <div><dt>Time</dt><dd className="sf-num">{formatAppointmentTime(row.startsAt, row.timezone)}</dd></div>
+        {row.hostName ? <div><dt>{row.status === 'requested' ? 'Requested with' : 'With'}</dt><dd>{row.hostName}</dd></div> : null}
+        <div><dt>Where</dt><dd>{row.location || (settings.officeAddress.length ? settings.officeAddress.join(', ') : 'The firm will confirm the place')}</dd></div>
         <div><dt>Consultation fee</dt><dd className="sf-num">{row.feeMinor > 0 ? formatMoney(row.feeMinor, row.currencyCode) : 'No fee'}</dd></div>
         <div><dt>Payment</dt><dd>{appointmentPaymentState(row)}</dd></div>
       </dl>
