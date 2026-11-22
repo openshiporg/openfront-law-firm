@@ -51,7 +51,8 @@ export async function signIn(prevState: AuthState, formData: FormData) {
   }
 
   // Next.js redirects throw; keep this outside the catch.
-  redirect(from);
+  // Staff land on their own work, not on the list of data models.
+  redirect(from === '/dashboard' ? '/dashboard/platform/my-work' : from);
 }
 
 export async function signUp(prevState: AuthState, formData: FormData) {
