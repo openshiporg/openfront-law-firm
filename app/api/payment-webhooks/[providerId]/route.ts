@@ -9,6 +9,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const MAX_BODY = 1_000_000;
 
+const secretKeyEnv = (p: any) => typeof p?.credentials?.secretKeyEnv === "string" ? p.credentials.secretKeyEnv : "STRIPE_SECRET_KEY";
+function sameProviderAccount(paymentProvider: any, provider: any) {
+  if (!paymentProvider) return false;
+  if (paymentProvider.id === provider.id) return true;
+  const a = process.env[secretKeyEnv(paymentProvider)], b = process.env[secretKeyEnv(provider)];
+  return Boolean(a) && a === b;
+}
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ providerId: string }> }) {
   const rawBody = await request.text();
   if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY) return NextResponse.json({ error: "Payload too large" }, { status: 413 });
@@ -26,13 +34,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!["checkout.session.completed", "payment_intent.succeeded"].includes(type)) return NextResponse.json({ received: true });
     const resource = verified.resource || {};
     const paymentId = resource.metadata?.paymentId;
-    if (!paymentId) throw new Error("Payment correlation metadata is missing.");
+    // The provider account can serve other sites. An event that names no payment of ours is theirs:
+    // acknowledge it, or the provider retries it for days and then switches this endpoint off.
+    if (typeof paymentId !== "string" || !paymentId) return NextResponse.json({ received: true, ignored: true });
+    const known = await prisma.payment.findFirst({ where: { id: paymentId, firmId: provider.firmId }, include: { paymentProvider: true } });
+    if (!known) return NextResponse.json({ received: true, ignored: true });
     const key = `provider-webhook:${provider.id}:${verified.event.id}`;
     const prior = await prisma.idempotencyKey.findUnique({ where: { idempotencyKey: key } });
     if (prior?.recoveryPoint === "completed") return NextResponse.json({ received: true, duplicate: true });
     if (!prior) await prisma.idempotencyKey.create({ data: { idempotencyKey: key, requestMethod: "POST", requestPath: "payment-provider-webhook", requestParams: { providerId, eventId: verified.event.id }, recoveryPoint: "verified", lockedAt: new Date() } });
     const payment = await prisma.payment.findFirst({ where: { id: paymentId, firmId: resource.metadata?.firmId } });
-    if (!payment || payment.paymentProviderId !== resource.id && payment.providerCode !== provider.code) throw new Error("Provider event does not correlate to this payment.");
+    // One endpoint serves every provider record that uses the same provider account (operating and trust).
+    if (!payment || resource.metadata?.firmId !== known.firmId || !sameProviderAccount(known.paymentProvider, provider)) throw new Error("Provider event does not correlate to this payment.");
     // Reconcile the Checkout this event is about, which may be an older page than the one stored.
     const checkoutId = type === "checkout.session.completed" && typeof resource.id === "string" && resource.id.startsWith("cs_") ? resource.id : undefined;
     const settled = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId, undefined, checkoutId);

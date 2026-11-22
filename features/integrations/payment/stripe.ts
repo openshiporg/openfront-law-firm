@@ -54,6 +54,7 @@ export async function createPaymentFunction({ invoice, retainer, consultation, p
     customer_email: resource.email || undefined,
     line_items: [{ quantity: 1, price_data: { currency: currency.toLowerCase(), unit_amount: amount, product_data: { name: resource.title || fallbackName } } }],
     metadata, payment_intent_data: { metadata },
+    // The provider's shortest page life is thirty minutes; the fifteen-minute hold closes the page itself when it lapses.
     ...(consultation ? { expires_at: Math.floor(Date.now() / 1000) + 31 * 60 } : {}),
   }, { idempotencyKey });
   return { status: "pending", checkoutSessionId: session.id, checkoutUrl: session.url, amount, currency: currency.toUpperCase() };
@@ -104,6 +105,15 @@ export async function getPaymentStatusFunction({ paymentId, provider }: PaymentO
     paymentIntentId: intent?.id,
     data: session,
   };
+}
+
+/** Closes an unpaid Checkout page. A page already paid or closed is left as it is. */
+export async function expireCheckoutFunction({ paymentId, provider }: PaymentOperationInput) {
+  const stripe = getStripeClient(provider);
+  const session = await stripe.checkout.sessions.retrieve(paymentId);
+  if (session.status !== "open") return { status: session.status };
+  const closed = await stripe.checkout.sessions.expire(paymentId);
+  return { status: closed.status };
 }
 
 export async function generatePaymentLinkFunction({ paymentId, provider }: PaymentOperationInput) {

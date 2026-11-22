@@ -1,7 +1,7 @@
 import { paymentProviderAdapters } from "../../integrations/payment";
 
 const ADAPTERS = new Set(Object.keys(paymentProviderAdapters));
-const OPERATIONS = new Set(["createPaymentFunction", "capturePaymentFunction", "refundPaymentFunction", "getPaymentStatusFunction", "generatePaymentLinkFunction", "handleWebhookFunction"]);
+const OPERATIONS = new Set(["createPaymentFunction", "capturePaymentFunction", "refundPaymentFunction", "getPaymentStatusFunction", "generatePaymentLinkFunction", "handleWebhookFunction", "expireCheckoutFunction"]);
 const INPUT_KEYS = new Set(["invoice", "retainer", "consultation", "firmId", "paymentId", "amount", "currency", "idempotencyKey", "successUrl", "cancelUrl", "refundId", "event", "headers", "rawBody"]);
 
 export function paymentAdapterPayload(provider: any, args: any) {
@@ -19,7 +19,8 @@ export function paymentAdapterPayload(provider: any, args: any) {
 
 export async function executeAdapterFunction({ provider, functionName, args }: { provider: any; functionName: string; args: any }) {
   if (!OPERATIONS.has(functionName)) throw new Error("Unknown payment adapter operation");
-  const selector = provider?.[functionName];
+  // Closing a checkout page is done by the adapter that opened it.
+  const selector = provider?.[functionName === "expireCheckoutFunction" ? "createPaymentFunction" : functionName];
   if (typeof selector !== "string") throw new Error("Payment adapter is not configured");
   const payload = paymentAdapterPayload(provider, args);
   if (/^https:/i.test(selector)) {
@@ -41,4 +42,5 @@ export const capturePayment = (args: any) => executeAdapterFunction({ ...args, f
 export const refundPayment = (args: any) => executeAdapterFunction({ ...args, functionName: "refundPaymentFunction", args });
 export const getPaymentStatus = (args: any) => executeAdapterFunction({ ...args, functionName: "getPaymentStatusFunction", args });
 export const generatePaymentLink = (args: any) => executeAdapterFunction({ ...args, functionName: "generatePaymentLinkFunction", args });
+export const expireCheckout = (args: any) => executeAdapterFunction({ ...args, functionName: "expireCheckoutFunction", args });
 export const handleWebhook = (args: any) => executeAdapterFunction({ ...args, functionName: "handleWebhookFunction", args });

@@ -1,7 +1,7 @@
 /** Browser-safe appointment DTOs and display helpers. No server/client transport,
  * request headers, cookies or provider configuration may be imported here. */
 export type Service = { id: string; code: string; publicSlug: string; name: string; description: string; consultationFeeMinor: number; consultationMinutes: number; currencyCode: string }
-export type CustomerConsultation = { id: string; serviceTitle: string; feeMinor: number; currencyCode: string; status: string; startsAt: string | null; endsAt: string | null; timezone: string; paymentState?: string; hostName?: string | null; location?: string | null; paidAt?: string | null }
+export type CustomerConsultation = { id: string; serviceTitle: string; feeMinor: number; currencyCode: string; status: string; startsAt: string | null; endsAt: string | null; timezone: string; paymentState?: string; payBy?: string | null; hostName?: string | null; location?: string | null; paidAt?: string | null }
 export type AvailabilitySlot = { startsAt: string; endsAt: string }
 export type ServiceAvailability = { timezone: string; slots: AvailabilitySlot[] }
 
@@ -14,7 +14,8 @@ const appointmentLabels: Record<string, { label: string; tone: string }> = {
 }
 /** The status a client reads. An unpaid request with a fee is not waiting on the firm: it is waiting on payment. */
 export function appointmentStatus(status: string, paymentState?: string) {
-  if (status === 'requested' && paymentState === 'due') return { label: 'Payment due', tone: 'sf-dot--accent' }
+  if (status === 'requested' && paymentState === 'due') return { label: 'Awaiting payment', tone: 'sf-dot--accent' }
+  if (status === 'requested' && paymentState === 'paid') return { label: 'Paid, awaiting confirmation', tone: 'sf-dot--amber' }
   return appointmentLabels[status] ?? { label: status.replaceAll('_', ' ').replace(/^./, first => first.toUpperCase()) || 'Unknown', tone: 'sf-dot--slate' }
 }
 export function appointmentPaymentState(row: Pick<CustomerConsultation, 'feeMinor' | 'status' | 'paymentState' | 'paidAt' | 'timezone'>) {
@@ -26,13 +27,18 @@ export function appointmentPaymentState(row: Pick<CustomerConsultation, 'feeMino
     try { return `Paid by card on ${new Intl.DateTimeFormat('en-US', { ...options, timeZone: row.timezone }).format(paid)}` } catch { return `Paid by card on ${new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(paid)}` }
   }
   if (row.paymentState === 'refunded') return 'Refunded to your card'
-  if (row.paymentState === 'due') return 'Due now — pay to hold this time'
+  if (row.paymentState === 'due') return 'Not paid yet'
   if (row.status === 'cancelled') return 'Cancelled — no payment collected'
   return 'Not paid'
 }
 /** One-line notice under the appointment facts. */
-export function appointmentNotice(row: Pick<CustomerConsultation, 'feeMinor' | 'status' | 'paymentState'>) {
-  if (row.paymentState === 'due') return 'Pay the consultation fee to hold this time. Unpaid requests are released after 30 minutes.'
+export function appointmentNotice(row: Pick<CustomerConsultation, 'feeMinor' | 'status' | 'paymentState' | 'payBy' | 'timezone'>) {
+  if (row.paymentState === 'due') {
+    const by = row.payBy ? new Date(row.payBy) : null
+    let clock = ''
+    if (by && Number.isFinite(by.getTime())) { try { clock = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: row.timezone }).format(by) } catch { clock = '' } }
+    return clock ? `This time is held for you until ${clock}. Pay the consultation fee before then, or the time is released.` : 'This time is held for you for 15 minutes. Pay the consultation fee before then, or the time is released.'
+  }
   if (row.paymentState === 'refunded') return row.status === 'cancelled' ? 'This consultation was cancelled and the fee was refunded to your card.' : 'The consultation fee was refunded to your card.'
   if (row.status === 'requested') return row.paymentState === 'paid' ? 'Fee received. The firm runs a conflict check before confirming.' : 'The firm runs a conflict check before confirming. No payment is collected online.'
   if (row.paymentState === 'paid') return 'Fee received. Cancel before it starts for a full refund.'

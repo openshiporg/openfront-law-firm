@@ -4,7 +4,7 @@ import { isHumanIdentitySession } from '../access'
 import { prismaWithoutGraphQLErrorConversion, runSerializableTransaction } from '../lib/transactions'
 import { sha256Digest } from '../lib/digests'
 import { recordAuditEvent } from './workflow-helpers'
-import { consultationPaymentKey, consultationPaymentState, reconcileOpenConsultationCheckouts, releaseUnpaidConsultations } from './consultationPayments'
+import { CONSULTATION_PAYMENT_WINDOW_MS, consultationPaymentKey, consultationPaymentState, reconcileOpenConsultationCheckouts, releaseUnpaidConsultations } from './consultationPayments'
 import { assertCurrentCommandActor } from './command-authority'
 import { adversePartyContact, normalizeConflictTerm, parseAdversePartyNames, splitPersonName } from './intakeWorkflows'
 import { loadActiveHumanSession } from '../lib/machine-auth'
@@ -51,7 +51,7 @@ async function account(tx: any, context: Context) {
   return user
 }
 function dto(row: any, payment: any = null) {
-  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || 'UTC', paymentState: consultationPaymentState(row, payment), hostName: row.host?.name ?? null, location: row.location || null, paidAt: payment?.capturedAt?.toISOString?.() ?? null }
+  return { id: row.id, serviceTitle: row.serviceTitle, feeMinor: row.feeMinor, currencyCode: row.currencyCode, status: row.status, startsAt: row.startsAt?.toISOString() ?? null, endsAt: row.endsAt?.toISOString() ?? null, timezone: row.timezone || 'UTC', paymentState: consultationPaymentState(row, payment), hostName: row.host?.name ?? null, location: row.location || null, paidAt: payment?.capturedAt?.toISOString?.() ?? null, payBy: consultationPaymentState(row, payment) === 'due' && row.createdAt ? new Date(row.createdAt.getTime() + CONSULTATION_PAYMENT_WINDOW_MS).toISOString() : null }
 }
 /** Customer DTOs carry the consultation-fee payment state (none/due/paid/refunded/expired). */
 async function withPayments(tx: any, rows: any[]) {
@@ -174,7 +174,7 @@ export function insideConsultationHours(start: Date, end: Date, timeZone: string
 function withinHorizon(start: Date, now: number) {
   return start.getTime() >= now + BOOKING_LEAD_MS && start.getTime() <= now + BOOKING_HORIZON_MS
 }
-type Host = { userId: string; name: string; officeId: string | null; timezone: string; session: any }
+type Host = { userId: string; name: string; email: string; managesFirm: boolean; officeId: string | null; timezone: string; session: any }
 async function eligibleHosts(tx: any, firm: any): Promise<Host[]> {
   const hosts: Host[] = []
   let after: string | undefined
@@ -182,12 +182,12 @@ async function eligibleHosts(tx: any, firm: any): Promise<Host[]> {
     const memberships = await tx.firmMembership.findMany({
       where: { firmId: firm.id, status: 'active', user: { status: 'active' }, role: { firmId: firm.id, status: 'active', canManageIntake: true }, OR: [{ primaryOfficeId: null }, { primaryOffice: { status: 'active' } }], ...(after ? { id: { gt: after } } : {}) },
       orderBy: { id: 'asc' }, take: 100,
-      select: { id: true, userId: true, user: { select: { name: true } }, primaryOfficeId: true, primaryOffice: { select: { status: true, timezone: true } } },
+      select: { id: true, userId: true, user: { select: { name: true, email: true } }, role: { select: { canManageFirm: true } }, primaryOfficeId: true, primaryOffice: { select: { status: true, timezone: true } } },
     })
     for (const membership of memberships) {
       const session = await loadActiveHumanSession(tx, membership.userId, firm.id)
       if (!session) continue
-      hosts.push({ userId: membership.userId, name: membership.user?.name ?? '', officeId: membership.primaryOfficeId ?? null, timezone: validTimezone(membership.primaryOffice?.timezone, validTimezone(firm.defaultTimezone)), session })
+      hosts.push({ userId: membership.userId, name: membership.user?.name ?? '', email: membership.user?.email ?? '', managesFirm: Boolean(membership.role?.canManageFirm), officeId: membership.primaryOfficeId ?? null, timezone: validTimezone(membership.primaryOffice?.timezone, validTimezone(firm.defaultTimezone)), session })
     }
     if (memberships.length < 100) return hosts
     after = memberships[memberships.length - 1].id
@@ -209,16 +209,26 @@ function busyWhere(firmId: string, hostId: string, start: Date, end: Date) {
 }
 
 const personKey = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ')
-/** Pure: hosts in the order a request for one practice area is offered to them. */
-export function orderHostsForService<T extends { name: string }>(hosts: T[], profiles: Array<{ name: string; practiceAreas: Array<{ id: string }> }>, serviceId: string): T[] {
+type HostProfile = { name: string; email?: string | null; practiceAreas: Array<{ id: string }> }
+/**
+ * Pure: the people a request for one practice area can be booked with. The practice-area page
+ * names its attorneys, so those are the only hosts when the firm has published any. Otherwise
+ * another published attorney, and only then other intake staff. Someone who runs the firm's
+ * settings and has no published attorney profile is never a host.
+ */
+export function hostsForService<T extends { name: string; email?: string; managesFirm?: boolean }>(hosts: T[], profiles: HostProfile[], serviceId: string): T[] {
   const rank = new Map<string, number>()
   for (const profile of profiles) {
-    const key = personKey(profile.name)
     const value = profile.practiceAreas.some((area) => area.id === serviceId) ? 0 : 1
-    rank.set(key, Math.min(rank.get(key) ?? 2, value))
+    for (const key of [personKey(profile.name), profile.email ? `@${personKey(profile.email)}` : '']) if (key) rank.set(key, Math.min(rank.get(key) ?? 2, value))
   }
-  return hosts.map((host, index) => ({ host, index, rank: rank.get(personKey(host.name)) ?? 2 }))
-    .sort((a, b) => a.rank - b.rank || a.index - b.index).map((entry) => entry.host)
+  const ranked = hosts.map((host) => ({ host, rank: Math.min(rank.get(personKey(host.name)) ?? 2, host.email ? rank.get(`@${personKey(host.email)}`) ?? 2 : 2) }))
+    .filter((entry) => entry.rank < 2 || !entry.host.managesFirm)
+  const best = Math.min(...ranked.map((entry) => entry.rank))
+  return ranked.filter((entry) => entry.rank === best).map((entry) => entry.host)
+}
+async function publishedProfiles(tx: any, firmId: string): Promise<HostProfile[]> {
+  return tx.attorneyProfile.findMany({ where: { firmId, isPublic: true }, select: { name: true, email: true, practiceAreas: { select: { id: true } } }, take: 200 })
 }
 /** Busy intervals per host over the booking horizon; refuses rather than under-reporting. */
 async function hostBusyIntervals(tx: any, firm: any, hosts: Host[], now: number) {
@@ -272,7 +282,7 @@ export async function consultationAvailability(_root: unknown, args: { serviceId
     if (!service) throw new Error('Service is unavailable.')
     const timezone = validTimezone(firm.defaultTimezone)
     const now = Date.now()
-    const hosts = await eligibleHosts(tx, firm)
+    const hosts = hostsForService(await eligibleHosts(tx, firm), await publishedProfiles(tx, firm.id), service.id)
     const busy = await hostBusyIntervals(tx, firm, hosts, now)
     return { timezone, slots: openSlots(hosts, busy, service.consultationMinutes, now, BOOKING_HORIZON_MS) }
   })
@@ -302,13 +312,11 @@ export async function consultationOpenTimes(_root: unknown, args: { serviceId?: 
     const now = Date.now()
     const hosts = await eligibleHosts(tx, firm)
     const busy = await hostBusyIntervals(tx, firm, hosts, now)
-    const byLength = new Map<number, Array<{ startsAt: string; endsAt: string }>>()
+    const profiles = await publishedProfiles(tx, firm.id)
     return {
       timezone,
-      services: services.map((service: any) => {
-        if (!byLength.has(service.consultationMinutes)) byLength.set(service.consultationMinutes, openSlots(hosts, busy, service.consultationMinutes, now, OPEN_TIMES_HORIZON_MS).slice(0, OPEN_TIMES_PER_SERVICE))
-        return { serviceId: service.id, slots: byLength.get(service.consultationMinutes) }
-      }),
+      // Each practice area offers only the times its own attorneys are free.
+      services: services.map((service: any) => ({ serviceId: service.id, slots: openSlots(hostsForService(hosts, profiles, service.id), busy, service.consultationMinutes, now, OPEN_TIMES_HORIZON_MS).slice(0, OPEN_TIMES_PER_SERVICE) })),
     }
   })
 }
@@ -371,25 +379,25 @@ export async function bookClientConsultation(
     if (own) throw new Error('You already have a consultation at this time. Open it from your appointments, or choose another time.')
     const everyHost = await eligibleHosts(tx, firm)
     if (!everyHost.length) throw new Error('No consultation host is available.')
-    // The practice-area page names the attorneys who handle it, so the request goes to one of
-    // them first, then to another published attorney, and only then to other intake staff.
-    const profiles = await tx.attorneyProfile.findMany({ where: { firmId: firm.id, isPublic: true }, select: { name: true, practiceAreas: { select: { id: true } } }, take: 200 })
-    const hosts = orderHostsForService(everyHost, profiles, service.id)
+    // The practice-area page names the attorneys who handle it, so the request is booked with one of them.
+    const hosts = hostsForService(everyHost, await publishedProfiles(tx, firm.id), service.id)
+    if (!hosts.length) throw new Error('No consultation host is available.')
     let receiver: Host | null = null
     const inHours = everyHost.filter((host) => insideConsultationHours(start, end, host.timezone))
-    const insideHours = inHours.length > 0
+    const insideHours = hosts.some((host) => inHours.includes(host))
     // All booking writers take the host locks in membership order, whatever order the hosts are
     // then offered the request in, so two bookings can never wait on each other. Raw Consultation CRUD is omitted.
     for (const host of inHours) {
       await assertCurrentCommandActor(tx, context.withSession(host.session), 'canManageIntake')
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`consultation-host:${firm.id}:${host.userId}`}))`
     }
+    // Of the attorneys free at this time, the one with the fewest consultations ahead takes it.
+    let lightest = Infinity
     for (const host of hosts) {
       if (!inHours.includes(host)) continue
-      if (!await tx.consultation.count({ where: busyWhere(firm.id, host.userId, start, end) })) {
-        receiver = host
-        break
-      }
+      if (await tx.consultation.count({ where: busyWhere(firm.id, host.userId, start, end) })) continue
+      const ahead = await tx.consultation.count({ where: { firmId: firm.id, hostId: host.userId, status: { in: ['requested', 'scheduled'] }, endsAt: { gt: new Date() } } })
+      if (ahead < lightest) { lightest = ahead; receiver = host }
     }
     if (!insideHours) throw new Error('Select an available time.')
     if (!receiver) throw new Error('This time is no longer available. Choose another time.')
@@ -428,10 +436,12 @@ export async function bookClientConsultation(
 }
 
 export async function customerConsultationPage(_root: unknown, args: { cursor?: string | null }, context: Context) {
+  await settleOpenCheckouts(context)
   return runSerializableTransaction(context.prisma, async (tx: any) => {
     const user = await account(tx, context)
     const firm = await servicingFirm(tx)
     if (!firm) throw new Error('Appointment history is temporarily unavailable.')
+    await releaseUnpaidConsultations(tx, firm.id)
     const after = decodeCursor(args.cursor, ['a', 'c', 'i'])
     if (after && after.a !== user.id) throw new Error('This page is unavailable. Start again from the first page.')
     const keyset = after ? { OR: [{ createdAt: { lt: new Date(after.c) } }, { createdAt: new Date(after.c), id: { gt: after.i } }] } : {}
@@ -449,10 +459,12 @@ export async function customerConsultations(root: unknown, _args: unknown, conte
   return (await customerConsultationPage(root, {}, context)).appointments
 }
 export async function customerConsultation(_root: unknown, args: { id: string }, context: Context) {
+  await settleOpenCheckouts(context)
   return runSerializableTransaction(context.prisma, async (tx: any) => {
     const user = await account(tx, context)
     const firm = await servicingFirm(tx)
     if (!firm) throw new Error('Appointment history is temporarily unavailable.')
+    await releaseUnpaidConsultations(tx, firm.id)
     const row = await tx.consultation.findFirst({ where: { id: args.id, accountId: user.id, firmId: firm.id }, include: { host: { select: { name: true } } } })
     return row ? (await withPayments(tx, [row]))[0] : null
   })

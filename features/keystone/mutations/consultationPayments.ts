@@ -2,7 +2,7 @@ import type { Context } from ".keystone/types";
 import { randomUUID } from "node:crypto";
 import { isHumanIdentitySession } from "../access";
 import { prismaWithoutGraphQLErrorConversion, runSerializableTransaction } from "../lib/transactions";
-import { createPayment, getPaymentStatus, refundPayment } from "../utils/paymentProviderAdapter";
+import { createPayment, expireCheckout, getPaymentStatus, refundPayment } from "../utils/paymentProviderAdapter";
 import { reconcilePaymentByProviderId } from "./portalPayments";
 import { applyPaymentRefund, recordAuditEvent } from "./workflow-helpers";
 import { sendConsultationEmail } from "../lib/mail";
@@ -10,10 +10,10 @@ import { sendConsultationEmail } from "../lib/mail";
 /**
  * Paid consultations (Clio Grow / Calendly-style): a practice area with a consultation
  * fee takes card payment through Stripe Checkout right after the request is made. The
- * time is held for the checkout window; an unpaid request is released afterwards. A
+ * time is held for fifteen minutes; an unpaid request is released afterwards and its checkout page closed. A
  * client cancellation before the start refunds the fee to the card in full.
  */
-export const CONSULTATION_PAYMENT_WINDOW_MS = 35 * 60_000;
+export const CONSULTATION_PAYMENT_WINDOW_MS = 15 * 60_000;
 export const consultationPaymentKey = (consultationId: string) => `consultation:${consultationId}`;
 export const consultationIdFromPaymentKey = (key: string | null | undefined) => /^consultation:([^:]+)$/.exec(key ?? "")?.[1] ?? null;
 const OPERATING_PROVIDER = "pp_stripe_operating";
@@ -65,13 +65,22 @@ export async function releaseUnpaidConsultations(tx: any, firmId: string) {
 export async function reconcileOpenConsultationCheckouts(prisma: any, firmId: string) {
   const open = await prisma.payment.findMany({
     where: { firmId, status: "pending", idempotencyKey: { startsWith: "consultation:" }, providerPaymentId: { not: "" } },
-    orderBy: { createdAt: "asc" }, take: 10, select: { id: true, firmId: true, providerPaymentId: true },
+    orderBy: { createdAt: "asc" }, take: 25, select: { id: true, firmId: true, providerPaymentId: true, idempotencyKey: true, paymentProvider: true },
   });
   for (const payment of open) {
     if (!payment.providerPaymentId) continue;
     try {
       const result = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId);
       if (result.status === "captured" && !(result as any).replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
+      if (["captured", "settled", "refunded"].includes(result.status)) continue;
+      // Not paid and the hold has run out: close the checkout page so the card cannot be charged for a released time.
+      const consultationId = consultationIdFromPaymentKey(payment.idempotencyKey);
+      const held = consultationId ? await prisma.consultation.findFirst({ where: { id: consultationId, firmId }, select: { createdAt: true, status: true } }) : null;
+      if (held && payment.paymentProvider && (held.status !== "requested" || Date.now() - held.createdAt.getTime() > CONSULTATION_PAYMENT_WINDOW_MS)) {
+        const closed = await expireCheckout({ provider: payment.paymentProvider, paymentId: payment.providerPaymentId });
+        // A closed page can no longer be paid, so the payment stops being checked.
+        if (closed?.status === "expired") await prisma.payment.updateMany({ where: { id: payment.id, status: "pending" }, data: { status: "cancelled", failedAt: new Date(), failureReason: "Checkout closed after the hold ended" } });
+      }
     } catch (error) {
       console.error("Consultation checkout could not be checked with the provider", error);
     }
@@ -100,7 +109,7 @@ export async function startConsultationPayment(_root: unknown, args: { consultat
   const consultation = await ownedConsultation(prisma, context, args.consultationId);
   if (consultation.feeMinor <= 0) throw new Error("This consultation has no fee.");
   if (consultation.status !== "requested") throw new Error("This consultation can no longer be paid online.");
-  if (Date.now() - consultation.createdAt.getTime() > CONSULTATION_PAYMENT_WINDOW_MS - 5 * 60_000) throw new Error("The time held for payment has ended. Request a new time.");
+  if (Date.now() - consultation.createdAt.getTime() > CONSULTATION_PAYMENT_WINDOW_MS - 60_000) throw new Error("The time held for payment has ended. Request a new time.");
   const payer = consultation.participants[0];
   if (!payer) throw new Error("This consultation is unavailable.");
   const provider = await prisma.paymentProvider.findFirst({ where: { firmId: consultation.firmId, code: OPERATING_PROVIDER, isInstalled: true } });
@@ -205,4 +214,17 @@ export async function refundConsultationFee(prisma: any, input: { firmId: string
     await recordAuditEvent(tx, { firmId: input.firmId, eventType: "refund.succeeded", category: "financial", actorUserId: input.actorUserId, paymentId: payment.id, metadata: { refundId: refund.id, providerRefundId, amountMinor, source: "consultation_cancelled", consultationId: input.consultationId } });
     return refund;
   });
+}
+
+/**
+ * Runs on its own every minute in the server process, with no visitor needed: records card
+ * payments whose client never came back from Checkout (same path as the return page, so a
+ * payment is recorded once), then releases holds that ran out and closes their pages.
+ */
+export async function sweepConsultationPayments(prisma: any) {
+  const firms = await prisma.firm.findMany({ where: { status: "active" }, select: { id: true }, take: 50 });
+  for (const firm of firms) {
+    await reconcileOpenConsultationCheckouts(prisma, firm.id);
+    await runSerializableTransaction(prisma, (tx: any) => releaseUnpaidConsultations(tx, firm.id));
+  }
 }

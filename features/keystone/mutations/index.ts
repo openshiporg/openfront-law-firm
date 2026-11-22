@@ -770,7 +770,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
       type ConsultationAvailability { timezone: String!, slots: [ConsultationSlot!]! }
       type ConsultationServiceOpenTimes { serviceId: ID!, slots: [ConsultationSlot!]! }
       type ConsultationOpenTimes { timezone: String!, services: [ConsultationServiceOpenTimes!]! }
-      type CustomerConsultation { id: ID!, serviceTitle: String!, feeMinor: Int!, currencyCode: String!, status: String!, startsAt: String, endsAt: String, timezone: String!, paymentState: String!, hostName: String, location: String, paidAt: String }
+      type CustomerConsultation { id: ID!, serviceTitle: String!, feeMinor: Int!, currencyCode: String!, status: String!, startsAt: String, endsAt: String, timezone: String!, paymentState: String!, payBy: String, hostName: String, location: String, paidAt: String }
       type ConsultationPaymentStart { url: String, paymentId: ID!, status: String! }
       type ConsultationPaymentStatus { status: String! }
       type CustomerConsultationPage { appointments: [CustomerConsultation!]!, nextCursor: String }

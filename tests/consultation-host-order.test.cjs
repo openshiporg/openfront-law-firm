@@ -11,20 +11,32 @@ const end = source.indexOf('/** Busy intervals per host')
 const js = ts.transpileModule(source.slice(start, end), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
 const mod = { exports: {} }
 new Function('exports', 'module', js)(mod.exports, mod)
-const { orderHostsForService } = mod.exports
+const { hostsForService } = mod.exports
 
-const hosts = [{ name: 'Demo Admin' }, { name: 'Margaret Hale' }, { name: 'Eleanor Marsh' }, { name: 'Priya Raman' }]
+const hosts = [
+  { name: 'Demo Admin', email: 'admin@firm.test', managesFirm: true },
+  { name: 'Margaret Hale', email: 'margaret@firm.test', managesFirm: true },
+  { name: 'Eleanor Marsh', email: 'eleanor@firm.test', managesFirm: false },
+  { name: 'Priya Raman', email: 'priya@firm.test', managesFirm: false },
+  { name: 'Marcus Bell', email: 'marcus@firm.test', managesFirm: false },
+]
 const profiles = [
   { name: 'Eleanor Marsh', practiceAreas: [{ id: 'estate' }] },
   { name: 'priya  raman', practiceAreas: [{ id: 'estate' }, { id: 'family' }] },
 ]
+const names = (list) => list.map((h) => h.name)
 
-test('a request goes first to the attorney published for that practice area', () => {
-  assert.deepEqual(orderHostsForService(hosts, profiles, 'family').map((h) => h.name), ['Priya Raman', 'Eleanor Marsh', 'Demo Admin', 'Margaret Hale'])
+test('a request is booked only with an attorney published for that practice area', () => {
+  assert.deepEqual(names(hostsForService(hosts, profiles, 'family')), ['Priya Raman'])
+  assert.deepEqual(names(hostsForService(hosts, profiles, 'estate')), ['Eleanor Marsh', 'Priya Raman'])
 })
-test('attorneys sharing a practice area keep membership order', () => {
-  assert.deepEqual(orderHostsForService(hosts, profiles, 'estate').map((h) => h.name).slice(0, 2), ['Eleanor Marsh', 'Priya Raman'])
+test('a practice area with no named attorney falls back to the other published attorneys', () => {
+  assert.deepEqual(names(hostsForService(hosts, profiles, 'tax')), ['Eleanor Marsh', 'Priya Raman'])
 })
-test('with no published profiles the membership order is unchanged', () => {
-  assert.deepEqual(orderHostsForService(hosts, [], 'family'), hosts)
+test('with no published profiles intake staff take requests, never a firm administrator', () => {
+  assert.deepEqual(names(hostsForService(hosts, [], 'family')), ['Eleanor Marsh', 'Priya Raman', 'Marcus Bell'])
+  assert.deepEqual(hostsForService(hosts.slice(0, 2), [], 'family'), [])
+})
+test('an administrator who is also a published attorney for the area can take it', () => {
+  assert.deepEqual(names(hostsForService(hosts, [{ name: 'Someone Else', email: 'Margaret@firm.test', practiceAreas: [{ id: 'family' }] }], 'family')), ['Margaret Hale'])
 })

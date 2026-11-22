@@ -9,7 +9,7 @@ export * from './consultation-presentation'
  */
 export type CustomerResult<T> = { status: 'ok'; data: T } | { status: 'signed_out' } | { status: 'unavailable' }
 
-const selection = 'id serviceTitle feeMinor currencyCode status startsAt endsAt timezone paymentState hostName location paidAt'
+const selection = 'id serviceTitle feeMinor currencyCode status startsAt endsAt timezone paymentState hostName location paidAt payBy'
 const serviceSelection = 'id code publicSlug name description consultationFeeMinor consultationMinutes currencyCode'
 
 export type CatalogPage = { services: Service[]; nextCursor: string | null }
