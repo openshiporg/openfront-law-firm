@@ -4734,6 +4734,211 @@ input SignatureEventOrderByInput {
   updatedAt: OrderDirection
 }
 
+type LegalSource {
+  id: ID!
+  firm: Firm
+  matter: Matter
+  provider: LegalSourceProviderType
+  kind: LegalSourceKindType
+  externalId: String
+  jurisdiction: String
+  citation: String
+  title: String
+  court: String
+  decidedOn: String
+  sourceAsOf: String
+  officialUrl: String
+  sourceStatus: String
+  contentSha256: String
+  paragraphCount: Int
+  retrievedAt: DateTime
+  retrievedBy: User
+  paragraphs(where: LegalSourceParagraphWhereInput! = {}, orderBy: [LegalSourceParagraphOrderByInput!]! = [], take: Int! = 1000, skip: Int! = 0, cursor: LegalSourceParagraphWhereUniqueInput): [LegalSourceParagraph!]
+  paragraphsCount(where: LegalSourceParagraphWhereInput! = {}): Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+enum LegalSourceProviderType {
+  maine_statutes
+  ecfr
+  maine_law_court
+  courtlistener
+}
+
+enum LegalSourceKindType {
+  statute
+  regulation
+  judgment
+}
+
+input LegalSourceWhereUniqueInput {
+  id: ID
+}
+
+input LegalSourceWhereInput {
+  AND: [LegalSourceWhereInput!]
+  OR: [LegalSourceWhereInput!]
+  NOT: [LegalSourceWhereInput!]
+  id: IDFilter
+  firm: FirmWhereInput
+  matter: MatterWhereInput
+  provider: LegalSourceProviderTypeNullableFilter
+  kind: LegalSourceKindTypeNullableFilter
+  externalId: StringFilter
+  jurisdiction: StringFilter
+  citation: StringFilter
+  title: StringFilter
+  court: StringFilter
+  decidedOn: StringFilter
+  sourceAsOf: StringFilter
+  officialUrl: StringFilter
+  sourceStatus: StringFilter
+  contentSha256: StringFilter
+  paragraphCount: IntFilter
+  retrievedAt: DateTimeFilter
+  retrievedBy: UserWhereInput
+  paragraphs: LegalSourceParagraphManyRelationFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input LegalSourceProviderTypeNullableFilter {
+  equals: LegalSourceProviderType
+  in: [LegalSourceProviderType!]
+  notIn: [LegalSourceProviderType!]
+  not: LegalSourceProviderTypeNullableFilter
+}
+
+input LegalSourceKindTypeNullableFilter {
+  equals: LegalSourceKindType
+  in: [LegalSourceKindType!]
+  notIn: [LegalSourceKindType!]
+  not: LegalSourceKindTypeNullableFilter
+}
+
+input LegalSourceParagraphManyRelationFilter {
+  every: LegalSourceParagraphWhereInput
+  some: LegalSourceParagraphWhereInput
+  none: LegalSourceParagraphWhereInput
+}
+
+input LegalSourceOrderByInput {
+  id: OrderDirection
+  provider: OrderDirection
+  kind: OrderDirection
+  externalId: OrderDirection
+  jurisdiction: OrderDirection
+  citation: OrderDirection
+  title: OrderDirection
+  court: OrderDirection
+  decidedOn: OrderDirection
+  sourceAsOf: OrderDirection
+  officialUrl: OrderDirection
+  sourceStatus: OrderDirection
+  contentSha256: OrderDirection
+  paragraphCount: OrderDirection
+  retrievedAt: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+type LegalSourceParagraph {
+  id: ID!
+  firm: Firm
+  matter: Matter
+  source: LegalSource
+  position: Int
+  anchor: String
+  label: String
+  text: String
+  textSha256: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input LegalSourceParagraphWhereUniqueInput {
+  id: ID
+}
+
+input LegalSourceParagraphWhereInput {
+  AND: [LegalSourceParagraphWhereInput!]
+  OR: [LegalSourceParagraphWhereInput!]
+  NOT: [LegalSourceParagraphWhereInput!]
+  id: IDFilter
+  firm: FirmWhereInput
+  matter: MatterWhereInput
+  source: LegalSourceWhereInput
+  position: IntFilter
+  anchor: StringFilter
+  label: StringFilter
+  text: StringFilter
+  textSha256: StringFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input LegalSourceParagraphOrderByInput {
+  id: OrderDirection
+  position: OrderDirection
+  anchor: OrderDirection
+  label: OrderDirection
+  text: OrderDirection
+  textSha256: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+type ResearchNote {
+  id: ID!
+  firm: Firm
+  matter: Matter
+  title: String
+  body: String
+  author: User
+  citedParagraphs(where: LegalSourceParagraphWhereInput! = {}, orderBy: [LegalSourceParagraphOrderByInput!]! = [], take: Int! = 1000, skip: Int! = 0, cursor: LegalSourceParagraphWhereUniqueInput): [LegalSourceParagraph!]
+  citedParagraphsCount(where: LegalSourceParagraphWhereInput! = {}): Int
+  claimCount: Int
+  supportedCount: Int
+  revision: Int
+  removedCitations: JSON
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input ResearchNoteWhereUniqueInput {
+  id: ID
+}
+
+input ResearchNoteWhereInput {
+  AND: [ResearchNoteWhereInput!]
+  OR: [ResearchNoteWhereInput!]
+  NOT: [ResearchNoteWhereInput!]
+  id: IDFilter
+  firm: FirmWhereInput
+  matter: MatterWhereInput
+  title: StringFilter
+  body: StringFilter
+  author: UserWhereInput
+  citedParagraphs: LegalSourceParagraphManyRelationFilter
+  claimCount: IntFilter
+  supportedCount: IntFilter
+  revision: IntFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input ResearchNoteOrderByInput {
+  id: OrderDirection
+  title: OrderDirection
+  body: OrderDirection
+  claimCount: OrderDirection
+  supportedCount: OrderDirection
+  revision: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
 type RateCard {
   id: ID!
   firm: Firm
@@ -9097,6 +9302,8 @@ type Mutation {
   changeIntakeParticipant(participantId: ID!, participantRole: String, notes: String, remove: Boolean, reason: String!): PartyChangeResult!
   addMatterParty(matterId: ID!, contactId: ID!, partyRole: String!, side: String, representedById: ID, counselContactId: ID, isPrimaryClient: Boolean, notes: String): PartyChangeResult!
   changeMatterParty(partyId: ID!, partyRole: String, side: String, notes: String, remove: Boolean, reason: String!): PartyChangeResult!
+  attachLegalSource(matterId: ID!, provider: String!, reference: String!): LegalSourceAttachResult!
+  saveResearchNote(matterId: ID!, noteId: ID, title: String!, body: String!): ResearchNoteSaveResult!
   completeFirmOnboarding(firmName: String!, firmSlug: String!, firmDisplayName: String, firmShortName: String, brandTagline: String, brandColor: String, supportEmail: String, logoIcon: String, logoColor: String, officeName: String!, officeCode: String!, timezone: String!, currencyCode: String!, practiceAreaName: String): FirmOnboardingResult!
 }
 
@@ -9249,6 +9456,15 @@ type Query {
   signatureEvent(where: SignatureEventWhereUniqueInput!): SignatureEvent
   signatureEvents(where: SignatureEventWhereInput! = {}, orderBy: [SignatureEventOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: SignatureEventWhereUniqueInput): [SignatureEvent!]
   signatureEventsCount(where: SignatureEventWhereInput! = {}): Int
+  legalSource(where: LegalSourceWhereUniqueInput!): LegalSource
+  legalSources(where: LegalSourceWhereInput! = {}, orderBy: [LegalSourceOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: LegalSourceWhereUniqueInput): [LegalSource!]
+  legalSourcesCount(where: LegalSourceWhereInput! = {}): Int
+  legalSourceParagraph(where: LegalSourceParagraphWhereUniqueInput!): LegalSourceParagraph
+  legalSourceParagraphs(where: LegalSourceParagraphWhereInput! = {}, orderBy: [LegalSourceParagraphOrderByInput!]! = [], take: Int! = 1000, skip: Int! = 0, cursor: LegalSourceParagraphWhereUniqueInput): [LegalSourceParagraph!]
+  legalSourceParagraphsCount(where: LegalSourceParagraphWhereInput! = {}): Int
+  researchNote(where: ResearchNoteWhereUniqueInput!): ResearchNote
+  researchNotes(where: ResearchNoteWhereInput! = {}, orderBy: [ResearchNoteOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: ResearchNoteWhereUniqueInput): [ResearchNote!]
+  researchNotesCount(where: ResearchNoteWhereInput! = {}): Int
   rateCard(where: RateCardWhereUniqueInput!): RateCard
   rateCards(where: RateCardWhereInput! = {}, orderBy: [RateCardOrderByInput!]! = [], take: Int! = 100, skip: Int! = 0, cursor: RateCardWhereUniqueInput): [RateCard!]
   rateCardsCount(where: RateCardWhereInput! = {}): Int
@@ -9384,6 +9600,7 @@ type Query {
   viewerNeedsFirmOnboarding: Boolean!
   practiceOverview: PracticeOverview!
   practiceWorkspace(category: String!): PracticeWorkspace!
+  searchLegalAuthority(query: String!): LegalSourceSearchResult!
   previewContactImport(rows: [ContactImportRowInput!]!): ContactImportPreview!
   portalSharedResource(sessionToken: String!, shareId: ID!): PortalSharedResource!
   portalPolicyWorkspace(search: String, status: String, page: Int, matterId: ID, portalAccountId: ID): PortalPolicyWorkspace!
@@ -10014,6 +10231,36 @@ type StaffInvitationResult {
   email: String!
 }
 
+type LegalSourceCandidate {
+  provider: String!
+  kind: String!
+  reference: String!
+  citation: String!
+  title: String!
+  detail: String!
+  officialUrl: String!
+}
+
+type LegalSourceSearchResult {
+  candidates: [LegalSourceCandidate!]!
+  notices: [String!]!
+}
+
+type LegalSourceAttachResult {
+  id: ID!
+  status: String!
+  paragraphCount: Int!
+  citation: String!
+}
+
+type ResearchNoteSaveResult {
+  id: ID!
+  revision: Int!
+  claimCount: Int!
+  supportedCount: Int!
+  removedCitations: [String!]!
+}
+
 type PartyChangeResult {
   id: ID!
   status: String!
@@ -10298,6 +10545,7 @@ type CustomerConsultation {
   endsAt: String
   timezone: String!
   paymentState: String!
+  payBy: String
   hostName: String
   location: String
   paidAt: String

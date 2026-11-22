@@ -64,6 +64,8 @@ model User {
   from_CommunicationParticipant_user    CommunicationParticipant[] @relation("CommunicationParticipant_user")
   from_CommunicationMessage_senderUser  CommunicationMessage[]     @relation("CommunicationMessage_senderUser")
   from_DocumentVersion_createdBy        DocumentVersion[]          @relation("DocumentVersion_createdBy")
+  from_LegalSource_retrievedBy          LegalSource[]              @relation("LegalSource_retrievedBy")
+  from_ResearchNote_author              ResearchNote[]             @relation("ResearchNote_author")
   from_RateRule_user                    RateRule[]                 @relation("RateRule_user")
   from_TimeEntry_user                   TimeEntry[]                @relation("TimeEntry_user")
   from_TimeEntry_approvedBy             TimeEntry[]                @relation("TimeEntry_approvedBy")
@@ -212,6 +214,9 @@ model Firm {
   from_SignatureRequest_firm         SignatureRequest[]         @relation("SignatureRequest_firm")
   from_DocumentSigner_firm           DocumentSigner[]           @relation("DocumentSigner_firm")
   from_SignatureEvent_firm           SignatureEvent[]           @relation("SignatureEvent_firm")
+  from_LegalSource_firm              LegalSource[]              @relation("LegalSource_firm")
+  from_LegalSourceParagraph_firm     LegalSourceParagraph[]     @relation("LegalSourceParagraph_firm")
+  from_ResearchNote_firm             ResearchNote[]             @relation("ResearchNote_firm")
   from_RateCard_firm                 RateCard[]                 @relation("RateCard_firm")
   from_RateRule_firm                 RateRule[]                 @relation("RateRule_firm")
   from_TimeEntry_firm                TimeEntry[]                @relation("TimeEntry_firm")
@@ -863,6 +868,9 @@ model Matter {
   from_SignatureRequest_matter         SignatureRequest[]         @relation("SignatureRequest_matter")
   from_DocumentSigner_matter           DocumentSigner[]           @relation("DocumentSigner_matter")
   from_SignatureEvent_matter           SignatureEvent[]           @relation("SignatureEvent_matter")
+  from_LegalSource_matter              LegalSource[]              @relation("LegalSource_matter")
+  from_LegalSourceParagraph_matter     LegalSourceParagraph[]     @relation("LegalSourceParagraph_matter")
+  from_ResearchNote_matter             ResearchNote[]             @relation("ResearchNote_matter")
   from_RateCard_matter                 RateCard[]                 @relation("RateCard_matter")
   from_RateRule_matter                 RateRule[]                 @relation("RateRule_matter")
   from_TimeEntry_matter                TimeEntry[]                @relation("TimeEntry_matter")
@@ -1468,6 +1476,84 @@ model SignatureEvent {
   @@index([requestId])
   @@index([signerId])
   @@index([providerEventId])
+}
+
+model LegalSource {
+  id             String                  @id @default(cuid())
+  firm           Firm                    @relation("LegalSource_firm", fields: [firmId], references: [id])
+  firmId         String                  @map("firm")
+  matter         Matter                  @relation("LegalSource_matter", fields: [matterId], references: [id])
+  matterId       String                  @map("matter")
+  provider       LegalSourceProviderType
+  kind           LegalSourceKindType
+  externalId     String                  @default("")
+  jurisdiction   String                  @default("")
+  citation       String                  @default("")
+  title          String                  @default("")
+  court          String                  @default("")
+  decidedOn      String                  @default("")
+  sourceAsOf     String                  @default("")
+  officialUrl    String                  @default("")
+  sourceStatus   String                  @default("")
+  contentSha256  String                  @default("")
+  paragraphCount Int
+  retrievedAt    DateTime
+  retrievedBy    User?                   @relation("LegalSource_retrievedBy", fields: [retrievedById], references: [id])
+  retrievedById  String?                 @map("retrievedBy")
+  paragraphs     LegalSourceParagraph[]  @relation("LegalSourceParagraph_source")
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @default(now()) @updatedAt
+
+  @@unique([matterId, provider, externalId, contentSha256])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([retrievedById])
+}
+
+model LegalSourceParagraph {
+  id                                String         @id @default(cuid())
+  firm                              Firm           @relation("LegalSourceParagraph_firm", fields: [firmId], references: [id])
+  firmId                            String         @map("firm")
+  matter                            Matter         @relation("LegalSourceParagraph_matter", fields: [matterId], references: [id])
+  matterId                          String         @map("matter")
+  source                            LegalSource    @relation("LegalSourceParagraph_source", fields: [sourceId], references: [id])
+  sourceId                          String         @map("source")
+  position                          Int
+  anchor                            String         @default("")
+  label                             String         @default("")
+  text                              String         @default("") @postgresql.Text
+  textSha256                        String         @default("")
+  createdAt                         DateTime       @default(now())
+  updatedAt                         DateTime       @default(now()) @updatedAt
+  from_ResearchNote_citedParagraphs ResearchNote[] @relation("ResearchNote_citedParagraphs")
+
+  @@unique([sourceId, anchor])
+  @@index([firmId])
+  @@index([matterId])
+  @@index([sourceId])
+}
+
+model ResearchNote {
+  id               String                 @id @default(cuid())
+  firm             Firm                   @relation("ResearchNote_firm", fields: [firmId], references: [id])
+  firmId           String                 @map("firm")
+  matter           Matter                 @relation("ResearchNote_matter", fields: [matterId], references: [id])
+  matterId         String                 @map("matter")
+  title            String                 @default("")
+  body             String                 @default("") @postgresql.Text
+  author           User?                  @relation("ResearchNote_author", fields: [authorId], references: [id])
+  authorId         String?                @map("author")
+  citedParagraphs  LegalSourceParagraph[] @relation("ResearchNote_citedParagraphs")
+  claimCount       Int
+  supportedCount   Int
+  revision         Int                    @default(1)
+  removedCitations Json?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @default(now()) @updatedAt
+
+  @@index([firmId])
+  @@index([matterId])
+  @@index([authorId])
 }
 
 model RateCard {
@@ -3274,6 +3360,19 @@ enum DocumentSignerStatusType {
   viewed
   signed
   declined
+}
+
+enum LegalSourceProviderType {
+  maine_statutes
+  ecfr
+  maine_law_court
+  courtlistener
+}
+
+enum LegalSourceKindType {
+  statute
+  regulation
+  judgment
 }
 
 enum RateCardStatusType {

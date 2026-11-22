@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, BrainCircuit, Gavel, ReceiptText, Settings2 } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, BrainCircuit, Gavel, ReceiptText, Settings2 } from 'lucide-react'
 
 import { PracticePage, PracticeStatus, SectionJumps } from '@/features/platform/components/PracticeSurface'
 import { EmptyState, ErrorBanner, FileLabel, Pager, Panel, StatusText, Track, statusLabel, trackItemClass } from '@/features/platform/components/ui'
@@ -37,6 +37,7 @@ export async function MatterWorkspacePage({ matterId, teamPage = 1, partyPage = 
       <Track>
         <Link href="/dashboard/platform/matters" className={trackItemClass(false)}><ArrowLeft className="size-4" aria-hidden="true" />Matters</Link>
         <Link href={`/dashboard/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(false)}><Settings2 className="size-4" aria-hidden="true" />Fields</Link>
+        <Link href={`/dashboard/platform/matters/${encodeURIComponent(matter.id)}/research`} className={trackItemClass(true)}><BookOpenCheck className="size-4" aria-hidden="true" />Research</Link>
         <Link href={`/dashboard/platform/ai/matters/${encodeURIComponent(matter.id)}`} className={trackItemClass(true)}><BrainCircuit className="size-4" aria-hidden="true" />AI evidence</Link>
         <Link href="/dashboard/platform/billing#draft-invoice" className={trackItemClass(true)}><ReceiptText className="size-4" aria-hidden="true" />Bill</Link>
       </Track>

@@ -28,6 +28,7 @@ import {
   DocumentSigner,
   SignatureEvent,
 } from "./documents";
+import { LegalSource, LegalSourceParagraph, ResearchNote } from "./legalResearch";
 import {
   RateCard,
   RateRule,
@@ -107,6 +108,9 @@ const modelDefinitions = {
   SignatureRequest,
   DocumentSigner,
   SignatureEvent,
+  LegalSource,
+  LegalSourceParagraph,
+  ResearchNote,
   RateCard,
   RateRule,
   TimeEntry,

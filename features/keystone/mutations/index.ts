@@ -107,6 +107,7 @@ import {
   transitionRetentionPolicy,
 } from "./retentionWorkflows";
 import redirectToInit from "./redirectToInit";
+import { attachLegalSource, saveResearchNote, searchLegalAuthority } from "./legalResearch";
 import { consultationCatalog, consultationCatalogPage, consultationService, consultationAvailability, consultationOpenTimes, registerConsultationAccount, bookClientConsultation, customerConsultations, customerConsultationPage, customerConsultation } from "./customerConsultations";
 
 const graphql = String.raw;
@@ -525,6 +526,36 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         email: String!
       }
 
+      type LegalSourceCandidate {
+        provider: String!
+        kind: String!
+        reference: String!
+        citation: String!
+        title: String!
+        detail: String!
+        officialUrl: String!
+      }
+
+      type LegalSourceSearchResult {
+        candidates: [LegalSourceCandidate!]!
+        notices: [String!]!
+      }
+
+      type LegalSourceAttachResult {
+        id: ID!
+        status: String!
+        paragraphCount: Int!
+        citation: String!
+      }
+
+      type ResearchNoteSaveResult {
+        id: ID!
+        revision: Int!
+        claimCount: Int!
+        supportedCount: Int!
+        removedCitations: [String!]!
+      }
+
       type PartyChangeResult {
         id: ID!
         status: String!
@@ -791,6 +822,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         viewerNeedsFirmOnboarding: Boolean!
         practiceOverview: PracticeOverview!
         practiceWorkspace(category: String!): PracticeWorkspace!
+        searchLegalAuthority(query: String!): LegalSourceSearchResult!
         previewContactImport(rows: [ContactImportRowInput!]!): ContactImportPreview!
         portalSharedResource(sessionToken: String!, shareId: ID!): PortalSharedResource!
         portalPolicyWorkspace(search: String, status: String, page: Int, matterId: ID, portalAccountId: ID): PortalPolicyWorkspace!
@@ -1341,6 +1373,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           notes: String
         ): PartyChangeResult!
         changeMatterParty(partyId: ID!, partyRole: String, side: String, notes: String, remove: Boolean, reason: String!): PartyChangeResult!
+        attachLegalSource(matterId: ID!, provider: String!, reference: String!): LegalSourceAttachResult!
+        saveResearchNote(matterId: ID!, noteId: ID, title: String!, body: String!): ResearchNoteSaveResult!
 
         completeFirmOnboarding(
           firmName: String!
@@ -1380,6 +1414,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
           Boolean(context.session?.itemId && !activeFirmId(context.session)),
         practiceOverview,
         practiceWorkspace,
+        searchLegalAuthority,
         previewContactImport,
         portalSharedResource,
         portalPolicyWorkspace,
@@ -1482,6 +1517,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         changeIntakeParticipant,
         addMatterParty,
         changeMatterParty,
+        attachLegalSource,
+        saveResearchNote,
         completeFirmOnboarding,
       },
     },
