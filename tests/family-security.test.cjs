@@ -134,7 +134,7 @@ test('all sign-in/sign-up failure branches return email only and plain messages'
 });
 
 test('successful sign-in sets the protected cookie and sanitizes the actual redirect', async () => {
-  for (const [from, expected] of [['//evil.invalid', '/dashboard'], ['/dashboard/orders', '/dashboard/orders']]) {
+  for (const [from, expected] of [['//evil.invalid', '/dashboard/platform/my-work'], ['/dashboard/orders', '/dashboard/orders']]) {
     const { auth, cookies } = authSandbox({ success: true, data: { authenticate: { sessionToken: 'synthetic-session' } } });
     await assert.rejects(auth.signIn({ message: null, formData: { email: '' } }, form(from)), error => error.target === expected);
     assert.equal(cookies[0][0], 'keystonejs-session');
