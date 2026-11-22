@@ -228,7 +228,7 @@ export async function sendConsultationEmail(prisma: any, consultationId: string,
     const origin = new URL(getBaseUrlForEmails());
     const url = new URL(`/account/appointments/${encodeURIComponent(row.id)}`, origin.origin);
     const transport = createTransport({ host, port, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } });
-    await transport.sendMail({
+    const sent = await transport.sendMail({
       to, from, subject: copy.subject,
       html: emailLayout({
         storeName: firmName, preheader: copy.lead, title: copy.subject.split(" — ")[0],
@@ -238,6 +238,8 @@ ${emailButton("View your appointment", url.href)}
 ${emailMuted(escapeHtml(copy.footnote))}`,
       }),
     });
+    // The provider's message id, so a delivery question can be traced in the mail provider's log.
+    console.log(`Consultation ${kind} email accepted for consultation ${row.id}: ${sent?.messageId ?? "no id"} ${String(sent?.response ?? "").slice(0, 120)}`);
   } catch (error) {
     console.error(`Consultation ${kind} email was not sent`, error);
   }
