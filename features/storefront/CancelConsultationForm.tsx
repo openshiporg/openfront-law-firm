@@ -1,13 +1,14 @@
 'use client'
 
 import { useActionState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { cancelConsultation } from './actions/customer-account'
 
 export function CancelConsultationForm({ consultationId }: { consultationId: string }) {
   const [state, action, pending] = useActionState(cancelConsultation, { error: null, done: false })
   if (state.done) return <p role="status" className="sf-notice">Consultation cancelled.</p>
   return <details className="sf-card">
-    <summary className="sf-card__body cursor-pointer list-none font-medium [&::-webkit-details-marker]:hidden">Cancel this consultation</summary>
+    <summary className="sf-card__body flex cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">Cancel this consultation<ChevronDown className="size-5 shrink-0 opacity-70 transition-transform [details[open]_&]:rotate-180" aria-hidden="true" /></summary>
     <form action={action} className="sf-form border-t border-[var(--color-rule)] p-5">
       <input type="hidden" name="consultationId" value={consultationId} />
       <label className="sf-field-label">Reason <span className="sf-field-opt">(optional)</span><textarea name="reason" maxLength={1000} className="sf-field" /></label>

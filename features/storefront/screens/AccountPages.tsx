@@ -81,7 +81,7 @@ export async function AccountPage({ searchParams }: { searchParams: Promise<{ af
       </div>
     </header>
     {rows.length ? <ul className="sf-rows">{rows.map(row => {
-      const status = appointmentStatus(row.status)
+      const status = appointmentStatus(row.status, row.paymentState)
       return <li key={row.id}><Link className="sf-row" href={`/account/appointments/${row.id}`}>
         <span className="sf-row__title"><span className={`sf-dot ${status.tone}`} aria-hidden="true" /><span>{row.serviceTitle}</span><span className="sf-status">{status.label}</span></span>
         <span className="sf-row__meta sf-num">{formatAppointmentTime(row.startsAt, row.timezone)} · {formatMinorUnits(row.feeMinor, row.currencyCode)}</span>

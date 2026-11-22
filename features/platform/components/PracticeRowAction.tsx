@@ -148,6 +148,8 @@ export function PracticeRowAction({
     ? choice.operation
     : action.operation
 
+  const reasonOptional = selectedOperation === 'confirmConsultation' || selectedOperation === 'completeConsultation' || selectedOperation === 'markConsultationNoShow'
+
   return (
     <details className="group/action relative justify-self-end text-left">
       <summary className={cn(trackClass, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>
@@ -196,11 +198,11 @@ export function PracticeRowAction({
           </label>
         ) : null}
         <label className={labelClass} htmlFor={`reason-${id}`}>
-          Reason
+          {reasonOptional ? 'Note (optional)' : 'Reason'}
           <textarea
             id={`reason-${id}`}
             name="reason"
-            required
+            required={!reasonOptional}
             minLength={5}
             maxLength={2000}
             rows={3}

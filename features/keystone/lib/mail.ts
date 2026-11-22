@@ -1,6 +1,6 @@
 // Internal Keystone mail helper, not a public Next Server Action.
 import { createTransport } from "nodemailer";
-import { emailButton, emailLayout, emailMuted, emailParagraph, escapeHtml } from "./email-layout";
+import { emailButton, emailLayout, emailMuted, emailPanel, emailParagraph, escapeHtml } from "./email-layout";
 
 // Utility function to get base URL for emails
 function getBaseUrlForEmails(): string {
@@ -174,4 +174,71 @@ export async function sendPortalInvitationEmail(inviteToken: string, to: string,
     subject: "You're invited to your client portal",
     html: passwordResetEmail({ url: acceptUrl.href, heading: 'Your law firm invited you to its client portal. Use this one-time link to accept', action: 'Open client portal', footnote: 'If you were not expecting this invitation you can safely ignore it.' }),
   });
+}
+
+export type ConsultationEmailKind = "requested" | "paid" | "confirmed" | "cancelled";
+
+/** Pure: subject and lines of one consultation email. */
+export function consultationEmailCopy(kind: ConsultationEmailKind, input: { firmName: string; service: string; when: string; fee: string | null; host: string | null; place: string | null; refunded?: boolean }) {
+  const subject = {
+    requested: `We received your consultation request — ${input.firmName}`,
+    paid: `Payment received for your consultation — ${input.firmName}`,
+    confirmed: `Your consultation is confirmed — ${input.firmName}`,
+    cancelled: `Your consultation was cancelled — ${input.firmName}`,
+  }[kind];
+  const lead = {
+    requested: "We received your request. We check for conflicts before confirming, usually within a business day.",
+    paid: `We received your payment${input.fee ? ` of ${input.fee}` : ""}. We check for conflicts before confirming, usually within a business day.`,
+    confirmed: "Your consultation is confirmed.",
+    cancelled: input.refunded ? "Your consultation was cancelled. The fee is being refunded to your card." : "Your consultation was cancelled.",
+  }[kind];
+  const facts = [input.service, input.when, input.host && kind === "confirmed" ? `With ${input.host}` : null, input.place && kind === "confirmed" ? input.place : null].filter(Boolean) as string[];
+  const footnote = kind === "cancelled"
+    ? "You can request a new time from the website."
+    : "Requesting or attending a consultation does not make us your lawyers. This inbox is not for emergencies or deadlines.";
+  return { subject, lead, facts, footnote };
+}
+
+/**
+ * Tells the client who booked what happened to their consultation. Best effort: a mail failure
+ * is logged and never fails or rolls back the booking, payment or staff action that caused it.
+ */
+export async function sendConsultationEmail(prisma: any, consultationId: string, kind: ConsultationEmailKind): Promise<void> {
+  try {
+    const host = process.env.SMTP_HOST?.trim();
+    const from = process.env.SMTP_FROM?.trim();
+    const port = Number(process.env.SMTP_PORT);
+    if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Email delivery is not configured.");
+    const row = await prisma.consultation.findFirst({
+      where: { id: consultationId },
+      select: { id: true, serviceTitle: true, feeMinor: true, currencyCode: true, startsAt: true, timezone: true, location: true, firmId: true, firm: { select: { name: true } }, account: { select: { email: true } }, host: { select: { name: true } } },
+    });
+    const to = row?.account?.email?.trim();
+    if (!row || !to || to.length > 254 || !/^[^\s@<>,;()]+@[^\s@<>,;()]+\.[^\s@<>,;()]+$/.test(to)) return;
+    const payment = await prisma.payment.findFirst({ where: { firmId: row.firmId, idempotencyKey: `consultation:${row.id}` }, select: { status: true, refundedMinor: true } });
+    const paid = Boolean(payment && (["captured", "settled", "refunded"].includes(payment.status) || (payment.refundedMinor ?? 0) > 0));
+    let when = "Time to be confirmed";
+    if (row.startsAt) {
+      const options: Intl.DateTimeFormatOptions = { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" };
+      try { when = new Intl.DateTimeFormat("en-US", { ...options, timeZone: row.timezone }).format(row.startsAt); } catch { when = new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(row.startsAt); }
+    }
+    const fee = row.feeMinor > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: row.currencyCode || "USD" }).format(row.feeMinor / 100) : null;
+    const firmName = row.firm?.name?.trim() || "The firm";
+    const copy = consultationEmailCopy(kind, { firmName, service: row.serviceTitle || "Consultation", when, fee, host: row.host?.name ?? null, place: row.location || null, refunded: paid });
+    const origin = new URL(getBaseUrlForEmails());
+    const url = new URL(`/account/appointments/${encodeURIComponent(row.id)}`, origin.origin);
+    const transport = createTransport({ host, port, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } });
+    await transport.sendMail({
+      to, from, subject: copy.subject,
+      html: emailLayout({
+        storeName: firmName, preheader: copy.lead, title: copy.subject.split(" — ")[0],
+        body: `${emailParagraph(escapeHtml(copy.lead))}
+${emailPanel(copy.facts.map((line) => escapeHtml(line)).join("<br>"))}
+${emailButton("View your appointment", url.href)}
+${emailMuted(escapeHtml(copy.footnote))}`,
+      }),
+    });
+  } catch (error) {
+    console.error(`Consultation ${kind} email was not sent`, error);
+  }
 }

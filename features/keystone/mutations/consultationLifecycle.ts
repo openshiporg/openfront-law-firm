@@ -1,3 +1,4 @@
+import { sendConsultationEmail } from "../lib/mail";
 import type { Context } from ".keystone/types";
 
 import { isInteractiveHumanSession, type Session } from "../access";
@@ -46,7 +47,7 @@ export async function scheduleConsultation(
   const location = optionalBoundedText(args.location, "Location", 300);
   const reason = optionalBoundedText(args.reason, "Scheduling reason", 2000);
 
-  return runSerializableTransaction(context.prisma as any, async (tx: any) => {
+  const scheduled = await runSerializableTransaction(context.prisma as any, async (tx: any) => {
     await assertCurrentCommandActor(tx, context, "canManageIntake");
     const reference = await tx.consultation.findFirst({ where: { id: args.consultationId, firmId }, select: { id: true, hostId: true } });
     if (!reference) throw new Error("Consultation was not found in the active firm.");
@@ -101,6 +102,8 @@ export async function scheduleConsultation(
     });
     return projection(updated);
   });
+  await sendConsultationEmail(prismaWithoutGraphQLErrorConversion(context.prisma) as any, scheduled.id, "confirmed");
+  return scheduled;
 }
 
 /** Staff close a consultation: completed (with an outcome), cancelled or no-show. */
@@ -154,6 +157,7 @@ export async function transitionConsultation(
   // A firm-cancelled paid consultation is refunded to the card in full.
   if (args.toStatus === "cancelled") {
     await refundConsultationFee(prismaWithoutGraphQLErrorConversion(context.prisma) as any, { firmId, consultationId: result.id, actorUserId: userId, explanation: `Consultation cancelled by the firm.${reason ? ` ${reason}` : ""}` });
+    await sendConsultationEmail(prismaWithoutGraphQLErrorConversion(context.prisma) as any, result.id, "cancelled");
   }
   return result;
 }
@@ -218,5 +222,6 @@ export async function cancelOwnConsultation(
   });
   // Cancelling before the start refunds any paid consultation fee in full.
   await refundConsultationFee(prismaWithoutGraphQLErrorConversion(context.prisma) as any, { firmId: result.firmId, consultationId: result.id, actorUserId: session.itemId, explanation: `Consultation cancelled by the client before it started.${reason ? ` ${reason}` : ""}` });
+  await sendConsultationEmail(prismaWithoutGraphQLErrorConversion(context.prisma) as any, result.id, "cancelled");
   return projection(result);
 }

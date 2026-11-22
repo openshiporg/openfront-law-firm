@@ -12,7 +12,9 @@ const appointmentLabels: Record<string, { label: string; tone: string }> = {
   cancelled: { label: 'Cancelled', tone: 'sf-dot--red' },
   no_show: { label: 'No show', tone: 'sf-dot--red' },
 }
-export function appointmentStatus(status: string) {
+/** The status a client reads. An unpaid request with a fee is not waiting on the firm: it is waiting on payment. */
+export function appointmentStatus(status: string, paymentState?: string) {
+  if (status === 'requested' && paymentState === 'due') return { label: 'Payment due', tone: 'sf-dot--accent' }
   return appointmentLabels[status] ?? { label: status.replaceAll('_', ' ').replace(/^./, first => first.toUpperCase()) || 'Unknown', tone: 'sf-dot--slate' }
 }
 export function appointmentPaymentState(row: Pick<CustomerConsultation, 'feeMinor' | 'status' | 'paymentState'>) {

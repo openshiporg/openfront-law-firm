@@ -104,7 +104,9 @@ export async function runPracticeAction(
     const mutation = mutations[command.mutation]
     const id = field(formData, 'recordId', 200)
     const reason = String(formData.get('reason') ?? '').trim()
-    if (reason.length < 5 || reason.length > 2000) throw new Error('Reason must be 5–2,000 characters.')
+    // Routine consultation steps (confirm, completed, no-show) are recorded without a typed reason; the server accepts none.
+    const reasonOptional = operation === 'confirmConsultation' || operation === 'completeConsultation' || operation === 'markConsultationNoShow'
+    if (reason.length > 2000 || (reasonOptional ? reason.length > 0 && reason.length < 5 : reason.length < 5)) throw new Error('Reason must be 5–2,000 characters.')
     const outcome = String(formData.get('outcome') ?? '').trim() || null
     if (operation === 'finalizeConflictReview' && !['cleared', 'conflict_found'].includes(outcome ?? '')) {
       throw new Error('Select a conflict-review outcome.')
@@ -135,7 +137,7 @@ export async function runPracticeAction(
 
     revalidatePath(path)
     revalidatePath('/dashboard')
-    return { ok: true, message: 'Updated through the controlled workflow.' }
+    return { ok: true, message: 'Saved.' }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'The workflow could not be updated.' }
   }

@@ -5,6 +5,7 @@ import { prismaWithoutGraphQLErrorConversion, runSerializableTransaction } from 
 import { createPayment, getPaymentStatus, refundPayment } from "../utils/paymentProviderAdapter";
 import { reconcilePaymentByProviderId } from "./portalPayments";
 import { applyPaymentRefund, recordAuditEvent } from "./workflow-helpers";
+import { sendConsultationEmail } from "../lib/mail";
 
 /**
  * Paid consultations (Clio Grow / Calendly-style): a practice area with a consultation
@@ -47,6 +48,27 @@ export async function releaseUnpaidConsultations(tx: any, firmId: string) {
     await tx.consultation.update({ where: { id: row.id }, data: { status: "cancelled", cancellationReason: "Consultation fee was not paid; the time was released." } });
     if (payment) await tx.payment.updateMany({ where: { firmId, idempotencyKey: consultationPaymentKey(row.id), status: "pending" }, data: { status: "cancelled", failedAt: new Date(), failureReason: "Checkout window ended" } });
     await recordAuditEvent(tx, { firmId, eventType: "consultation.payment_expired", category: "financial", intakeId: row.intakeId, metadata: { consultationId: row.id } });
+  }
+}
+
+/**
+ * A client who pays and then closes the tab never returns to the appointment page. Before any
+ * unpaid hold is released, ask the provider about each open checkout so a charged card is
+ * recorded as paid instead of the booking being cancelled. Runs outside the booking transaction.
+ */
+export async function reconcileOpenConsultationCheckouts(prisma: any, firmId: string) {
+  const open = await prisma.payment.findMany({
+    where: { firmId, status: "pending", idempotencyKey: { startsWith: "consultation:" }, providerPaymentId: { not: "" } },
+    orderBy: { createdAt: "asc" }, take: 10, select: { id: true, firmId: true, providerPaymentId: true },
+  });
+  for (const payment of open) {
+    if (!payment.providerPaymentId) continue;
+    try {
+      const result = await reconcilePaymentByProviderId(prisma, payment.id, payment.firmId);
+      if (result.status === "captured" && !(result as any).replayed) await afterConsultationPaymentCaptured(prisma, payment.id);
+    } catch (error) {
+      console.error("Consultation checkout could not be checked with the provider", error);
+    }
   }
 }
 
@@ -126,6 +148,7 @@ export async function afterConsultationPaymentCaptured(prisma: any, paymentId: s
     if (consultation.status === "cancelled") await retryCancelledConsultationRefund(prisma, payment.firmId, consultationId);
     return;
   }
+  if (consultation.status !== "cancelled") await sendConsultationEmail(prisma, consultationId, "paid");
   await recordAuditEvent(prisma, { firmId: payment.firmId, eventType: "consultation.fee_paid", category: "financial", intakeId: consultation.intakeId, paymentId: payment.id, metadata: { consultationId, amountMinor: payment.amountMinor } }).catch(() => undefined);
   if (consultation.status === "cancelled") await refundConsultationFee(prisma, { firmId: payment.firmId, consultationId, actorUserId: consultation.accountId, explanation: "Consultation was released before its payment completed." });
 }

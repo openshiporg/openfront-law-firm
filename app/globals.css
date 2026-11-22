@@ -117,7 +117,7 @@
 /* Actual application-owned phone hit boxes. No pseudo-element inflation or
    parent-only target counting; decorative and hidden UA controls stay excluded. */
 @media (max-width: 639px) {
-  :where(button, input:not([type="hidden"]):not([aria-hidden="true"]), select:not([aria-hidden="true"]), textarea, summary, [role="button"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="combobox"], a[href]) { min-height: 44px; min-width: 44px; }
+  :where(button, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([aria-hidden="true"]), select:not([aria-hidden="true"]), textarea, summary, [role="button"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="combobox"], a[href]) { min-height: 44px; min-width: 44px; }
   :where(a[href]:not([class*="flex"]):not([class*="grid"]):not([class*="block"])) { display: inline-block; }
   :where([role="tablist"]) { min-height: 52px; max-width: 100%; overflow-x: auto; }
   input[type="number"] { appearance: textfield; }

@@ -69,7 +69,7 @@ const workspaceCopy: Record<WorkspaceCategory, WorkspaceCopy> = {
   },
   communications: {
     title: 'Communications',
-    description: 'Track matter/intake conversations, drafts, and attachments. The application sends no client email or SMS.',
+    description: 'Track matter/intake conversations, drafts, and attachments. Messages written here are kept on the matter; they are not emailed or texted to the client.',
     queue: null,
     metricKeys: [],
   },

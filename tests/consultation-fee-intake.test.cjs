@@ -23,7 +23,7 @@ const noop = {};
 const payments = load('features/keystone/mutations/consultationPayments.ts', {
   '../access': { isHumanIdentitySession: () => true },
   '../lib/transactions': { prismaWithoutGraphQLErrorConversion: (p) => p, runSerializableTransaction: async (p, fn) => fn(p) },
-  '../utils/paymentProviderAdapter': noop, './portalPayments': noop, './workflow-helpers': { recordAuditEvent: async () => {} },
+  '../utils/paymentProviderAdapter': noop, './portalPayments': noop, './workflow-helpers': { recordAuditEvent: async () => {} }, '../lib/mail': { sendConsultationEmail: async () => {} },
 });
 const lifecycles = load('features/keystone/lib/lifecycles.ts', {}).lifecycles;
 
