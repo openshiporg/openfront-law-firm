@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { keystoneClient } from '@/features/dashboard/lib/keystoneClient'
 import { validTimeZone, zonedWallTimeToInstant } from '@/features/platform/lib/datetime'
 import { decimalToMinorUnits } from '@/features/platform/lib/money'
+import { loadActiveHourlyRules, priceEntries } from '@/features/platform/billing/lib/loadRateRules'
 
 export type DeskCreateState = { ok: boolean; message: string; href?: string }
 
@@ -106,19 +107,36 @@ export async function createDeskRecord(_previous: DeskCreateState, formData: For
       if (durationMinutes < 1 || durationMinutes > 24 * 60) throw new Error('Time spent must be between 1 minute and 24 hours.')
       const viewer = await keystoneClient<{ authenticatedItem: { id: string } | null }>('query TimeViewer { authenticatedItem { ... on User { id } } }')
       if (!viewer.success || !viewer.data.authenticatedItem?.id) throw new Error('Sign in again to record time.')
+      const workDate = instant(formData, 'workDate', 'Date worked')
+      const isBillable = formData.get('isBillable') === 'on'
+      const userId = viewer.data.authenticatedItem.id
+      // Billable time is priced at entry from the active rate cards, as the timer does,
+      // so it reaches billing with an amount (approved time can no longer be priced).
+      let pricing: { rateMinor: number; amountMinor: number; currencyCode: string } | null = null
+      if (isBillable) {
+        const [matterRow, rules] = await Promise.all([
+          keystoneClient<{ matter: { id: string; practiceArea: { id: string } | null } | null }>('query DeskTimeMatterRate($id: ID!) { matter(where: { id: $id }) { id practiceArea { id } } }', { id: matterId }),
+          loadActiveHourlyRules(),
+        ])
+        if (matterRow.success && matterRow.data.matter && rules.success) {
+          const price = priceEntries(rules.data.rateRules, [{ id: 'desk', durationMinutes, workDate, user: { id: userId }, matter: matterRow.data.matter }]).get('desk')
+          if (price) pricing = { rateMinor: price.rateMinor, amountMinor: price.amountMinor, currencyCode: price.rule.currencyCode }
+        }
+      }
       const response = await keystoneClient<{ createTimeEntry: { id: string } | null }>(`mutation CreateDeskTime($data: TimeEntryCreateInput!) { createTimeEntry(data: $data) { id } }`, {
         data: {
           matter,
-          user: { connect: { id: viewer.data.authenticatedItem.id } },
-          workDate: instant(formData, 'workDate', 'Date worked'),
+          user: { connect: { id: userId } },
+          workDate,
           durationMinutes,
           description: text(formData, 'description', { min: 3, max: 2000, label: 'Work description' }),
-          isBillable: formData.get('isBillable') === 'on',
+          isBillable,
+          ...(pricing ?? {}),
         },
       })
       if (!response.success || !response.data.createTimeEntry) throw new Error(response.success ? 'The time entry was not created.' : 'The time entry was not created. Billing permission on this matter is required.')
       revalidatePath('/dashboard/platform/time-expenses')
-      return { ok: true, message: `Draft time entry created (${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'}).`, href: `/dashboard/platform/time-expenses/time-entry/${encodeURIComponent(response.data.createTimeEntry.id)}` }
+      return { ok: true, message: `Draft time entry created (${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'}).${isBillable && !pricing ? ' No rate applies yet.' : ''}`, href: `/dashboard/platform/time-expenses/time-entry/${encodeURIComponent(response.data.createTimeEntry.id)}` }
     }
 
     if (kind === 'party') {
