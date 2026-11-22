@@ -45,6 +45,22 @@ export async function customerSignOut() {
   revalidatePath('/account')
   redirect('/account/signin')
 }
+export type ProfileState = { error: string | null; saved: boolean }
+
+/** The signed-in client changes the name on their own account. Email is the sign-in and stays fixed. */
+export async function updateCustomerProfile(_previous: ProfileState, form: FormData): Promise<ProfileState> {
+  const name = String(form.get('name') || '').replace(/\s+/g, ' ').trim()
+  if (name.length < 2 || name.length > 120) return { error: 'Enter your name (2 to 120 characters).', saved: false }
+  const viewer = await keystoneClient<{ authenticatedItem: { id: string } | null }>('{ authenticatedItem { ... on User { id } } }')
+  const id = viewer.success ? viewer.data.authenticatedItem?.id : null
+  if (!id) redirect('/account/signin?from=%2Faccount%2Fprofile')
+  const response = await keystoneClient<{ updateUser: { id: string } | null }>('mutation($id: ID!, $name: String!) { updateUser(where: { id: $id }, data: { name: $name }) { id } }', { id, name })
+  if (!response.success || !response.data.updateUser) return { error: 'Your details could not be saved. Try again, or contact the firm.', saved: false }
+  revalidatePath('/account')
+  revalidatePath('/account/profile')
+  return { error: null, saved: true }
+}
+
 export type BookingState = { error: string | null; values: Record<string, string>; revision: number; outcome?: 'rejected' | 'unknown'; requestKey?: string }
 
 export async function bookConsultation(previous: BookingState, form: FormData): Promise<BookingState> {

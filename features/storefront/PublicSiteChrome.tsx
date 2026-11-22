@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { cookies } from "next/headers"
 import { EmailText } from './EmailText'
 
 import {
@@ -14,7 +15,7 @@ import { StorefrontNav } from './StorefrontNav'
 const LEFT_NAV = [['Practice areas', '/practice-areas'], ['Attorneys', '/attorneys'], ['About', '/about']] as const
 const RIGHT_NAV = [['Contact', '/contact'], ['Client portal', '/portal']] as const
 
-export function PublicSiteHeader({ settings }: { settings: StorefrontSettings }) {
+export function PublicSiteHeader({ settings, signedIn = false }: { settings: StorefrontSettings; signedIn?: boolean }) {
   return (
     <header className="sf-header">
       <div className="sf-header__bar">
@@ -27,7 +28,7 @@ export function PublicSiteHeader({ settings }: { settings: StorefrontSettings })
           </div>
         </div>
         <div className="sf-header__mobile">
-          <MobilePublicMenu settings={settings} />
+          <MobilePublicMenu settings={settings} signedIn={signedIn} />
         </div>
       </div>
     </header>
@@ -76,11 +77,13 @@ export function PublicSiteFooter({ settings }: { settings: StorefrontSettings })
 }
 
 export async function PublicPage({ children, dock, masthead }: { children: React.ReactNode; dock?: React.ReactNode; masthead?: React.ReactNode }) {
-  const settings = await getStorefrontSettings()
+  const [settings, jar] = await Promise.all([getStorefrontSettings(), cookies()])
+  // Only decides which account links the phone menu offers; every account page checks the session itself.
+  const signedIn = jar.has('keystonejs-session')
   return (
     <div className="storefront flex min-h-svh flex-col overflow-x-clip">
       <a className="sf-skip-link" href="#public-main">Skip to main content</a>
-      <PublicSiteHeader settings={settings} />
+      <PublicSiteHeader settings={settings} signedIn={signedIn} />
       {masthead}
       <main id="public-main" tabIndex={-1} className="flex-1 outline-none">{children}</main>
       {dock ? <StorefrontDock>{dock}</StorefrontDock> : null}

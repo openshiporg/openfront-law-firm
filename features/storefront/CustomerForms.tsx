@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useActionState, useId, useState } from 'react'
-import { customerAuthenticate, bookConsultation } from './actions/customer-account'
+import { customerAuthenticate, bookConsultation, updateCustomerProfile } from './actions/customer-account'
 import { FIRST_CONTACT_ACKNOWLEDGMENT } from './lib/first-contact'
 import { slotLabel, slotsByDay, slotTimeLabel, timezoneLabel, type AvailabilitySlot, type Service } from './lib/consultation-presentation'
 
@@ -18,6 +18,16 @@ export function CustomerAuthForm({ mode, service, from = '', at = '' }: { mode: 
     </label>
     {state.error && <p role="alert" className="sf-error">{state.error}</p>}
     <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--solid sf-pill--lg" disabled={pending}>{pending ? 'Saving…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button></div>
+  </form>
+}
+
+export function CustomerProfileForm({ name, email }: { name: string; email: string }) {
+  const [state, action, pending] = useActionState(updateCustomerProfile, { error: null, saved: false })
+  return <form action={action} className="sf-form">
+    <label className="sf-field-label">Name<input className="sf-field" name="name" required minLength={2} maxLength={120} autoComplete="name" defaultValue={name} /></label>
+    <div className="sf-field-label">Email<p className="sf-field sf-field--static" aria-readonly="true">{email}</p><span className="sf-fine">Your email is how you sign in. To change it, contact the firm.</span></div>
+    {state.error ? <p role="alert" className="sf-error">{state.error}</p> : state.saved ? <p role="status" className="sf-notice">Your details are saved.</p> : null}
+    <div className="sf-track sf-track--block"><button className="sf-pill sf-pill--solid sf-pill--lg" disabled={pending}>{pending ? 'Saving…' : 'Save details'}</button></div>
   </form>
 }
 

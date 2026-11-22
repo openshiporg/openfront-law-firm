@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { PublicPage } from '../PublicSiteChrome'
-import { CustomerAuthForm } from '../CustomerForms'
+import { CustomerAuthForm, CustomerProfileForm } from '../CustomerForms'
 import { CustomerResetRedeemForm, CustomerResetRequestForm } from '../CustomerResetForms'
 import { appointmentStatus, formatAppointmentTime, getCustomerConsultations, getCustomerProfile } from '../lib/consultation-data'
 import { firmMetadata } from '../lib/metadata'
@@ -77,7 +77,7 @@ export async function AccountPage({ searchParams }: { searchParams: Promise<{ af
       <div className="grid gap-3"><h1 className="sf-title">Appointments</h1><p className="sf-label">{profile?.name ? `${profile.name} · ` : ''}{profile?.email || 'Your account'}</p></div>
       <div className="sf-track">
         {settings.bookingEnabled ? <Link className="sf-pill sf-pill--primary" href="/practice-areas">New request</Link> : null}
-        <Link className="sf-pill" href="/account/reset">Change password</Link>
+        <Link className="sf-pill" href="/account/profile">Your details</Link>
         <form action={customerSignOut}><button className="sf-pill">Sign out</button></form>
       </div>
     </header>
@@ -105,4 +105,12 @@ export async function AccountResetPage({ searchParams }: { searchParams: Promise
     {resetToken ? <CustomerResetRedeemForm token={resetToken} /> : <CustomerResetRequestForm />}
   </AuthShell>
 }
+export async function AccountProfilePage() {
+  const profile = await getCustomerProfile()
+  if (!profile) redirect('/account/signin?from=%2Faccount%2Fprofile')
+  return <AuthShell title="Your details" label="The name the firm uses for you" foot={<span className="flex flex-wrap gap-x-5 gap-y-2"><Link className="sf-link" href="/account">Back to appointments</Link><Link className="sf-link" href="/account/reset">Change password</Link></span>}>
+    <CustomerProfileForm name={profile.name} email={profile.email} />
+  </AuthShell>
+}
+export async function profileMetadata() { return firmMetadata('Your details') }
 export async function resetMetadata() { return firmMetadata('Reset password') }

@@ -776,3 +776,6 @@ textarea.sf-field { padding-block: 0.75rem; min-height: 6.5rem; resize: vertical
   .alt-lower { padding-top: 1rem; }
   .alt-practice__link { min-height: 3rem; padding-block: 0.375rem; }
 }
+/* A read-only value shown in field shape (account email): same box, no input affordance. */
+.sf-field--static { display: flex; align-items: center; margin: 0; background: transparent; color: var(--alt-ivory-2); overflow-wrap: anywhere; }
+.sf-field--static:hover { border-color: var(--alt-ivory-3); }

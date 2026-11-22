@@ -68,6 +68,16 @@ type Source = {
   map(record: any): Omit<PracticeOverviewQueueItem, "kind" | "href" | "canAct">;
 };
 
+function consultationNote(consultation: any) {
+  if (!consultation?.startsAt) return "";
+  let when = "";
+  try {
+    when = new Intl.DateTimeFormat("en-US", { timeZone: consultation.timezone || "UTC", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(consultation.startsAt));
+  } catch { when = ""; }
+  const state = consultation.status === "scheduled" ? "consultation scheduled" : consultation.feeState === "due" ? "consultation awaiting payment" : "consultation to confirm on the calendar";
+  return when ? `${state}, ${when}` : state;
+}
+
 const iso = (value: unknown) => {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(String(value));
@@ -82,8 +92,10 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
       key: "pipeline", title: "Intake pipeline", description: "Prospects requiring screening, consultation, or an engagement decision.",
       model: "Intake", permissions: ["canReadIntake"],
       where: { status: { in: ["new", "screening", "conflict_review", "consultation", "decision"] } },
-      orderBy: [{ receivedAt: "desc" }, { id: "asc" }], query: "id intakeNumber title status receivedAt primaryContact { displayName }", kind: "Intake",
-      map: (record) => ({ id: record.id, title: record.title || record.intakeNumber, subtitle: [record.primaryContact?.displayName ?? "Client unavailable", record.intakeNumber].join(" · "), status: record.status, at: iso(record.receivedAt) }),
+      orderBy: [{ receivedAt: "desc" }, { id: "asc" }], query: "id intakeNumber title status receivedAt primaryContact { displayName } consultations(where: { status: { in: [requested, scheduled] } }, orderBy: { startsAt: asc }, take: 1) { status startsAt timezone feeState }", kind: "Intake",
+      // A website booking is one request seen from two desks: the row says where its consultation stands,
+      // so intake staff confirm it on the consultation calendar instead of treating it as separate work.
+      map: (record) => ({ id: record.id, title: record.title || record.intakeNumber, subtitle: [record.primaryContact?.displayName ?? "Client unavailable", record.intakeNumber, consultationNote(record.consultations?.[0])].filter(Boolean).join(" · "), status: record.status, at: iso(record.receivedAt) }),
     },
     {
       key: "conflicts", title: "Conflict review status", description: "Conflict checks awaiting review, oldest first. Review each check in the conflict review panel.",
