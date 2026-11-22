@@ -435,6 +435,7 @@ export const rules = {
   canReadCommunicationRecord: (args: AccessArgs) => optionalMatterRecordFilter(args, ["canReadCommunications", "canManageCommunications"]),
   canManageCommunicationRecord: (args: AccessArgs) => optionalMatterRecordFilter(args, ["canManageCommunications"]),
   canReadDocumentRecord: (args: AccessArgs) => optionalMatterRecordFilter(args, ["canReadDocuments", "canManageDocuments"]),
+  canReadLegalResearchRecord: (args: AccessArgs) => matterRecordFilter(args, ["canReadDocuments", "canManageDocuments"]),
   canManageDocumentRecord: (args: AccessArgs) => optionalMatterRecordFilter(args, ["canManageDocuments"]),
   canReadBillingRecord: (args: AccessArgs) => matterRecordFilter(args, ["canReadBilling", "canManageBilling"]),
   canManageBillingRecord: (args: AccessArgs) => matterRecordFilter(args, ["canManageBilling"]),

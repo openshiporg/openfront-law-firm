@@ -15,7 +15,7 @@ const canRead = ({ session }: any) => permissions.canReadDocuments({ session }) 
 
 const commandOnlyAccess = {
   operation: { query: canRead, create: denyAll, update: denyAll, delete: denyAll },
-  filter: { query: rules.canReadDocumentRecord, update: () => false, delete: () => false },
+  filter: { query: rules.canReadLegalResearchRecord, update: () => false, delete: () => false },
 };
 
 const ui = { hideCreate: true, hideDelete: true, itemView: { defaultFieldMode: "read" as const } };
