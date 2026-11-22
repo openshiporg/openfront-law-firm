@@ -133,8 +133,8 @@ export const practiceWorkspaceSources: Record<string, Source[]> = {
     {
       key: "consultations", title: "Consultation calendar", description: "Requested and scheduled prospective-client meetings visible to the current intake role.",
       model: "Consultation", permissions: ["canReadIntake"], where: { status: { in: ["requested", "scheduled"] } }, orderBy: { startsAt: "asc" },
-      query: "id status startsAt endsAt timezone location intake { intakeNumber title primaryContact { displayName } } host { name }", kind: "Consultation",
-      map: (record) => ({ id: record.id, title: record.intake?.title ?? "Prospective-client consultation", subtitle: `${record.intake?.primaryContact?.displayName ?? "Client unavailable"} · ${record.intake?.intakeNumber ?? "Intake"} · with ${record.host?.name ?? "unassigned host"}${record.location ? ` · ${record.location}` : ""}`, status: record.status, at: iso(record.startsAt) }),
+      query: "id status startsAt endsAt timezone location feeMinor feeState intake { intakeNumber title primaryContact { displayName } } host { name }", kind: "Consultation",
+      map: (record) => ({ id: record.id, title: record.intake?.title ?? "Prospective-client consultation", subtitle: `${record.intake?.primaryContact?.displayName ?? "Client unavailable"} · ${record.intake?.intakeNumber ?? "Intake"} · with ${record.host?.name ?? "unassigned host"}${record.location ? ` · ${record.location}` : ""}${record.feeState === "paid" ? " · fee paid" : record.feeState === "due" ? " · fee not paid" : record.feeState === "refunded" ? " · fee refunded" : ""}`, status: record.status, at: iso(record.startsAt) }),
     },
     {
       key: "docket", title: "Docket activity", description: "Recent filings, hearings, orders, and notices with source verification state.",

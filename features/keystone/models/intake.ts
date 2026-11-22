@@ -1,4 +1,4 @@
-import { list } from "@keystone-6/core";
+import { graphql, list } from "@keystone-6/core";
 import {
   integer,
   json,
@@ -6,6 +6,7 @@ import {
   select,
   text,
   timestamp,
+  virtual,
 } from "@keystone-6/core/fields";
 
 import { permissions } from "../access";
@@ -184,6 +185,19 @@ export const Consultation = list({
     serviceSnapshot: json({ access: { create: denyAll, update: denyAll } }),
     feeMinor: integer({ defaultValue: 0, validation: { isRequired: true, min: 0, max: 2147483647 }, access: { create: denyAll, update: denyAll } }),
     currencyCode: text({ defaultValue: "USD", access: { create: denyAll, update: denyAll } }),
+    // Whether the consultation fee is paid, for the staff calendar: none, due, paid, refunded or expired.
+    feeState: virtual({
+      field: graphql.field({
+        type: graphql.String,
+        async resolve(item: any, _args, context) {
+          if (!(item.feeMinor > 0)) return "none";
+          const payment = await context.prisma.payment.findFirst({ where: { firmId: item.firmId, idempotencyKey: `consultation:${item.id}` }, select: { status: true, amountMinor: true, refundedMinor: true } });
+          if (payment?.status === "refunded") return "refunded";
+          if (payment && ["captured", "settled"].includes(payment.status)) return (payment.refundedMinor ?? 0) >= payment.amountMinor ? "refunded" : "paid";
+          return item.status === "requested" ? "due" : "expired";
+        },
+      }),
+    }),
     status: select({
       type: "enum",
       options: [

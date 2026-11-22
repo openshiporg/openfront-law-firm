@@ -1980,6 +1980,7 @@ type Consultation {
   serviceSnapshot: JSON
   feeMinor: Int
   currencyCode: String
+  feeState: String
   status: ConsultationStatusType
   startsAt: DateTime
   endsAt: DateTime
@@ -10297,6 +10298,9 @@ type CustomerConsultation {
   endsAt: String
   timezone: String!
   paymentState: String!
+  hostName: String
+  location: String
+  paidAt: String
 }
 
 type ConsultationPaymentStart {
