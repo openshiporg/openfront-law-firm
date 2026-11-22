@@ -180,17 +180,21 @@ export async function priceUnapprovedTime(): Promise<RateActionState> {
   if (!rules.success) return { ok: false, message: rules.error }
   const priced = priceEntries(rules.data.rateRules, entries.data.timeEntries)
   let updated = 0
+  let refused = 0
   for (const [id, price] of priced) {
     const response = await keystoneClient<{ updateTimeEntry: { id: string } | null }>(`
       mutation PriceTimeEntry($id: ID!, $data: TimeEntryUpdateInput!) { updateTimeEntry(where: { id: $id }, data: $data) { id } }
     `, { id, data: { rateMinor: price.rateMinor, amountMinor: price.amountMinor, currencyCode: price.rule.currencyCode } })
     if (response.success && response.data.updateTimeEntry) updated++
+    else refused++
   }
   revalidateBilling()
-  const remaining = entries.data.timeEntries.length - updated
   if (!entries.data.timeEntries.length) return { ok: true, message: 'No unpriced draft or submitted time.' }
-  return {
-    ok: updated > 0,
-    message: `Priced ${updated.toLocaleString()} ${updated === 1 ? 'entry' : 'entries'}.${remaining ? ` ${remaining.toLocaleString()} still ${remaining === 1 ? 'has' : 'have'} no applicable rate.` : ''}`,
-  }
+  const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`
+  const noRate = entries.data.timeEntries.length - priced.size
+  const parts = [`Priced ${plural(updated, 'entry', 'entries')}.`]
+  // Pricing writes to the matter's time, so it needs "Can bill" on that matter's team.
+  if (refused) parts.push(`${plural(refused, 'entry is', 'entries are')} on matters where you are not on the team with Can bill; add yourself on the matter's Team tab, or ask the responsible attorney.`)
+  if (noRate) parts.push(`${plural(noRate, 'entry has', 'entries have')} no applicable rate.`)
+  return { ok: updated > 0 && !refused, message: parts.join(' ') }
 }
