@@ -34,6 +34,10 @@ export function pooledDatabaseUrl(url: string | undefined, role: PoolRole = 'web
   // A five-role crawl retained >12 GB in 15 idle PostgreSQL backends on a 22 MB DB.
   // Do not retain these one-off dashboard shapes; preserve an explicit operator choice.
   if (!parsed.searchParams.has('statement_cache_size')) parsed.searchParams.set('statement_cache_size', '0')
+  // OLTP access filters on tiny tables do not benefit from PostgreSQL LLVM JIT.
+  // Its compiled allocation stays resident after these deeply nested queries finish.
+  const options = parsed.searchParams.get('options') ?? ''
+  if (!/\bjit\s*=/.test(options)) parsed.searchParams.set('options', `${options} -c jit=off`.trim())
   const override = Number(process.env[OVERRIDE_ENV[role]])
   if (!parsed.searchParams.has('connection_limit')) parsed.searchParams.set('connection_limit', String(Number.isInteger(override) && override > 0 ? override : POOL_SIZES[role]))
   return parsed.toString()

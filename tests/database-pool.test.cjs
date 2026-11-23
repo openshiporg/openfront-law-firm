@@ -11,6 +11,7 @@ test('web and worker pools do not retain large prepared-statement trees', () => 
   for (const role of ['web', 'worker']) {
     const url = new URL(pooledDatabaseUrl('postgresql://u:p@example.invalid/db', role))
     assert.equal(url.searchParams.get('statement_cache_size'), '0')
+    assert.match(url.searchParams.get('options'), /jit=off/)
     assert.ok(Number(url.searchParams.get('connection_limit')) > 0)
   }
 })
