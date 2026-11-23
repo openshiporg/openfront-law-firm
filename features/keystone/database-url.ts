@@ -29,9 +29,13 @@ export function pooledDatabaseUrl(url: string | undefined, role: PoolRole = 'web
   } catch {
     return url
   }
-  if (parsed.searchParams.has('connection_limit')) return url
+  // Keystone's nested matter/ethical-wall filters generate large prepared query trees.
+  // Prisma defaults to retaining 100 statements per connection (on BOTH client and DB).
+  // A five-role crawl retained >12 GB in 15 idle PostgreSQL backends on a 22 MB DB.
+  // Do not retain these one-off dashboard shapes; preserve an explicit operator choice.
+  if (!parsed.searchParams.has('statement_cache_size')) parsed.searchParams.set('statement_cache_size', '0')
   const override = Number(process.env[OVERRIDE_ENV[role]])
-  parsed.searchParams.set('connection_limit', String(Number.isInteger(override) && override > 0 ? override : POOL_SIZES[role]))
+  if (!parsed.searchParams.has('connection_limit')) parsed.searchParams.set('connection_limit', String(Number.isInteger(override) && override > 0 ? override : POOL_SIZES[role]))
   return parsed.toString()
 }
 
