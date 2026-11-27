@@ -81,7 +81,14 @@ export async function bookConsultation(previous: BookingState, form: FormData): 
     { serviceId: String(form.get('serviceId') || ''), requestKey: String(form.get('requestKey') || ''), acknowledgmentVersion: String(form.get('acknowledgmentVersion') || ''), ...values },
   )
   if (!response.success) {
-    // A GraphQL/transport error is not proof of non-effect. Do not mint another
+    // The booking command's own refusal (the time was just taken, the notice changed, sign-in lapsed)
+    // is thrown inside its transaction, so nothing was booked. Show it and offer the current open times.
+    const refusal = refusalOr(response.error, '')
+    if (refusal) {
+      revalidatePath('/consultation')
+      return { error: refusal, values: { ...values, startsAt: '' }, revision, outcome: 'rejected' }
+    }
+    // Any other GraphQL/transport error is not proof of non-effect. Do not mint another
     // request or advise changed-body retry. Durable server-owned recovery remains
     // required; keep this original reference and entered values in the meantime.
     return { error: 'The outcome of this request is unconfirmed. Do not submit a different request. Check your appointment history and contact the firm with this request reference if it is still unresolved.', values, revision, outcome: 'unknown', requestKey: String(form.get('requestKey') || '') }
