@@ -13,6 +13,7 @@ test('web and worker pools do not retain large prepared-statement trees', () => 
     assert.equal(url.searchParams.get('statement_cache_size'), '0')
     assert.match(url.searchParams.get('options'), /jit=off/)
     assert.match(url.searchParams.get('options'), /idle_session_timeout=60000/)
+    assert.match(url.searchParams.get('options'), /join_collapse_limit=1/)
     assert.equal(url.searchParams.get('max_idle_connection_lifetime'), '30')
     assert.equal(url.searchParams.get('pool_timeout'), '20')
     assert.ok(Number(url.searchParams.get('connection_limit')) > 0)

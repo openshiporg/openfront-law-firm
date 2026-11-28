@@ -38,6 +38,10 @@ export function pooledDatabaseUrl(url: string | undefined, role: PoolRole = 'web
   // Its compiled allocation stays resident after these deeply nested queries finish.
   let options = parsed.searchParams.get('options') ?? ''
   if (!/\bjit\s*=/.test(options)) options = `${options} -c jit=off`.trim()
+  // The conflict-check access filter joins about 250 relations. PostgreSQL's join-order search
+  // spent 4-5 s planning it (10 ms executing) on every read, with 46 rows in the table.
+  // Joining in the written order plans it in about 0.2 s.
+  if (!/\bjoin_collapse_limit\s*=/.test(options)) options = `${options} -c join_collapse_limit=1`.trim()
   // A backend that has grown large is closed by the server after 60 s idle instead of
   // holding its memory; the app recycles idle connections first (30 s) so it never
   // reuses one the server has closed.
