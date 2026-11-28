@@ -16,15 +16,21 @@ import { useKeptForm } from './useKeptForm'
 type Action = {
   operation: PracticeActionOperation
   label: string
-  alternates?: Array<{ operation: PracticeActionOperation; label: string }>
+  alternates?: ReadonlyArray<{ operation: PracticeActionOperation; label: string }>
 }
+
+// Every open intake can be closed: declined by the firm, or withdrawn by the person who asked.
+const withdrawIntake = { operation: 'withdrawIntake', label: 'Withdrawn by the client' } as const
+const closeIntake = [{ operation: 'declineIntake', label: 'Decline (firm will not take it)' }, withdrawIntake] as const satisfies ReadonlyArray<{ operation: PracticeActionOperation; label: string }>
 
 const transitions: Record<string, Record<string, Action>> = {
   Intake: {
-    new: { operation: 'beginIntakeScreening', label: 'Begin screening' },
-    screening: { operation: 'sendIntakeToConflicts', label: 'Send to conflicts' },
-    conflict_review: { operation: 'moveIntakeToConsultation', label: 'Move to consultation' },
-    consultation: { operation: 'moveIntakeToDecision', label: 'Record decision stage' },
+    new: { operation: 'beginIntakeScreening', label: 'Begin screening', alternates: [withdrawIntake] },
+    screening: { operation: 'sendIntakeToConflicts', label: 'Send to conflicts', alternates: closeIntake },
+    conflict_review: { operation: 'moveIntakeToConsultation', label: 'Move to consultation', alternates: closeIntake },
+    consultation: { operation: 'moveIntakeToDecision', label: 'Record decision stage', alternates: closeIntake },
+    // Opening the matter is done in "Open matter from cleared intake"; here the firm can only say no.
+    decision: { operation: 'declineIntake', label: 'Close intake', alternates: [withdrawIntake] },
   },
   'Conflict check': {
     requested: { operation: 'beginConflictSearch', label: 'Begin manual search' },
@@ -117,6 +123,7 @@ const primaryLabels: Partial<Record<PracticeActionOperation, string>> = {
   completeConsultation: 'Mark completed',
   confirmConsultation: 'Confirm at requested time',
   holdMatter: 'Place on hold',
+  declineIntake: 'Decline (firm will not take it)',
 }
 
 export function PracticeRowAction({

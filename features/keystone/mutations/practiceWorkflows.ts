@@ -85,6 +85,13 @@ export async function transitionIntake(
     if (!intake) throw new Error("Intake was not found in the active firm.");
     if (intake.status === args.toStatus) return { intake, replayed: true };
     assertLifecycleTransition("intake", intake.status, args.toStatus);
+    const closing = ["declined", "withdrawn"].includes(args.toStatus);
+    if (closing) {
+      if (!reason || reason.length < 5) throw new Error("Give a reason of at least 5 characters to close an intake.");
+      // A booked consultation holds the client's time and possibly a paid fee; it is cancelled (and refunded) first.
+      const openConsultations = await tx.consultation.count({ where: { firmId, intakeId: intake.id, status: { in: ["requested", "scheduled"] } } });
+      if (openConsultations) throw new Error("This intake still has a booked consultation. Cancel the consultation first (a paid fee is refunded), then close the intake.");
+    }
     if (["consultation", "decision"].includes(args.toStatus)) {
       const [cleared, unresolved] = await Promise.all([
         tx.conflictCheck.count({ where: { firmId, intakeId: intake.id, status: "cleared" } }),
@@ -99,10 +106,16 @@ export async function transitionIntake(
       where: { id: intake.id },
       data: {
         status: args.toStatus,
-        ...(["declined", "withdrawn"].includes(args.toStatus) ? { declineReason: reason ?? "" } : {}),
-        ...(["declined", "withdrawn"].includes(args.toStatus) ? { decidedAt: now } : {}),
+        ...(closing ? { declineReason: reason ?? "", decidedAt: now } : {}),
       },
     });
+    // A closed intake leaves nothing in the conflict queue.
+    if (closing) {
+      await tx.conflictCheck.updateMany({
+        where: { firmId, intakeId: intake.id, status: { in: ["requested", "running", "review_required"] } },
+        data: { status: "cancelled", completedAt: now, summary: `Cancelled: the intake was ${args.toStatus === "declined" ? "declined by the firm" : "withdrawn"}.` },
+      });
+    }
     await recordAuditEvent(tx, {
       firmId, eventType: `intake.${args.toStatus}`, category: "legal_workflow", actorUserId: userId,
       intakeId: intake.id,

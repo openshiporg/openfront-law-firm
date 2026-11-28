@@ -46,6 +46,8 @@ const commands = {
   sendIntakeToConflicts: { mutation: 'intake', toStatus: 'conflict_review' },
   moveIntakeToConsultation: { mutation: 'intake', toStatus: 'consultation' },
   moveIntakeToDecision: { mutation: 'intake', toStatus: 'decision' },
+  declineIntake: { mutation: 'intake', toStatus: 'declined' },
+  withdrawIntake: { mutation: 'intake', toStatus: 'withdrawn' },
   beginConflictSearch: { mutation: 'conflictTransition', toStatus: 'running' },
   submitConflictReview: { mutation: 'conflictTransition', toStatus: 'review_required' },
   finalizeConflictReview: { mutation: 'conflictFinalize', toStatus: null },
